@@ -921,13 +921,15 @@ replications_poisson <- function(A, B, graine, statistiques, elements_bloc = ELE
 # (longueur B). Un groupe sans cellule n'est admis que d'effectif nul (il
 # est sauté, sans tirage) : d'effectif positif, ses décès n'auraient aucune
 # cellule où se répartir (erreur de programmation, contrôlée avant tout
-# tirage).
+# tirage). Un effectif au-delà de .Machine$integer.max (size de rmultinom())
+# est aussi une erreur de programmation : les appelants rangent le total des
+# événements en integer avant tout tirage (#348).
 replications_multinomiales <- function(poids, groupe, effectifs, B, graine, statistiques,
                                        elements_bloc = ELEMENTS_BLOC_REPLICATIONS) {
   n <- length(poids)
   G <- length(effectifs)
   if (length(groupe) != n || anyNA(groupe) || any(groupe < 1L | groupe > G) || any(!(poids > 0)) ||
-      anyNA(effectifs) || any(effectifs < 0))
+      anyNA(effectifs) || any(effectifs < 0) || any(effectifs > .Machine$integer.max))
     stop("replications_multinomiales() : groupes, poids ou effectifs invalides (erreur de programmation).",
          call. = FALSE)
   idx <- lapply(seq_len(G), function(g) which(groupe == g))
@@ -1694,6 +1696,23 @@ calculer_validation <- function(exposition, segmentation, par_annee, convention,
     A_v <- theta * at$attendus
     qx_v <- -expm1(-mu_v)
   }
+  # Décomptes d'événements en double, puis rangement en integer (#199 ; ADR
+  # 0009, point 9.6, (iii)) avant statistiques_validation() et tout tirage
+  # (#348 ; forme F348 ; spécification d'actuary-approfondi, Q5) : sous
+  # positionnee, l'effectif O_s tiré par rmultinom() est une somme partielle
+  # d'événements positifs, au plus le total ; refus denombrement_hors_plage
+  # au-delà de .Machine$integer.max, gardes dans leur ordre : pour toute
+  # entrée qui atteint aujourd'hui les gardes, le refus et sa grandeur citée
+  # restent identiques ; une entrée refusée plus loin sur
+  # sous_groupes/observes (sous_groupes_validation()) cite désormais la
+  # garde avancée, au même motif. Garde défensive : le total de l'étape
+  # exposition est gardé (M397).
+  sans_attendu <- at$etat %in% c("evenement_sans_exposition", "evenement_sous_taux_nul")
+  ev_sans_d <- sum(as.numeric(cel$evenements[sans_attendu]))
+  total_d <- sum(as.numeric(exposition$evenements))
+  ev_sans <- denombrement_entier(ev_sans_d, "validation", "evenements_sans_attendu")
+  ev_hors <- denombrement_entier(ap$hors_plage$evenements, "validation", "evenements_hors_plage")
+  total <- denombrement_entier(total_d, "validation", "evenements_total")
   # Séquence des suites : segment x année.
   sequence <- if (isTRUE(par_annee)) (ap$segment - 1L) * length(unique(cel$annee)) + match(cel$annee, sort(unique(cel$annee)))
               else ap$segment
@@ -1720,17 +1739,10 @@ calculer_validation <- function(exposition, segmentation, par_annee, convention,
 
   # Décomptes et identité des événements (M253, point 5).
   O <- sum(as.numeric(cel$evenements[ret]))
-  sans_attendu <- at$etat %in% c("evenement_sans_exposition", "evenement_sous_taux_nul")
-  ev_sans <- sum(as.numeric(cel$evenements[sans_attendu]))
-  total <- sum(as.numeric(exposition$evenements))
-  if (!identical(O + ev_sans + ap$hors_plage$evenements, total))
+  # Identité vérifiée en double (décomptes rangés en integer avant les
+  # statistiques, #348) ; l'avertissement qui suit cite la valeur rangée.
+  if (!identical(O + ev_sans_d + ap$hors_plage$evenements, total_d))
     stop("calculer_validation() : décomptes d'événements incohérents (erreur de programmation).", call. = FALSE)
-  # Rangement en integer après l'identité, vérifiée en double (#199 ; ADR 0009,
-  # point 9.6, (iii)) : garde défensive, le total de l'étape exposition étant
-  # déjà gardé (M397) ; l'avertissement qui suit cite la valeur rangée.
-  ev_sans <- denombrement_entier(ev_sans, "validation", "evenements_sans_attendu")
-  ev_hors <- denombrement_entier(ap$hors_plage$evenements, "validation", "evenements_hors_plage")
-  total <- denombrement_entier(total, "validation", "evenements_total")
   avert <- avertissements_vides()
   if (any(sans_attendu))
     avert <- avertir(avert, "validation", "evenements_sans_attendu",
@@ -1810,8 +1822,13 @@ calculer_validation <- function(exposition, segmentation, par_annee, convention,
 # evenement_sans_exposition (une cellule du test porte un événement sans
 # exposition, E_sc = 0 et D_sc > 0 : test non produit, sans refus, décision
 # 7 de #124, granularité Q4 de M290) ; moins_de_deux_segments_informatifs
-# (ddl = 0 : tests non produits, sans refus).
-ETATS_TESTS_HOMOGENEITE <- c("produite", "evenement_sans_exposition", "moins_de_deux_segments_informatifs")
+# (ddl = 0 : tests non produits, sans refus) ; precision_insuffisante (un
+# pivot de l'élimination sans soustraction de T n'est pas fini et > 0 : T
+# non calculable par cette méthode en double précision, même critère et même
+# fonction que theta_80 ; T et p-valeurs NA, aucun tirage, sans refus ;
+# décision du mainteneur du 21/11/2026, M570, P1 (a) ; #334).
+ETATS_TESTS_HOMOGENEITE <- c("produite", "evenement_sans_exposition", "moins_de_deux_segments_informatifs",
+                             "precision_insuffisante")
 # États de la p-valeur exacte (resultat$tests$etat_p_exacte) : ceux du test
 # quand il n'est pas produit ; sinon produite (deux groupes comparés),
 # plus_de_deux_groupes, convolution_au_dela_n_max (coût de la convolution
@@ -1820,14 +1837,19 @@ ETATS_TESTS_HOMOGENEITE <- c("produite", "evenement_sans_exposition", "moins_de_
 # somme de statistiques de tranche n'est pas mise en oeuvre).
 ETATS_P_EXACTE_HOMOGENEITE <- c("produite", "plus_de_deux_groupes", "convolution_au_dela_n_max",
                                 "non_produite_par_cette_version", "evenement_sans_exposition",
-                                "moins_de_deux_segments_informatifs")
+                                "moins_de_deux_segments_informatifs", "precision_insuffisante")
 # États d'une ligne de resultat$segments, par priorité :
 # evenement_sans_exposition pour un segment d'exposition nulle sur la portée
 # qui y porte des décès (reprise de l'audit, m1) ; segment_sans_exposition
 # (E_s = 0 sur la portée, sans décès : hors du test, hors de ddl, O = A = 0) ;
 # evenement_sans_exposition (portée dont une cellule porte un événement sans
-# exposition : z non produit) ; variance_nulle (V_ss = 0, segment absent des
-# strates informatives : z non défini) ; produite.
+# exposition : z non produit) ; variance_nulle (V_ss, somme des w_sk sans
+# soustraction (#334), nulle en double précision ; en arithmétique exacte,
+# segment exposé dans aucune strate informative : cellules où il est seul
+# exposé, ou sans décès ; par arrondi seulement quand tous les produits
+# D_.c pi_sc pi_kc sont arrondis à 0 (sous 2^-1075 ≈ 2,5e-324 ; parts
+# d'exposition infimes) ; z et theta_80 non définis ; aucun signal ; spécification
+# d'actuary-approfondi de #336, D8, et de #333, Q4, § 1) ; produite.
 ETATS_SEGMENTS_HOMOGENEITE <- c("produite", "segment_sans_exposition", "evenement_sans_exposition", "variance_nulle")
 # Mention d'indépendance des unités (M278, #159), en fin de chaque statut
 # d'une loi.
@@ -1866,7 +1888,8 @@ PUISSANCE_ECART_MINIMAL <- 0.80
 SEUIL_ECART_MINIMAL <- 1.25
 # États d'une branche de resultat$ecart_minimal, par priorité : état du test
 # global s'il n'est pas produit (evenement_sans_exposition,
-# moins_de_deux_segments_informatifs) ; sinon état de la ligne globale du
+# moins_de_deux_segments_informatifs, precision_insuffisante : hérité sans
+# signal, M570, P1 (a)) ; sinon état de la ligne globale du
 # segment dans resultat$segments s'il n'est pas produit
 # (segment_sans_exposition, variance_nulle ; evenement_sans_exposition) ;
 # sinon produite, non_atteint quand la limite de lambda_s(theta) au bout de
@@ -1874,7 +1897,10 @@ SEUIL_ECART_MINIMAL <- 1.25
 # limite +Inf compte au-delà, #338), ou precision_insuffisante quand la
 # racine n'est pas calculable par cette méthode en double précision à cette
 # tolérance, qu'elle soit ou non représentable (#340) : pivot de
-# l'élimination non fini ou non positif (les deux branches), limite NA, NaN
+# l'élimination non fini ou non positif (les deux branches), part
+# d'exposition arrondie à 0 dans une strate où le segment et un autre
+# segment sont exposés (limite non déterminée par le calcul : part du
+# segment, branche + ; part des autres, branche - ; #333), limite NA, NaN
 # ou -Inf, lambda_s encore au plus lambda_80 en |log theta| = 1024 (limite
 # au-delà du seuil ; garde défensive), non-convergence d'uniroot (#339),
 # postcondition non tenue (theta non fini, nul ou égal à 1, ou résidu au-delà
@@ -1934,7 +1960,8 @@ statut_ecart_minimal <- function(superieur) {
         if (superieur) "lorsque theta tend vers l'infini ;" else "lorsque theta tend vers 0 ;",
         "état precision_insuffisante (NA) quand la racine n'est pas calculable par cette méthode en double",
         "précision à cette tolérance, qu'elle soit ou non représentable (pivot de l'élimination non fini ou non",
-        "positif, limite indéterminée, résolution non convergée, ou postcondition |lambda_s(theta_80) / lambda_80 -",
+        "positif, limite indéterminée (dont une part d'exposition arrondie à 0 dans une strate où le segment et un",
+        "autre segment sont exposés), résolution non convergée, ou postcondition |lambda_s(theta_80) / lambda_80 -",
         "1| <= 1e-8 non tenue) ; unités d'observation indépendantes ; sous l'unité contrat, les décès sont",
         "sur-dispersés et theta_80 est trop proche de 1 (écart minimal détectable sous-estimé)")
 }
@@ -1954,9 +1981,13 @@ STATUTS_HOMOGENEITE <- local({
             "informative ; somme_tranches : NA (un décompte par tranche)")),
     c("tests", "statistique",
       paste("T = U' V^- U, U = O - A, V = somme sur les strates informatives de D_. (diag pi - pi pi') ; somme des T",
-            "des tranches (ddl > 0) pour somme_tranches ; arithmétique flottante, système linéaire résolu sur V",
-            "réduite (un groupe de référence par composante connexe du graphe groupes-strates) : approximation",
-            "numérique")),
+            "des tranches (ddl > 0) pour somme_tranches ; arithmétique flottante : par composante connexe du graphe",
+            "groupes-strates, le groupe d'attendu A le plus grand (le plus petit indice à égalité) est la référence",
+            "retirée ; V réduite factorisée par élimination sans soustraction (w_jk = somme sur les strates",
+            "informatives de D_. pi_j pi_k, pivots formés de sommes de termes positifs), T = somme des y_i^2 / d_i, y",
+            "obtenu de U des groupes retenus : approximation numérique ; T = +Inf quand la statistique dépasse le plus",
+            "grand double ; état precision_insuffisante (T et p-valeurs NA) quand un pivot de l'élimination n'est",
+            "pas fini et strictement positif")),
     c("tests", "ddl",
       paste("exact (combinatoire) : rang de V, nombre de groupes exposés dans les strates informatives moins nombre",
             "de composantes connexes du graphe groupes-strates ; somme des ddl des tranches pour somme_tranches")),
@@ -1969,7 +2000,9 @@ STATUTS_HOMOGENEITE <- local({
     c("tests", "p_exacte",
       paste("exacte conditionnellement aux D_. de chaque strate sous H0, E tenue pour fixe, quand deux groupes",
             "seulement sont comparés ; asymptotique sous le modèle de survie ; O_1 somme de binomiales indépendantes",
-            "Bin(D_., pi_1), p = P(|O_1 - A_1| >= |o_1 - A_1|), égalité à 1e-10 A_1 près ; convolution des dbinom,",
+            "Bin(D_., pi_1), groupe 1 : le groupe retenu, d'attendu A le plus petit, la référence (attendu le plus",
+            "grand, le plus petit indice à égalité) étant retirée comme pour statistique ; p = P(|O_1 - A_1| >= |o_1 -",
+            "A_1|), égalité à 1e-10 A_1 près ; convolution des dbinom,",
             "approximation numérique ; produite si le nombre de produits de la convolution est au plus",
             "N_MAX_PRODUITS_CONVOLUTION (état convolution_au_dela_n_max sinon) ; plus de deux groupes : état",
             "plus_de_deux_groupes ; somme_tranches : état non_produite_par_cette_version ;", ind)),
@@ -1994,8 +2027,10 @@ STATUTS_HOMOGENEITE <- local({
             "rapporté à une table")),
     c("segments", "z",
       paste("z_s = (O_s - A_s) / sqrt(V_ss), écart réduit du segment au regroupé, de loi asymptotique N(0, 1) sous",
-            "H0 (V_ss -> infini, même régime que p_asymptotique), E tenue pour fixe ; aucune p-valeur produite ;",
-            "calcul en arithmétique flottante, approximation numérique ; aucune correction de multiplicité ;", ind)),
+            "H0 (V_ss -> infini, même régime que p_asymptotique), E tenue pour fixe ; V_ss = somme des w_sk (k",
+            "différent de s), sans soustraction ; U du groupe de référence de sa composante pris égal à moins la",
+            "somme des U des autres groupes (identité exacte) ; aucune p-valeur produite ; calcul en arithmétique",
+            "flottante, approximation numérique ; aucune correction de multiplicité ;", ind)),
     c("ecart_minimal", "theta_80_superieur", statut_ecart_minimal(TRUE)),
     c("ecart_minimal", "theta_80_inferieur", statut_ecart_minimal(FALSE)))
   texte_moteur(data.frame(table = vapply(l, `[`, "", 1L), grandeur = vapply(l, `[`, "", 2L),
@@ -2033,28 +2068,78 @@ somme_par <- function(x, i, n) {
   s
 }
 
+# Élimination sans soustraction (type GTH) d'une matrice réduite V_g =
+# diag(v_g) - W_g, v_j = somme des w_jk sur les groupes retenus (k != j)
+# plus r_j, poids vers le groupe de référence de sa composante (forme F334,
+# #334 ; spécification d'actuary-approfondi, Q3, § 1 ; correction (6′) de
+# B30 pour theta_80). W : poids w_jk >= 0 hors diagonale (diagonale non lue),
+# groupes retenus dans l'ordre où l'élimination les prend ; r : r_j >= 0.
+# Pivot d_i = somme_{k > i} w_ik + r_i, multiplicateur L[k, i] = w_ki / d_i,
+# puis w_kl += L[k, i] w_il et r_k += L[k, i] r_i : V_g = M diag(d) M', M
+# unitriangulaire inférieure de termes -L ; seulement +, x et / sur des
+# positifs. Évaluation de b' V_g^-1 b par colonne de B (m lignes) :
+# substitution avant b_k += L[k, i] b_i, puis somme des b_i^2 / d_i
+# (colSums). Seule élimination de l'étape, appelée par score_homogeneite()
+# (statistique T) et par ecart_minimal_homogeneite() (lambda_s). Rend
+# list(d (pivots), L (multiplicateurs), pivots (TRUE si tous les pivots
+# sont finis et > 0), evaluer (fonction de B, une valeur par colonne)).
+eliminer_sans_soustraction <- function(W, r) {
+  m <- length(r)
+  d <- numeric(m)
+  L <- matrix(0, m, m)
+  for (i in seq_len(m)) {
+    k <- seq_len(m)[-seq_len(i)]
+    d[i] <- sum(W[i, k]) + r[i]
+    if (length(k)) {
+      L[k, i] <- W[k, i] / d[i]
+      W[k, k] <- W[k, k] + outer(L[k, i], W[i, k])
+      r[k] <- r[k] + L[k, i] * r[i]
+    }
+  }
+  evaluer <- function(B) {
+    for (i in seq_len(m)) {
+      k <- seq_len(m)[-seq_len(i)]
+      if (length(k)) B[k, ] <- B[k, , drop = FALSE] + outer(L[k, i], B[i, ])
+    }
+    colSums(B * B / d)
+  }
+  list(d = d, L = L, pivots = all(is.finite(d) & d > 0), evaluer = evaluer)
+}
+
 # Cœur des tests du score conditionnels (spécification de #168, § 1), sur
 # des lignes (groupe, strate) d'une portée : D décès, E exposition centrale,
 # strate (1..K) et groupe (1..G) entiers ; aucune ligne d'une cellule qui
-# porte un événement sans exposition (écartées par l'appelant). Strate
+# porte un événement sans exposition (écartées par l'appelant) ; au plus une
+# ligne par couple (strate, groupe) (lignes agrégées par l'appelant, #335 ;
+# précondition contrôlée, erreur de programmation). Strate
 # informative : D_. > 0 et au moins deux groupes à E > 0 ; ligne utilisée :
 # strate informative et E > 0. Composantes connexes du graphe groupes-strates
 # par union au plus petit indice ; système réduit : un groupe de référence
-# (le plus petit indice) retiré par composante (V réduite définie positive,
-# U de somme nulle par composante : forme quadratique indépendante du choix).
-# Rend list(O, A (par groupe, toutes les lignes), U, v (diagonale de V),
+# (attendu le plus grand, le plus petit indice à égalité ; #334) retiré par
+# composante (V réduite définie positive, U de somme nulle par composante :
+# forme quadratique indépendante du choix en arithmétique exacte), factorisé
+# par eliminer_sans_soustraction(). Rend list(O, A (par groupe, toutes les
+# lignes), U (référence : moins la somme des autres U de sa composante), v
+# (diagonale de V, par sommes hors diagonale), W (poids hors diagonale),
 # utilisee (logique par ligne), presents, garde, ddl, strates_informatives,
 # statistique (fonction d'une matrice de décès des lignes utilisées, une
-# colonne par jeu ; observé et répliques passent par elle), t (observée),
+# colonne par jeu ; observé et répliques passent par elle), pivots (TRUE si
+# les pivots de l'élimination sont tous finis et > 0), t (observée ; NA si
+# ddl = 0 ou pivots faux),
 # poids, strate_tirage, effectifs (pour les réplications), groupe_utilise
 # (groupe de chaque ligne utilisée) et composante (racine de la composante
 # connexe de chaque groupe 1..G, lui-même pour un groupe absent), pour
 # l'écart minimal détectable (#218), exacte (list(n, p, o, a) quand deux groupes seulement sont comparés, NULL
 # sinon)).
 score_homogeneite <- function(D, E, strate, groupe, K, G) {
+  if (anyDuplicated((strate - 1) * as.numeric(G) + groupe))
+    stop("score_homogeneite() : plusieurs lignes pour un même couple (strate, groupe) (erreur de programmation).",
+         call. = FALSE)
   D <- as.numeric(D)
   Ds <- somme_par(D, strate, K)
   Es <- somme_par(E, strate, K)
+  # ne compte des groupes distincts exposés (précondition : une ligne par
+  # (strate, groupe)) ; strate informative : D_. > 0 et ne >= 2 (#336).
   ne <- somme_par(E > 0, strate, K)
   inf <- Ds > 0 & ne >= 2
   pi <- numeric(length(D))
@@ -2072,34 +2157,73 @@ score_homogeneite <- function(D, E, strate, groupe, K, G) {
     r <- unique(vapply(gs, racine, 0L))
     comp[r] <- min(r)
   }
-  garde <- presents[vapply(presents, racine, 0L) != presents]
+  composante <- vapply(seq_len(G), racine, 0L)
   P <- matrix(0, length(si), G)
   P[cbind(ru, gu)] <- pi[u]
-  V <- diag(somme_par(Au, gu, G), G) - crossprod(P, P * Ds[si])
-  Vg <- V[garde, garde, drop = FALSE]
+  # W : w_jk = somme sur les strates informatives de D_.c pi_jc pi_kc, hors
+  # diagonale (diagonale 0), partagée avec ecart_minimal_homogeneite() ; v
+  # (diagonale de V) par sommes hors diagonale, v_j = somme des w_jk (k !=
+  # j), sans soustraction (identité exacte : somme des pi_kc = 1 sur les
+  # lignes utilisées ; #334, spécification d'actuary-approfondi, Q3, § 1).
+  # W symétrisée au bit avant tout usage : crossprod() ne garantit pas
+  # w_jk == w_kj selon le BLAS ; sans cela v, et donc z, d'une paire de
+  # segments en strates communes pouvaient différer au dernier bit (z non
+  # opposés à deux segments ; revue finale de B33, m1, voie (b)). La moyenne
+  # de deux doubles égaux est exacte : W déjà symétrique est inchangée.
+  W <- crossprod(P, P * Ds[si])
+  W <- (W + t(W)) / 2
+  diag(W) <- 0
+  v <- rowSums(W)
   # U = O - A par groupe : O somme d'entiers (exacte en double), A calculée
   # une fois ; deux jeux de mêmes O par groupe ont ainsi le même T au bit
   # près (ex aequo du Monte-Carlo préservés ; reprise de l'audit, C1).
   Ag <- rowsum(Au, gu, reorder = TRUE)[, 1L]
+  # Groupe de référence de chaque composante : attendu A (lignes utilisées)
+  # le plus grand, le plus petit indice à égalité (which.max) ; U d'un groupe
+  # retenu a une erreur d'arrondi d'ordre eps A, et aucun U retenu ne subit
+  # l'annulation d'un groupe dont la part tend vers 1 (#334, Q3, § 1, 3).
+  A_u <- numeric(G)
+  A_u[as.integer(names(Ag))] <- Ag
+  ref <- vapply(split(presents, composante[presents]), function(m) m[which.max(A_u[m])], 0L, USE.NAMES = FALSE)
+  garde <- setdiff(presents, ref)
+  ref_de <- ref[match(composante[garde], composante[ref])]
+  # T = U_g' V_g^-1 U_g par l'élimination sans soustraction (F334), groupes
+  # retenus dans l'ordre croissant des indices, r_j = w_j,réf(j) ; T est
+  # calculable si tous les pivots sont finis et > 0 (même critère que
+  # theta_80 ; état precision_insuffisante du test sinon, décision du
+  # mainteneur du 21/11/2026, M570, P1 (a)) ; T = +Inf quand la statistique
+  # dépasse le plus grand double.
+  el <- eliminer_sans_soustraction(W[garde, garde, drop = FALSE], W[cbind(garde, ref_de)])
   statistique <- function(Dm) {
     Um <- rowsum(Dm, gu, reorder = TRUE) - Ag
     Uk <- Um[match(garde, as.integer(rownames(Um))), , drop = FALSE]
-    colSums(Uk * solve(Vg, Uk))
+    el$evaluer(Uk)
   }
+  # U pour z : O - A des groupes retenus ; U du groupe de référence égal à
+  # moins la somme des U des autres groupes de sa composante (identité
+  # exacte : U somme à 0 dans chaque composante).
+  U <- numeric(G)
+  U[as.integer(names(Ag))] <- rowsum(Du, gu, reorder = TRUE)[, 1L] - Ag
+  for (j in ref) U[j] <- -sum(U[setdiff(presents[composante[presents] == composante[j]], j)])
   ddl <- length(garde)
   exacte <- if (length(presents) == 2L && ddl == 1L)
     list(n = Ds[si], p = P[, garde], o = sum(Du[gu == garde]), a = sum(Au[gu == garde]))
-  list(O = somme_par(D, groupe, G), A = somme_par(Ar, groupe, G), U = somme_par(Du - Au, gu, G), v = diag(V),
+  list(O = somme_par(D, groupe, G), A = somme_par(Ar, groupe, G), U = U, v = v, W = W,
        utilisee = u, presents = presents, garde = garde, ddl = ddl, strates_informatives = length(si),
-       statistique = statistique, t = if (ddl) statistique(matrix(Du, ncol = 1L)) else NA_real_,
+       statistique = statistique, pivots = el$pivots,
+       t = if (ddl && el$pivots) statistique(matrix(Du, ncol = 1L)) else NA_real_,
        poids = E[u], strate_tirage = ru, effectifs = Ds[si], groupe_utilise = gu,
-       composante = vapply(seq_len(G), racine, 0L), exacte = exacte)
+       composante = composante, exacte = exacte)
 }
 
 # p-valeur exacte d'un test produit (score_homogeneite()) : deux groupes
 # comparés, O_1 somme de binomiales indépendantes Bin(D_., pi_1) sur les
-# strates informatives (loi_somme_binomiales(), brique de #167, F3), p =
-# P(|O_1 - A_1| >= |o_1 - A_1|), égalité à TOLERANCE_RESIDU_NUL x A_1 près ;
+# strates informatives (loi_somme_binomiales(), brique de #167, F3), groupe
+# 1 le groupe retenu (sc$garde : attendu A le plus petit, la référence étant
+# retirée comme pour la statistique ; #334), p = P(|O_1 - A_1| >= |o_1 -
+# A_1|), égalité à TOLERANCE_RESIDU_NUL x A_1 près ; en arithmétique exacte,
+# O_1 - A_1 = -(O_2 - A_2) : p ne dépend du groupe retenu que par cette
+# tolérance (rapportée à A_1) et par l'arrondi ;
 # coût au-delà de N_MAX_PRODUITS_CONVOLUTION : état
 # convolution_au_dela_n_max. Rend list(p, etat).
 p_exacte_homogeneite <- function(sc) {
@@ -2222,9 +2346,9 @@ resoudre_branche_ecart_minimal <- function(lambda, signe, lam80, seuil, pivots, 
 #   |h_c| en u = log theta sans soustraction, a_c = somme des E_kc (k != s) /
 #   E_.c (jamais 1 - pi_sc) : pi_sc (-expm1(-u)) / (a_c e^-u + pi_sc) si
 #   u >= 0, pi_sc (-expm1(u)) / (a_c + pi_sc e^u) sinon ; 0 si pi_sc = 0 ou
-#   a_c = 0 (strate où s est seul exposé, sur plusieurs lignes : aucun autre
-#   segment n'y porte de terme, b_j n'en reçoit rien ; sinon 1/0 en
-#   -infini) ;
+#   a_c = 0, sans terme (pi_sc = 0 : s non exposé dans la strate, h_c = 0
+#   exact, ou part arrondie à 0 ; a_c = 0 : par arrondi seulement depuis
+#   #335 ; une part arrondie à 0 rend la branche precision_insuffisante, #333) ;
 #   limites exactes par les mêmes formules (1 en +infini, pi_sc / a_c en
 #   -infini) ;
 #   L_s = M diag(d) M' par élimination sans soustraction (type GTH), dans
@@ -2232,7 +2356,9 @@ resoudre_branche_ecart_minimal <- function(lambda, signe, lam80, seuil, pivots, 
 #   pi_kc et r_j = w_js : pivot d_i = somme_{k > i} w_ik + r_i, L[k, i] = w_ki
 #   / d_i, w_kl += L[k, i] w_il, r_k += L[k, i] r_i ; évaluation : b_k +=
 #   L[k, i] b_i, lambda_s = somme b_i^2 / d_i ; seulement +, x et / sur des
-#   positifs ; factorisation une fois par segment.
+#   positifs ; factorisation une fois par segment, par
+#   eliminer_sans_soustraction() sur sc$W (celle de la statistique du test,
+#   F334, #334).
 # Chaque branche (theta > 1, theta < 1) est résolue par
 # resoudre_branche_ecart_minimal(), avec la fonction lambda_s du segment et
 # le même indicateur des pivots pour les deux branches ; les voies vers
@@ -2258,12 +2384,12 @@ ecart_minimal_homogeneite <- function(sc, etat_test, etats_segments, S) {
   n <- length(sc$effectifs)
   Ec <- somme_par(sc$poids, ru, n)
   # P[c, j] = pi_jc (strates informatives x groupes), cumulé par (strate,
-  # segment) : un segment peut occuper plusieurs lignes d'une cellule (somme
-  # des parts, sans soustraction ; constat C-R1 de l'audit, décision du
-  # mainteneur du 20/11/2026, (a)) ; W[j, k] = w_jk.
+  # segment) (somme des parts, sans soustraction ; constat C-R1 de l'audit,
+  # décision du mainteneur du 20/11/2026, (a)) ; cumul gardé, sans objet
+  # depuis #335 (une ligne par (strate, segment), précondition de
+  # score_homogeneite()). W[j, k] = w_jk : matrice sc$W du test, formée une
+  # fois par score_homogeneite() (même V que le test ; F334, #334).
   P <- matrix(somme_par(sc$poids / Ec[ru], ru + n * (gu - 1L), n * S), n, S)
-  W0 <- crossprod(P, P * sc$effectifs)
-  diag(W0) <- 0
   for (s in which(etats_segments == "produite")) {
     dans_s <- gu == s
     pis <- somme_par(sc$poids[dans_s], ru[dans_s], n) / Ec
@@ -2292,35 +2418,24 @@ ecart_minimal_homogeneite <- function(sc, etat_test, etats_segments, S) {
       if (any(hors)) Q[hors, ] <- M[hors, , drop = FALSE] / den[hors] * num[hors]
       Q
     }
-    # Élimination sur C(s) \ {s}, ordre croissant des indices.
+    # Élimination sur C(s) \ {s}, ordre croissant des indices, référence s
+    # (eliminer_sans_soustraction(), partagée avec la statistique du test).
     garde <- setdiff(sc$presents[sc$composante[sc$presents] == sc$composante[s]], s)
-    m <- length(garde)
-    W <- W0[garde, garde, drop = FALSE]
-    r <- W0[garde, s]
-    d <- numeric(m)
-    L <- matrix(0, m, m)
-    for (i in seq_len(m)) {
-      k <- seq_len(m)[-seq_len(i)]
-      d[i] <- sum(W[i, k]) + r[i]
-      if (length(k)) {
-        L[k, i] <- W[k, i] / d[i]
-        W[k, k] <- W[k, k] + outer(L[k, i], W[i, k])
-        r[k] <- r[k] + L[k, i] * r[i]
-      }
-    }
+    el <- eliminer_sans_soustraction(sc$W[garde, garde, drop = FALSE], sc$W[garde, s])
     Pg <- P[, garde, drop = FALSE]
-    lambda <- function(u) {
-      b <- drop(crossprod(h_pond(u, Pg), sc$effectifs))
-      for (i in seq_len(m)) {
-        k <- seq_len(m)[-seq_len(i)]
-        b[k] <- b[k] + L[k, i] * b[i]
-      }
-      sum(b * b / d)
-    }
-    pivots <- all(is.finite(d) & d > 0)
-    b_sup <- resoudre_branche_ecart_minimal(lambda, 1, lam80, seuil, pivots)
+    lambda <- function(u) el$evaluer(crossprod(h_pond(u, Pg), sc$effectifs))
+    pivots <- el$pivots
+    # Part arrondie à 0 (#333 ; spécification d'actuary-approfondi, Q4, § 3) :
+    # dans une strate informative où s et un autre segment ont une ligne
+    # utilisée (E > 0), une part calculée nulle perd le terme de la strate
+    # dans la limite lambda_s(+-infini), qui n'est donc pas déterminée par le
+    # calcul : part de s nulle, branche + precision_insuffisante ; part des
+    # autres nulle, branche -. Sans signal (M551 (3)) ; aucun état nouveau.
+    deux <- tabulate(ru[dans_s], n) > 0 & tabulate(ru[!dans_s], n) > 0
+    nul <- list(theta = NA_real_, etat = "precision_insuffisante")
+    b_sup <- if (any(deux & pis == 0)) nul else resoudre_branche_ecart_minimal(lambda, 1, lam80, seuil, pivots)
     sup[s] <- b_sup$theta; e_sup[s] <- b_sup$etat
-    b_inf <- resoudre_branche_ecart_minimal(lambda, -1, lam80, seuil, pivots)
+    b_inf <- if (any(deux & autres == 0)) nul else resoudre_branche_ecart_minimal(lambda, -1, lam80, seuil, pivots)
     inf[s] <- b_inf$theta; e_inf[s] <- b_inf$etat
   }
   list(superieur = sup, etat_superieur = e_sup, inferieur = inf, etat_inferieur = e_inf, lambda_80 = lam80)
@@ -2384,19 +2499,62 @@ calculer_homogeneite <- function(exposition, segmentation, par_annee, convention
   saine <- !fautive[cel]
   tranche_fautive <- tabulate(tranche_cel[fautive], nb) > 0
   toute_faute <- any(fautive)
+  # Agrégation unique des lignes saines par (segment, cellule) (#335 ; forme
+  # F335 ; spécification d'actuary-approfondi, Q1) : après l'écart des
+  # cellules fautives, jugées ligne par ligne ci-dessus ; E = somme des E et
+  # D = somme des D (en double), à la première occurrence du couple dans
+  # l'ordre des lignes de la plage. Sous H0, la somme de Poisson de même force
+  # est Poisson de l'exposition sommée (résultat exact) : le test compare des
+  # segments, pas des lignes. Ce vecteur alimente tout l'aval (scores global,
+  # par tranche et par variable, valeurs observées, diagnostics, exposition
+  # des segments). Sans couple répété, il est identique, valeur et ordre, aux
+  # lignes saines (flux des réplications inchangé, R11).
+  i_s <- which(saine)
+  couple <- (cel[i_s] - 1) * as.numeric(S) + sg[i_s]
+  a <- match(couple, unique(couple))
+  prem <- i_s[!duplicated(a)]
+  n_a <- length(prem)
+  D_a <- somme_par(D[i_s], a, n_a)
+  E_a <- somme_par(E[i_s], a, n_a)
+  cel_a <- cel[prem]
+  sg_a <- sg[prem]
+  tranche_a <- tranche[prem]
 
-  sc_g <- score_homogeneite(D[saine], E[saine], cel[saine], sg[saine], K, S)
-  lignes_g <- which(saine)[sc_g$utilisee]
+  # Décomptes d'événements en double, puis rangement en integer (#199 ; ADR
+  # 0009, point 9.6, (iii)) avant tout score et tout tirage (#348 ; forme
+  # F348 ; spécification d'actuary-approfondi, Q5) : l'effectif de toute
+  # strate tirée par rmultinom() est une somme partielle d'événements
+  # positifs, au plus le total ; total au plus .Machine$integer.max, donc
+  # size valide ; sinon refus denombrement_hors_plage, gardes dans leur
+  # ordre : pour toute entrée qui atteint aujourd'hui les gardes, le refus et
+  # sa grandeur citée restent identiques ; une entrée refusée plus loin sur
+  # segments/observes (portee()) cite désormais la garde avancée, au même
+  # motif. Garde défensive : le total de l'étape exposition est gardé (M397).
+  ev_fautives_d <- sum(D[!saine])
+  total_d <- sum(as.numeric(exposition$evenements))
+  ev_hors_d <- sum(as.numeric(exposition$evenements[!dans]))
+  ev_fautives <- denombrement_entier(ev_fautives_d, "homogeneite", "evenements_cellules_evenement_sans_exposition")
+  ev_hors <- denombrement_entier(ev_hors_d, "homogeneite", "evenements_hors_plage")
+  total <- denombrement_entier(total_d, "homogeneite", "evenements_total")
+
+  sc_g <- score_homogeneite(D_a, E_a, cel_a, sg_a, K, S)
+  lignes_g <- which(sc_g$utilisee)
   sc_b <- lapply(seq_len(nb), function(b) {
-    l <- saine & tranche == b
-    s <- score_homogeneite(D[l], E[l], cel[l], sg[l], K, S)
+    l <- tranche_a == b
+    s <- score_homogeneite(D_a[l], E_a[l], cel_a[l], sg_a[l], K, S)
     s$position <- match(which(l)[s$utilisee], lignes_g)
     s
   })
-  prod_g <- !toute_faute && sc_g$ddl > 0
-  prod_b <- vapply(seq_len(nb), function(b) !tranche_fautive[b] && sc_b[[b]]$ddl > 0, NA)
+  # Test produit : sans cellule fautive, ddl > 0 et pivots de l'élimination
+  # finis et > 0 (sinon precision_insuffisante, décidé avant tout tirage :
+  # aucun tirage pour ce test ; M570, P1 (a)). Somme des tranches :
+  # precision_insuffisante si une tranche de ddl > 0 l'est.
+  prod_g <- !toute_faute && sc_g$ddl > 0 && sc_g$pivots
+  prod_b <- vapply(seq_len(nb), function(b) !tranche_fautive[b] && sc_b[[b]]$ddl > 0 && sc_b[[b]]$pivots, NA)
   ddl_b <- vapply(sc_b, function(s) s$ddl, 0L)
-  prod_somme <- !toute_faute && sum(ddl_b) > 0
+  pivots_b <- vapply(sc_b, function(s) s$pivots, NA)
+  pivots_somme <- all(pivots_b[ddl_b > 0])
+  prod_somme <- !toute_faute && sum(ddl_b) > 0 && pivots_somme
 
   # Réplications du jeu « cellules » : global, tranches, somme.
   jeux <- list()
@@ -2416,7 +2574,7 @@ calculer_homogeneite <- function(exposition, segmentation, par_annee, convention
     t_rep <- replications_multinomiales(sc_g$poids, sc_g$strate_tirage, sc_g$effectifs, replications, graine, f_stat)
     # Valeurs observées du jeu par la même fonction que les répliques (global,
     # tranches, somme accumulée de la même façon ; reprise de l'audit, C2).
-    t_obs <- f_stat(matrix(D[lignes_g], ncol = 1L))
+    t_obs <- f_stat(matrix(D_a[lignes_g], ncol = 1L))
     jeux$cellules <- replications
   } else jeux$cellules <- 0
 
@@ -2434,16 +2592,17 @@ calculer_homogeneite <- function(exposition, segmentation, par_annee, convention
   }
   non_produit <- function(etat) list(p = NA_real_, etat = etat)
   mc_na <- c(p = NA_real_, e = NA_real_)
-  etat_de <- function(faute, ddl) if (faute) "evenement_sans_exposition"
-                                   else if (ddl == 0L) "moins_de_deux_segments_informatifs" else "produite"
+  etat_de <- function(faute, ddl, pivots) if (faute) "evenement_sans_exposition"
+                                           else if (ddl == 0L) "moins_de_deux_segments_informatifs"
+                                           else if (!pivots) "precision_insuffisante" else "produite"
   tests <- list()
-  e_g <- etat_de(toute_faute, sc_g$ddl)
+  e_g <- etat_de(toute_faute, sc_g$ddl, sc_g$pivots)
   tests[[1L]] <- ligne("global", NA_character_, NA_character_, na_i, na_i, sc_g,
                        if (prod_g) t_obs$global else NA_real_, if (toute_faute) na_i else sc_g$ddl, e_g,
                        if (prod_g) p_exacte_homogeneite(sc_g) else non_produit(e_g),
                        if (prod_g) pvaleur_monte_carlo(t_obs$global, t_rep$global, "superieure") else mc_na)
   for (b in seq_len(nb)) {
-    e_b <- etat_de(tranche_fautive[b], ddl_b[b])
+    e_b <- etat_de(tranche_fautive[b], ddl_b[b], pivots_b[b])
     tests[[length(tests) + 1L]] <-
       ligne("tranche", NA_character_, NA_character_, tranches_age[b], fin_tranche[b], sc_b[[b]],
             if (prod_b[b]) t_obs[[paste0("tranche_", b)]] else NA_real_, if (tranche_fautive[b]) na_i else ddl_b[b],
@@ -2451,7 +2610,7 @@ calculer_homogeneite <- function(exposition, segmentation, par_annee, convention
             if (prod_b[b]) pvaleur_monte_carlo(t_obs[[paste0("tranche_", b)]], t_rep[[paste0("tranche_", b)]],
                                                "superieure") else mc_na)
   }
-  e_s <- etat_de(toute_faute, sum(ddl_b))
+  e_s <- etat_de(toute_faute, sum(ddl_b), pivots_somme)
   t_somme <- if (prod_somme) t_obs$somme_tranches else NA_real_
   # Somme des tranches : strates informatives des tranches à ddl > 0 ; groupes
   # NA (un décompte par tranche, non sommable ; reprise de l'audit, m2).
@@ -2468,10 +2627,11 @@ calculer_homogeneite <- function(exposition, segmentation, par_annee, convention
   if (length(segmentation) == 2L) for (k in 1:2) {
     v <- segmentation[k]; w <- segmentation[3L - k]
     mv <- unique(segments[[v]]); mw <- unique(segments[[w]])
-    gv <- match(ex[[v]], mv); gw <- match(ex[[w]], mw)
-    st <- (cel - 1L) * length(mw) + gw
-    sc_v <- score_homogeneite(D[saine], E[saine], st[saine], gv[saine], K * length(mw), length(mv))
-    prod_v <- !toute_faute && sc_v$ddl > 0
+    # Lignes agrégées : (segment, cellule) unique, donc (strate, groupe) aussi.
+    gv <- match(ex[[v]][prem], mv); gw <- match(ex[[w]][prem], mw)
+    st <- (cel_a - 1L) * length(mw) + gw
+    sc_v <- score_homogeneite(D_a, E_a, st, gv, K * length(mw), length(mv))
+    prod_v <- !toute_faute && sc_v$ddl > 0 && sc_v$pivots
     nom_jeu <- paste0("variable_", v)
     mc <- mc_na
     if (prod_v) {
@@ -2480,7 +2640,7 @@ calculer_homogeneite <- function(exposition, segmentation, par_annee, convention
       mc <- pvaleur_monte_carlo(sc_v$t, r$t, "superieure")
       jeux[[nom_jeu]] <- replications
     } else jeux[[nom_jeu]] <- 0
-    e_v <- etat_de(toute_faute, sc_v$ddl)
+    e_v <- etat_de(toute_faute, sc_v$ddl, sc_v$pivots)
     tests[[length(tests) + 1L]] <-
       ligne("variable", v, w, na_i, na_i, sc_v, if (prod_v) sc_v$t else NA_real_,
             if (toute_faute) na_i else sc_v$ddl, e_v,
@@ -2489,16 +2649,17 @@ calculer_homogeneite <- function(exposition, segmentation, par_annee, convention
   tests <- do.call(rbind, tests)
   rownames(tests) <- NULL
 
-  # Observés et attendus par segment (portée globale, puis par tranche).
-  portee <- function(nom, debut, fin, sc, l_toutes, faute) {
-    l_saines <- l_toutes & saine
+  # Observés et attendus par segment (portée globale, puis par tranche) ;
+  # l_toutes : lignes de la plage de la portée (cellules fautives comprises) ;
+  # l_a : lignes agrégées de la portée.
+  portee <- function(nom, debut, fin, sc, l_toutes, l_a, faute) {
     e_tout <- somme_par(E[l_toutes], sg[l_toutes], S)
     d_tout <- somme_par(D[l_toutes], sg[l_toutes], S)
     d <- data.frame(portee = rep(nom, S), stringsAsFactors = FALSE)
     for (k in segmentation) d[[k]] <- segments[[k]]
     d$tranche_debut <- rep(as.integer(debut), S)
     d$tranche_fin <- rep(as.integer(fin), S)
-    d$exposition_centrale <- somme_par(E[l_saines], sg[l_saines], S)
+    d$exposition_centrale <- somme_par(E_a[l_a], sg_a[l_a], S)
     d$observes <- denombrement_entier(sc$O, "homogeneite", "segments/observes")  # integer (#199)
     d$attendus <- sc$A
     # double et character même sans segment (#201) : ifelse() rend logical(0) sur S = 0.
@@ -2516,9 +2677,9 @@ calculer_homogeneite <- function(exposition, segmentation, par_annee, convention
     d$etat <- etat
     d
   }
-  seg <- c(list(portee("global", na_i, na_i, sc_g, rep(TRUE, nrow(ex)), toute_faute)),
+  seg <- c(list(portee("global", na_i, na_i, sc_g, rep(TRUE, nrow(ex)), rep(TRUE, n_a), toute_faute)),
            lapply(seq_len(nb), function(b) portee("tranche", tranches_age[b], fin_tranche[b], sc_b[[b]], tranche == b,
-                                                  tranche_fautive[b])))
+                                                  tranche_a == b, tranche_fautive[b])))
   # Écart minimal détectable (#218 ; F218) : une ligne par segment du test
   # global, dans l'ordre des lignes globales de seg ; V du test global (sc_g),
   # chaque segment pris pour référence dans sa composante (décision du
@@ -2532,21 +2693,16 @@ calculer_homogeneite <- function(exposition, segmentation, par_annee, convention
   seg <- do.call(rbind, seg)
   rownames(seg) <- NULL
 
-  # Décomptes et identité des événements.
-  Dc <- somme_par(D, cel, K)
-  nexp <- somme_par(E > 0, cel, K)
+  # Décomptes et identité des événements ; Dc et nexp sur les lignes agrégées
+  # (nexp : segments exposés de la cellule ; cellules fautives exclues des
+  # diagnostics qui les emploient).
+  Dc <- somme_par(D_a, cel_a, K)
+  nexp <- somme_par(E_a > 0, cel_a, K)
   O <- sum(sc_g$O)
-  ev_fautives <- sum(D[!saine])
-  total <- sum(as.numeric(exposition$evenements))
-  ev_hors <- sum(as.numeric(exposition$evenements[!dans]))
-  if (!identical(O + ev_fautives + ev_hors, total))
+  # Identité vérifiée en double (décomptes rangés en integer avant les scores,
+  # #348) ; l'avertissement qui suit cite la valeur rangée.
+  if (!identical(O + ev_fautives_d + ev_hors_d, total_d))
     stop("calculer_homogeneite() : décomptes d'événements incohérents (erreur de programmation).", call. = FALSE)
-  # Rangement en integer après l'identité, vérifiée en double (#199 ; ADR 0009,
-  # point 9.6, (iii)) : garde défensive (total de l'étape exposition gardé,
-  # M397) ; l'avertissement qui suit cite la valeur rangée.
-  ev_fautives <- denombrement_entier(ev_fautives, "homogeneite", "evenements_cellules_evenement_sans_exposition")
-  ev_hors <- denombrement_entier(ev_hors, "homogeneite", "evenements_hors_plage")
-  total <- denombrement_entier(total, "homogeneite", "evenements_total")
   avert <- avertissements_vides()
   if (toute_faute)
     avert <- avertir(avert, "homogeneite", "evenements_sans_exposition",

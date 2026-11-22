@@ -466,6 +466,12 @@ TRANSITIONS_EN_COURS <- list()
 # transition_340(), transition_331(), apres_340(), apres_331(),
 # statuts_apres_b32(), substituer_b32() et les constantes *_340, *_331 et
 # CHEMIN_STATUTS_B32 retirées.
+# Transitions #334 (V réduite sans soustraction : statuts de statistique,
+# p_exacte et z) et #333 (cause « part arrondie à 0 » des deux statuts
+# ecart_minimal) de B33, sur R11 et R12, closes par la régénération (R) de
+# B33 (exécution 45021813451, sur 5aa23d7) : transition_334(),
+# transition_333(), apres_334() et les constantes SUBST_334, SUBST_333 et
+# CHEMIN_STATUTS_334 retirées.
 
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
 CHAMPS_CHANGEMENT <- list(type = c("de", "vers"), valeur = c("valeurs", "positions"),

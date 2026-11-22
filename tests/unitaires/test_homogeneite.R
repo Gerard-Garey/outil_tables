@@ -57,12 +57,12 @@ verifier("A PARAMETRES_ETAPES$homogeneite : plage_ages, tranches_age, replicatio
   p <- tablexp:::PARAMETRES_ETAPES$homogeneite
   identical(p$parametre, c("plage_ages", "tranches_age", "replications")) && identical(p$type, rep("double", 3L))
 })
-verifier("A états : tests, p exacte, segments", {
+verifier("A états : tests, p exacte, segments (precision_insuffisante des tests et de la p exacte : M570, P1 (a), #334)", {
   identical(tablexp:::ETATS_TESTS_HOMOGENEITE,
-            c("produite", "evenement_sans_exposition", "moins_de_deux_segments_informatifs")) &&
+            c("produite", "evenement_sans_exposition", "moins_de_deux_segments_informatifs", "precision_insuffisante")) &&
     identical(tablexp:::ETATS_P_EXACTE_HOMOGENEITE,
               c("produite", "plus_de_deux_groupes", "convolution_au_dela_n_max", "non_produite_par_cette_version",
-                "evenement_sans_exposition", "moins_de_deux_segments_informatifs")) &&
+                "evenement_sans_exposition", "moins_de_deux_segments_informatifs", "precision_insuffisante")) &&
     identical(tablexp:::ETATS_SEGMENTS_HOMOGENEITE,
               c("produite", "segment_sans_exposition", "evenement_sans_exposition", "variance_nulle"))
 })
@@ -107,7 +107,9 @@ verifier("T185.1 STATUTS_HOMOGENEITE : p_asymptotique sous le régime de la plus
 # impossible à nombre de strates fixe : la plus grande part vaut au moins 1/K) ;
 # « D_. peut rester petit dans chaque strate » (faux à K fixe) est remplacé ; le
 # nombre de groupes est dit fixé ; aucun numéro de théorème ni source citée (M388).
-verifier("T202 STATUTS_HOMOGENEITE : p_asymptotique sans condition sur les parts des strates, à nombre de groupes fixé, D_. borné seulement quand le nombre de strates croît ; z inchangé ; aucune source citée", {
+# Texte de z complété par #334 (spécification d'actuary-approfondi, Q3, § 4) :
+# V_ss par sommes hors diagonale, U du groupe de référence.
+verifier("T202 STATUTS_HOMOGENEITE : p_asymptotique sans condition sur les parts des strates, à nombre de groupes fixé, D_. borné seulement quand le nombre de strates croît ; z au texte de #334 ; aucune source citée", {
   s <- tablexp:::STATUTS_HOMOGENEITE
   pa <- s$statut[s$table == "tests" & s$grandeur == "p_asymptotique"]
   z <- s$statut[s$table == "segments" & s$grandeur == "z"]
@@ -118,9 +120,33 @@ verifier("T202 STATUTS_HOMOGENEITE : p_asymptotique sans condition sur les parts
     !any(grepl("aucune strate ne portant|part non négligeable", s$statut)) &&
     !any(grepl("théorème|Billingsley", s$statut, ignore.case = TRUE)) &&
     identical(z, paste("z_s = (O_s - A_s) / sqrt(V_ss), écart réduit du segment au regroupé, de loi asymptotique N(0, 1) sous",
-                       "H0 (V_ss -> infini, même régime que p_asymptotique), E tenue pour fixe ; aucune p-valeur produite ;",
-                       "calcul en arithmétique flottante, approximation numérique ; aucune correction de multiplicité ;",
+                       "H0 (V_ss -> infini, même régime que p_asymptotique), E tenue pour fixe ; V_ss = somme des w_sk (k",
+                       "différent de s), sans soustraction ; U du groupe de référence de sa composante pris égal à moins la",
+                       "somme des U des autres groupes (identité exacte) ; aucune p-valeur produite ; calcul en",
+                       "arithmétique flottante, approximation numérique ; aucune correction de multiplicité ;",
                        tablexp:::INDEPENDANCE_HOMOGENEITE))
+})
+# Texte de statistique (#334 ; spécification d'actuary-approfondi, Q3, § 4,
+# complété de l'état precision_insuffisante du test, M570, P1 (a)) : littéral.
+verifier("I #334 STATUTS_HOMOGENEITE : statut de statistique au texte de la spécification (référence d'attendu A le plus grand, élimination sans soustraction, T = +Inf, état precision_insuffisante) ; plus de « système linéaire » ; statut de p_exacte : groupe 1 = groupe retenu", {
+  s <- tablexp:::STATUTS_HOMOGENEITE
+  st <- s$statut[s$table == "tests" & s$grandeur == "statistique"]
+  att <- paste("T = U' V^- U, U = O - A, V = somme sur les strates informatives de D_. (diag pi - pi pi') ; somme des T",
+               "des tranches (ddl > 0) pour somme_tranches ; arithmétique flottante : par composante connexe du graphe",
+               "groupes-strates, le groupe d'attendu A le plus grand (le plus petit indice à égalité) est la référence",
+               "retirée ; V réduite factorisée par élimination sans soustraction (w_jk = somme sur les strates",
+               "informatives de D_. pi_j pi_k, pivots formés de sommes de termes positifs), T = somme des y_i^2 / d_i, y",
+               "obtenu de U des groupes retenus : approximation numérique ; T = +Inf quand la statistique dépasse le",
+               "plus grand double ; état precision_insuffisante (T et p-valeurs NA) quand un pivot de l'élimination",
+               "n'est pas fini et strictement positif")
+  pe <- s$statut[s$table == "tests" & s$grandeur == "p_exacte"]
+  frag <- paste("Bin(D_., pi_1), groupe 1 : le groupe retenu, d'attendu A le plus petit, la référence (attendu le plus",
+                "grand, le plus petit indice à égalité) étant retirée comme pour statistique ; p = P(")
+  tous(texte = if (identical(st, att)) TRUE else "texte de statistique",
+       p_exacte = if (lengths(regmatches(pe, gregexpr(frag, pe, fixed = TRUE))) == 1L) TRUE
+                  else "groupe retenu absent du statut de p_exacte (réserve d'actuary, Q1)",
+       ancien = if (!any(grepl("système linéaire", s$statut, fixed = TRUE))) TRUE else "« système linéaire » présent",
+       utf8 = if (identical(Encoding(st), "UTF-8")) TRUE else "encodage")
 })
 verifier("A REFERENCE_METHODE_HOMOGENEITE : données consignées de la source (URL, SHA-256, pages ; E2.25), après relecture sur l'image (M290)", {
   r <- tablexp:::REFERENCE_METHODE_HOMOGENEITE
@@ -838,7 +864,9 @@ verifier("I paramètres de l'étape (F218) : niveau_ecart_minimal, puissance_eca
 # méthode, qu'elle soit ou non représentable), puis par le sens de l'erreur
 # de la branche + (#331, spécification d'actuary-approfondi, Q5, corrigée à
 # la reprise : prudente, optimiste ou de sens non établi ; branche -
-# inchangée), et ses quatre substitutions pour theta_80_inferieur.
+# inchangée), et ses quatre substitutions pour theta_80_inferieur. Cause
+# « part d'exposition arrondie à 0 » de precision_insuffisante nommée par #333
+# (spécification d'actuary-approfondi, Q4, § 3 ; M570).
 STATUT_SUP_218 <- paste(
   "approximation asymptotique : plus petit theta > 1 tel que lambda_s(theta) >= lambda_80, theta multipliant la force",
   "du seul segment s dans chaque cellule ; lambda_s(theta) = delta_s(theta)' V^- delta_s(theta), delta_s(theta) = somme",
@@ -861,7 +889,8 @@ STATUT_SUP_218 <- paste(
   "(NA) quand lambda_s(theta) reste au plus lambda_80 (1 + 1e-8), tolérance relative de la résolution numérique,",
   "lorsque theta tend vers l'infini ; état precision_insuffisante (NA) quand la racine n'est pas calculable par cette",
   "méthode en double précision à cette tolérance, qu'elle soit ou non représentable (pivot de l'élimination non fini",
-  "ou non positif, limite indéterminée, résolution non convergée, ou postcondition |lambda_s(theta_80) / lambda_80 - 1|",
+  "ou non positif, limite indéterminée (dont une part d'exposition arrondie à 0 dans une strate où le segment et un",
+  "autre segment sont exposés), résolution non convergée, ou postcondition |lambda_s(theta_80) / lambda_80 - 1|",
   "<= 1e-8 non tenue) ; unités d'observation indépendantes ; sous l'unité contrat, les décès sont sur-dispersés et",
   "theta_80 est trop proche de 1 (écart minimal détectable sous-estimé)")
 verifier("I STATUTS_HOMOGENEITE (littéral de la spécification, § 7) : deux lignes ecart_minimal en fin (theta_80_superieur, theta_80_inferieur), textes exacts, inférieur par les quatre substitutions ; 15 lignes, UTF-8", {
@@ -880,11 +909,16 @@ verifier("I STATUTS_HOMOGENEITE (littéral de la spécification, § 7) : deux li
     if (lengths(regmatches(inf, gregexpr(r[1L], inf, fixed = TRUE))) != 1L) return(paste("substitution non unique :", r[1L]))
     inf <- sub(r[1L], r[2L], inf, fixed = TRUE)
   }
+  # Statuts choisis par (table, grandeur), non par position (mineur de la
+  # revue finale de B32, D4 (a), M569) ; la position en fin reste contrôlée
+  # par « lignes ».
+  k <- match(c("theta_80_superieur", "theta_80_inferieur"), s$grandeur[s$table == "ecart_minimal"])
+  st <- s$statut[s$table == "ecart_minimal"][k]
   tous(lignes = if (nrow(s) == 15L && identical(s$table[14:15], c("ecart_minimal", "ecart_minimal")) &&
                     identical(s$grandeur[14:15], c("theta_80_superieur", "theta_80_inferieur"))) TRUE else "lignes",
-       sup = if (identical(s$statut[14L], STATUT_SUP_218)) TRUE else "texte de theta_80_superieur",
-       inf = if (identical(s$statut[15L], inf)) TRUE else "texte de theta_80_inferieur",
-       utf8 = if (all(Encoding(s$statut[14:15]) == "UTF-8")) TRUE else "encodage")
+       sup = if (identical(st[1L], STATUT_SUP_218)) TRUE else "texte de theta_80_superieur",
+       inf = if (identical(st[2L], inf)) TRUE else "texte de theta_80_inferieur",
+       utf8 = if (!anyNA(k) && all(Encoding(st) == "UTF-8")) TRUE else "encodage")
 })
 # Audit de #218, constat m3 : le texte des deux statuts ecart_minimal écrit la
 # tolérance en dur, « (1 + 1e-8) » (statut_ecart_minimal()), alors que le calcul
@@ -942,14 +976,20 @@ verifier("I statut theta_80_superieur (#331) : chiffres cités (0,472 ; 51,38 ; 
     n <- vapply(fragments, function(f) lengths(regmatches(txt, gregexpr(f, txt, fixed = TRUE))), 0L)
     if (all(n == 1L)) TRUE else paste("fragment(s) absent(s) ou répété(s) :", paste(fragments[n != 1L], collapse = " | "))
   }
-  sup <- tablexp:::STATUTS_HOMOGENEITE$statut[14L]
+  # Statut choisi par (table, grandeur), non par position (D4 (a), M569).
+  s <- tablexp:::STATUTS_HOMOGENEITE
+  sup <- s$statut[s$table == "ecart_minimal" & s$grandeur == "theta_80_superieur"]
   tous(chiffres = if (identical(c(seuil_pi, rho2, pi_c), c("0,472", "51,38", "0,0049"))) TRUE
                   else paste("recalculés :", seuil_pi, rho2, pi_c),
+       unique = if (length(sup) == 1L) TRUE else sprintf("%d statut(s) theta_80_superieur", length(sup)),
        statut = controle(sup),
        deces = if (deces < 0.2) TRUE else paste("décès attendus au coin :", format(deces, digits = 6)),
+       # Témoin de chaque chiffre cité, « 0,2 » compris (mineur de la revue
+       # finale de B32, D4 (a), M569).
        temoin = if (!isTRUE(controle(sub("51,38", "51,39", sup, fixed = TRUE))) &&
                     !isTRUE(controle(sub("0,0049", "0,0048", sup, fixed = TRUE))) &&
-                    !isTRUE(controle(sub("0,472", "0,473", sup, fixed = TRUE)))) TRUE else "témoin")
+                    !isTRUE(controle(sub("0,472", "0,473", sup, fixed = TRUE))) &&
+                    !isTRUE(controle(sub("(moins de 0,2 d", "(moins de 0,3 d", sup, fixed = TRUE)))) TRUE else "témoin")
 })
 verifier("I table ecart_minimal (F218) : une ligne par segment dans l'ordre des lignes globales de segments, clés de segmentation, theta_80_superieur, etat_superieur, theta_80_inferieur, etat_inferieur ; types (double, character) ; aucune ligne de tranche", {
   em <- H$resultat$ecart_minimal
@@ -1394,10 +1434,12 @@ verifier("I T7 débordement de D_c |h_c| en -infini (recalcul indépendant ; con
 })
 # Strate où s est seul exposé sur deux lignes (C1 d'actuary, visa de la
 # correction) : âge 60, A sur deux lignes (E 100, D 5 chacune) ; âge 61, A
-# (100, 5) et X (100, 9). La strate 60 est informative (deux lignes
-# exposées) mais a_c = 0 pour A : |h| y vaut 0, sans terme 1/0 en -infini.
-# Recalcul indépendant restreint à la cellule où les deux segments sont
-# exposés (âge 61 : D 14, parts 1/2 et 1/2).
+# (100, 5) et X (100, 9). Avant #335, la strate 60 était informative (deux
+# lignes exposées) avec a_c = 0 pour A : |h| y valait 0, sans terme 1/0 en
+# -infini ; depuis #335, les deux lignes sont agrégées et la strate 60 n'est
+# plus informative (un seul segment exposé). Recalcul indépendant restreint à
+# la cellule où les deux segments sont exposés (âge 61 : D 14, parts 1/2 et
+# 1/2).
 verifier("I strate à un seul segment exposé sur deux lignes (recalcul indépendant) : deux ordres ; theta- de A et de X produites, égales, à 1e-12 du recalcul et de 0.14367128799545387 ; signal ecart_minimal_detectable", {
   d <- expo_seg(c("A", "A", "A", "X"), c(60, 60, 61, 61), rep(100, 4L), c(5, 5, 5, 9))
   att <- exp(stats::uniroot(function(u) lambda_deux(14, 0.5, 0.5, exp(u)) - L80_1, c(-30, 0), tol = 1e-14)$root)
@@ -1417,37 +1459,233 @@ verifier("I strate à un seul segment exposé sur deux lignes (recalcul indépen
 })
 # Invariance au découpage d'une cellule en plusieurs lignes (constat C-R1 de
 # l'audit ; décision du mainteneur du 20/11/2026, (a) : pi_jc cumulé par
-# (strate, segment)). Âges 60 et 61 ; une ligne : A (100, 4), X (300, 9),
-# A (200, 6), X (100, 3). Découpage de (A, 61) en 150 / 4 et 50 / 2, puis de
-# (X, 61) en 30 / 1 et 70 / 2, chacun dans deux ordres : pour s = A, la
-# découpe porte tantôt sur s (référence de s), tantôt sur l'autre segment, et
-# inversement pour s = X. Attendus : valeurs du code de 303d6e0 (passage par
-# la statistique, agrégée par rowsum) sur une ligne.
-# Limite (#335) : score_homogeneite() n'agrège pas non plus par (strate,
-# groupe) ; T est faux quand la cellule découpée appartient à un segment
-# autre que la référence du test global (le premier de la table). Le segment
-# découpé est donc toujours placé en tête, seul cas où T est invariant.
-verifier("I invariance au découpage d'une cellule en plusieurs lignes (valeurs de 303d6e0 sur une ligne) : A puis X découpé, deux ordres chacun : T, états et theta à 1e-12 de la variante sur une ligne", {
+# (strate, segment) ; #335 : lignes saines agrégées par (segment, cellule)
+# dans calculer_homogeneite(), forme F335, spécification d'actuary-approfondi,
+# Q1, critères I1 et I3). Âges 60 et 61 ; une ligne : A (100, 4), X (300, 9),
+# A (200, 6), X (100, 3). Découpages exacts en double (150 + 50, 30 + 70) de
+# (A, 61) et de (X, 61), le segment découpé en tête ou non, dans plusieurs
+# ordres. Le résultat entier (tests, dont p exacte et p de Monte-Carlo,
+# segments, dont z et états, ecart_minimal, diagnostics, avertissements) est
+# identical() à celui de la table à une ligne prise dans l'ordre de première
+# occurrence des couples (segment, âge) de la variante (I1 ; la p de
+# Monte-Carlo suit l'ordre des lignes de chaque strate, I2). Attendus
+# numériques : valeurs du code de 303d6e0 sur une ligne (T, theta), p exacte
+# et z remesurées à 368e110 sur une ligne. Mesure adverse (C7) : à 368e110,
+# (X, 61) découpé avec A en tête (variante X_decoupe_A_en_tete) donnait T =
+# 0.11369378473976757, p exacte 0.82977183901774476, p de Monte-Carlo 0.85 et
+# z de X -0.33718508973524852 ; la contrainte « segment découpé en tête » de
+# ce test est levée.
+une_ligne_ordonnee <- function(un, variante) {
+  cle <- function(d) paste(d$segment, d$age)
+  un[match(unique(cle(variante)), cle(un)), ]
+}
+verifier("I invariance au découpage d'une cellule en plusieurs lignes (#335, I1, I3) : A puis X découpé, en tête ou non, plusieurs ordres : résultat identical() à la table à une ligne dans l'ordre de première occurrence ; T, p exacte, p de Monte-Carlo, z, états et theta de la variante sur une ligne", {
   un <- expo_seg(c("A", "X", "A", "X"), c(60, 60, 61, 61), c(100, 300, 200, 100), c(4, 9, 6, 3))
   da <- expo_seg(c("A", "X", "A", "X", "A"), c(60, 60, 61, 61, 61), c(100, 300, 150, 100, 50), c(4, 9, 4, 3, 2))
   dx <- expo_seg(c("X", "X", "A", "A", "X"), c(61, 60, 61, 60, 61), c(70, 300, 200, 100, 30), c(2, 9, 6, 4, 1))
+  dxa <- expo_seg(c("A", "X", "A", "X", "X"), c(60, 60, 61, 61, 61), c(100, 300, 200, 30, 70), c(4, 9, 6, 1, 2))
   variantes <- list(une_ligne = un, A_decoupe = da, A_decoupe_permute = da[c(1L, 2L, 5L, 4L, 3L), ],
-                    X_decoupe = dx, X_decoupe_permute = dx[c(5L, 4L, 2L, 3L, 1L), ])
+                    A_decoupe_hors_tete = da[c(2L, 1L, 4L, 3L, 5L), ], X_decoupe = dx,
+                    X_decoupe_permute = dx[c(5L, 4L, 2L, 3L, 1L), ], X_decoupe_A_en_tete = dxa)
   att_v <- c(3.7393758326640887, 5.0691740146480493, 0.19727079739428313, 0.26742430949700979)
   e <- character(0)
   for (nom in names(variantes)) {
-    r <- tryCatch(homog(variantes[[nom]], "segment", c(60, 61), 60), error = function(x) x)
+    va <- variantes[[nom]]
+    r <- tryCatch(homog(va, "segment", c(60, 61), 60), error = function(x) x)
     if (inherits(r, "error")) { e <- c(e, paste(nom, ": erreur", conditionMessage(r))); next }
+    r1 <- homog(une_ligne_ordonnee(un, va), "segment", c(60, 61), 60)
+    if (!identical(r, r1)) e <- c(e, paste(nom, ": résultat différent de la table à une ligne"))
     em <- r$resultat$ecart_minimal[match(c("A", "X"), r$resultat$ecart_minimal$segment), ]
     if (!identical(c(em$etat_superieur, em$etat_inferieur), rep("produite", 4L)))
       { e <- c(e, paste(nom, ": états", paste(c(em$etat_superieur, em$etat_inferieur), collapse = "/"))); next }
     v <- c(em$theta_80_superieur, em$theta_80_inferieur)
     if (!isTRUE(proche(v, att_v, 1e-12, 0)))
       e <- c(e, paste(nom, ": theta", paste(format(v, digits = 17), collapse = ", ")))
-    if (!isTRUE(proche(ligne_test(r, "global")$statistique, 0.12676056338028169, 1e-12, 0)))
-      e <- c(e, paste(nom, ": T"))
+    g <- ligne_test(r, "global")
+    if (!isTRUE(proche(g$statistique, 0.12676056338028169, 1e-12, 0))) e <- c(e, paste(nom, ": T"))
+    if (!isTRUE(proche(g$p_exacte, 0.81249998595734196, 1e-12, 0))) e <- c(e, paste(nom, ": p exacte"))
+    sg <- r$resultat$segments[r$resultat$segments$portee == "global", ]
+    if (!identical(sg$etat, c("produite", "produite")) ||
+        !isTRUE(proche(sg$z[sg$segment == "X"], -0.35603449745815596, 1e-12, 0)))
+      e <- c(e, paste(nom, ": z ou états des segments"))
   }
   if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
+verifier("I invariance au découpage (#335, I1) : segment seul dans sa strate (Y à 62 ans, 250 / 5 deux fois contre 500 / 10), A seul à 60 ans (100 / 5 deux fois contre 200 / 10, cas de #336), ligne (A, 60, E = 0, D = 0) ajoutée : résultat identical() à la table à une ligne dans l'ordre de première occurrence", {
+  un <- expo_seg(c("A", "X", "A", "X"), c(60, 60, 61, 61), c(100, 300, 200, 100), c(4, 9, 6, 3))
+  y1 <- rbind(un, expo_seg("Y", 62, 500, 10))
+  y2 <- rbind(un[1:2, ], expo_seg("Y", 62, 250, 5), un[3:4, ], expo_seg("Y", 62, 250, 5))
+  a1 <- expo_seg(c("A", "A", "X"), c(60, 61, 61), c(200, 100, 100), c(10, 5, 9))
+  a2 <- expo_seg(c("A", "A", "A", "X"), c(60, 61, 60, 61), c(100, 100, 100, 100), c(5, 5, 5, 9))
+  z0 <- rbind(un, expo_seg("A", 60, 0, 0))
+  cas <- list(Y_seul = list(y2, y1, c(60, 62), 0.12676056338028169, 0.81249998595734196),
+              A_seul = list(a2, a1, c(60, 61), 1.1428571428571428, 0.42395019531249978),
+              ligne_nulle = list(z0, un, c(60, 61), 0.12676056338028169, 0.81249998595734196))
+  e <- character(0)
+  for (nom in names(cas)) {
+    k <- cas[[nom]]
+    r <- tryCatch(homog(k[[1L]], "segment", k[[3L]], 60), error = function(x) x)
+    if (inherits(r, "error")) { e <- c(e, paste(nom, ": erreur", conditionMessage(r))); next }
+    if (!identical(r, homog(une_ligne_ordonnee(k[[2L]], k[[1L]]), "segment", k[[3L]], 60)))
+      e <- c(e, paste(nom, ": résultat différent de la table à une ligne"))
+    g <- ligne_test(r, "global")
+    if (!isTRUE(proche(c(g$statistique, g$p_exacte), c(k[[4L]], k[[5L]]), 1e-12, 0)))
+      e <- c(e, paste(nom, ": T ou p exacte", paste(format(c(g$statistique, g$p_exacte), digits = 17), collapse = ", ")))
+  }
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
+verifier("I invariance au découpage (#335, I1) : deux variables (sexe, fumeur), cellule (F, n, 61) découpée hors de tête : résultat identical() (tests par variable compris) à la table à une ligne dans l'ordre de première occurrence", {
+  g <- expand.grid(fumeur = c("o", "n"), sexe = c("F", "H"), age = 60:62, stringsAsFactors = FALSE)[, c("sexe", "fumeur", "age")]
+  g$exposition_centrale <- c(120, 340, 90, 410, 150, 300, 110, 380, 130, 360, 100, 400)
+  g$evenements <- c(3L, 6L, 4L, 9L, 5L, 7L, 4L, 11L, 6L, 8L, 5L, 12L)
+  k <- which(g$sexe == "F" & g$fumeur == "n" & g$age == 61)
+  dec <- rbind(g[-k, ], g[k, ], g[k, ])
+  dec$exposition_centrale[nrow(dec) - 1:0] <- c(100, 200)
+  dec$evenements[nrow(dec) - 1:0] <- c(2L, 5L)
+  ref <- g[c(setdiff(seq_len(nrow(g)), k), k), ]
+  r <- homog(dec, c("sexe", "fumeur"), c(60, 62), 60)
+  r1 <- homog(ref, c("sexe", "fumeur"), c(60, 62), 60)
+  tous(variables = if (identical(sum(r$resultat$tests$test == "variable"), 2L) &&
+                       all(r$resultat$tests$etat == "produite")) TRUE else "tests par variable non produits",
+       identique = if (identical(r, r1)) TRUE else "résultat différent de la table à une ligne")
+})
+verifier("I score_homogeneite() : deux lignes de même (strate, groupe) -> erreur de programmation (précondition, #335, I4)", {
+  err <- tryCatch(tablexp:::score_homogeneite(c(1, 2, 3), c(10, 20, 30), c(1L, 1L, 1L), c(1L, 2L, 2L), 1L, 2L),
+                  error = function(x) x)
+  inherits(err, "error") && !inherits(err, "refus_tablexp") &&
+    grepl("erreur de programmation", conditionMessage(err), fixed = TRUE) &&
+    grepl("(strate, groupe)", conditionMessage(err), fixed = TRUE)
+})
+# Strates informatives sur les lignes agrégées (#336 ; spécification
+# d'actuary-approfondi, Q2 et D8, commentaire 7068050253, § 4 ; avis d'actuary
+# du 21/11/2026 : mécanisme réglé par #335, critère ne >= 2 de
+# score_homogeneite() inchangé). Une strate est informative si D_. > 0 et si
+# au moins deux segments (groupes) distincts y sont exposés. Attendus :
+# valeurs mesurées sur le moteur de f0c61e8 ; mesures adverses (C7) sur
+# d1517f2 (avant #335), citées dans chaque test.
+# Test 1 (cas de l'issue) : âge 60, A seul, sur deux lignes 100 / 5 ou une
+# ligne 200 / 10 ; âge 61, A (100, 5) et X (100, 9). À d1517f2, la variante à
+# deux lignes donnait strates_informatives 2, cellules_informatives 2,
+# cellules_non_informatives 0 et p de Monte-Carlo 0.39.
+verifier("I #336 test 1 : A seul à 60 ans, une ou deux lignes : diagnostics cellules 2, informatives 1, non informatives 1, sans décès 0 ; strates_informatives 1 (global, tranche, somme) ; T, p exacte, p de Monte-Carlo 0.37 ; deux lignes identical() à une ligne", {
+  a1 <- expo_seg(c("A", "A", "X"), c(60, 61, 61), c(200, 100, 100), c(10, 5, 9))
+  a2 <- expo_seg(c("A", "A", "A", "X"), c(60, 61, 60, 61), c(100, 100, 100, 100), c(5, 5, 5, 9))
+  e <- character(0)
+  for (nom in c("a1", "a2")) {
+    r <- tryCatch(homog(get(nom), "segment", c(60, 61), 60), error = function(x) x)
+    if (inherits(r, "error")) { e <- c(e, paste(nom, ": erreur", conditionMessage(r))); next }
+    dg <- unlist(r$diagnostics[c("cellules", "cellules_informatives", "cellules_non_informatives", "cellules_sans_deces")])
+    if (!identical(unname(dg), c(2L, 1L, 1L, 0L))) e <- c(e, paste(nom, ": diagnostics", paste(dg, collapse = "/")))
+    t <- r$resultat$tests
+    if (!identical(t$test, c("global", "tranche", "somme_tranches")) || !identical(t$strates_informatives, rep(1L, 3L)))
+      e <- c(e, paste(nom, ": strates_informatives", paste(t$strates_informatives, collapse = "/")))
+    if (!isTRUE(proche(c(t$statistique[1L], t$p_exacte[1L], t$p_monte_carlo),
+                       c(1.1428571428571428, 0.42395019531249978, rep(0.37, 3L)), 1e-12, 0)))
+      e <- c(e, paste(nom, ": T, p exacte ou p de Monte-Carlo"))
+  }
+  if (!identical(homog(a2, "segment", c(60, 61), 60), homog(a1, "segment", c(60, 61), 60)))
+    e <- c(e, "a2 : résultat différent de a1")
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
+# Test 2 (D8 : variance_nulle gardé, sans signal, sans état nouveau) : A et X
+# aux âges 60 et 61, Y seul à 62 ans, sur une ligne 500 / 10 (y1) ou deux
+# lignes 250 / 5 (y2). Y n'est exposé dans aucune strate informative : V_YY =
+# 0 (résultat exact), z et theta_80 non définis. À d1517f2, y2 donnait
+# groupes 3, strates_informatives 3, p exacte NA (plus_de_deux_groupes), p de
+# Monte-Carlo 0.78, Y produite (z = 0), theta de Y non_atteint aux deux
+# branches et un signal ecart_minimal_detectable de nombre 3.
+verifier("I #336 test 2 (D8) : Y seul à 62 ans, une ou deux lignes : groupes et strates_informatives 2, p exacte produite ; Y variance_nulle (z NA) aux portées globale et tranche ; theta de Y variance_nulle aux deux branches ; signal ecart_minimal_detectable de nombre 2 (A et X) ; deux lignes identical() à une ligne", {
+  un <- expo_seg(c("A", "X", "A", "X"), c(60, 60, 61, 61), c(100, 300, 200, 100), c(4, 9, 6, 3))
+  y1 <- rbind(un, expo_seg("Y", 62, 500, 10))
+  y2 <- rbind(un[1:2, ], expo_seg("Y", 62, 250, 5), un[3:4, ], expo_seg("Y", 62, 250, 5))
+  e <- character(0)
+  for (nom in c("y1", "y2")) {
+    r <- tryCatch(homog(get(nom), "segment", c(60, 62), 60), error = function(x) x)
+    if (inherits(r, "error")) { e <- c(e, paste(nom, ": erreur", conditionMessage(r))); next }
+    g <- ligne_test(r, "global")
+    if (!identical(c(g$groupes, g$strates_informatives), c(2L, 2L)) || !identical(g$etat_p_exacte, "produite") ||
+        !isTRUE(proche(c(g$p_exacte, g$p_monte_carlo), c(0.81249998595734196, 0.83), 1e-12, 0)))
+      e <- c(e, paste(nom, ": test global"))
+    s <- r$resultat$segments[r$resultat$segments$segment == "Y", ]
+    if (!identical(s$portee, c("global", "tranche")) || !identical(s$etat, rep("variance_nulle", 2L)) || !all(is.na(s$z)))
+      e <- c(e, paste(nom, ": Y aux segments", paste(s$etat, collapse = "/")))
+    em <- r$resultat$ecart_minimal[r$resultat$ecart_minimal$segment == "Y", ]
+    if (!identical(c(em$etat_superieur, em$etat_inferieur), rep("variance_nulle", 2L)) ||
+        !all(is.na(c(em$theta_80_superieur, em$theta_80_inferieur))))
+      e <- c(e, paste(nom, ": theta de Y", em$etat_superieur, em$etat_inferieur))
+    av <- r$avertissements
+    if (!identical(av$code, "ecart_minimal_detectable") || !identical(as.integer(av$nombre), 2L))
+      e <- c(e, paste(nom, ": avertissements", paste(av$code, av$nombre, collapse = "/")))
+  }
+  if (!identical(homog(y2, "segment", c(60, 62), 60), homog(y1, "segment", c(60, 62), 60)))
+    e <- c(e, "y2 : résultat différent de y1")
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
+# Test 3 (test par variable) : sexe x fumeur, âges 60 et 61 ; (H, o, 60) à E =
+# 0, D = 0. Deux découpages, chacun comparé à la table à une ligne : (H, n, 60)
+# en deux lignes 200 / 4 et 210 / 5 (au lieu de 410 / 9) ; (F, o, 60) en deux
+# lignes 50 / 1 et 70 / 2 (au lieu de 120 / 3). Test fumeur : la strate
+# (60, H) n'a qu'une modalité exposée (n) ; test sexe : la strate (60, o) n'a
+# qu'un sexe exposé (F) ; découpées sur deux lignes, elles ne sont pas
+# informatives. À d1517f2, strates_informatives (global, sexe, fumeur) valait
+# 2 3 4 pour le premier découpage et 2 4 3 pour le second (constat m1 de
+# l'audit léger de 8ab9193).
+verifier("I #336 test 3 (test par variable) : strate cellule x modalité à une seule modalité exposée sur deux lignes non informative, (H, n, 60) ou (F, o, 60) découpée : strates_informatives 3 (sexe), 3 (fumeur), 2 (global) ; deux lignes identical() à une ligne", {
+  g <- expand.grid(fumeur = c("o", "n"), sexe = c("F", "H"), age = 60:61, stringsAsFactors = FALSE)[, c("sexe", "fumeur", "age")]
+  g$exposition_centrale <- c(120, 340, 0, 410, 150, 300, 110, 380)
+  g$evenements <- c(3L, 6L, 0L, 9L, 5L, 7L, 4L, 11L)
+  r1 <- homog(g, c("sexe", "fumeur"), c(60, 61), 60)
+  decoupe <- list(Hn60 = list(sexe = "H", fumeur = "n", E = c(200, 210), D = c(4L, 5L)),
+                  Fo60 = list(sexe = "F", fumeur = "o", E = c(50, 70), D = c(1L, 2L)))
+  e <- character(0)
+  for (nom in names(decoupe)) {
+    x <- decoupe[[nom]]
+    k <- which(g$sexe == x$sexe & g$fumeur == x$fumeur & g$age == 60)
+    v2 <- rbind(g, g[k, ])
+    v2$exposition_centrale[c(k, nrow(v2))] <- x$E
+    v2$evenements[c(k, nrow(v2))] <- x$D
+    r <- homog(v2, c("sexe", "fumeur"), c(60, 61), 60)
+    t <- r$resultat$tests
+    si <- c(global = t$strates_informatives[t$test == "global"],
+            sexe = t$strates_informatives[t$test == "variable" & t$variable %in% "sexe"],
+            fumeur = t$strates_informatives[t$test == "variable" & t$variable %in% "fumeur"])
+    if (!identical(unname(si), c(2L, 3L, 3L)))
+      e <- c(e, paste(nom, ": strates_informatives", paste(names(si), si, collapse = ", ")))
+    if (!all(t$etat == "produite")) e <- c(e, paste(nom, ": tests non produits"))
+    if (!identical(r, r1)) e <- c(e, paste(nom, ": résultat différent de la table à une ligne"))
+  }
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
+# Ordre de première occurrence de l'agrégation (#335 ; constat C1 de l'audit
+# de l'étape (1) de B33) : sans couple (segment, cellule) répété, le vecteur
+# agrégé reprend les lignes saines dans leur ordre, dont dépend le flux des
+# réplications. Trois segments, âges 60 à 62, lignes mélangées ; ordre de
+# première occurrence des segments A, C, B ; dans les cellules, A, B, C à 60
+# ans, C, A, B à 61 ans, B, C, A à 62 ans. Attendus : valeurs remesurées
+# sur d1517f2 (moteur d'avant #335, sans agrégation ; résultat identical() à
+# celui de f0c61e8, mesuré). Un rangement des lignes agrégées par (cellule,
+# segment) laisse T et z inchangés mais donnait p de Monte-Carlo 0.91, 0.87,
+# 0.53 et 0.80 (mutant construit sur une copie).
+verifier("I ordre de première occurrence de l'agrégation (#335, C1) : trois segments, ordre des segments différent d'une cellule à l'autre, sans doublon : T, p de Monte-Carlo, erreur de Monte-Carlo et z des valeurs de d1517f2", {
+  d <- expo_seg(c("A", "C", "B", "B", "A", "C", "C", "A", "B"), c(60, 61, 60, 62, 61, 60, 62, 62, 61),
+                c(100, 220, 250, 260, 120, 180, 150, 140, 300), c(3, 8, 9, 10, 2, 4, 3, 6, 7))
+  r <- homog(d, "segment", c(60, 62), c(60, 62))
+  t <- r$resultat$tests
+  s <- r$resultat$segments
+  tous(tests = if (identical(t$test, c("global", "tranche", "tranche", "somme_tranches")) &&
+                   identical(t$etat, rep("produite", 4L))) TRUE else "lignes de test",
+       T = if (isTRUE(proche(t$statistique, c(0.22215301095965140, 0.29585222839658776, 1.31405436668594544,
+                                              1.60990659508253309), 1e-12, 0))) TRUE else "T",
+       p_monte_carlo = if (isTRUE(proche(t$p_monte_carlo, c(0.96, 0.85, 0.48, 0.83), 1e-12, 0))) TRUE
+                       else paste(t$p_monte_carlo, collapse = ", "),
+       erreur = if (isTRUE(proche(t$erreur_monte_carlo, c(0.019497692171126312, 0.035528157846981032,
+                                                          0.049709556425299145, 0.037374991638795055), 1e-12, 0))) TRUE
+                else "erreur de Monte-Carlo",
+       z = if (identical(s$segment, rep(c("A", "C", "B"), 3L)) &&
+               isTRUE(proche(s$z, c(-0.014533869254678681, -0.436273554792803164, 0.417352162176897690,
+                                    -0.537406223742030398, 0.265098964829306671, 0.168836372798534973,
+                                    0.612840174139278604, -1.123902973898032842, 0.467870382052322953),
+                             1e-12, 0))) TRUE else "z")
 })
 # Textes du rapport (spécification, § 8 ; M546, P1-c).
 verifier("I MENTIONS_RAPPORT (littéral de la spécification, § 8) : suffisance_intro, suffisance_homogeneite, suffisance_homogeneite_absente ; homogeneite_portee : deux premières phrases inchangées, puis l'écart minimal détectable", {
@@ -1719,10 +1957,16 @@ verifier("I #338 m2 NaN de lambda hors de zeroin (par la seam ; messages de R 4.
 # (1 + g p_A) / (1 - g p_X), g = sqrt(lambda_80 / (D p_X p_A)). Tolérance 1e-10
 # en relatif (celle de T7) : écart mesuré 5,2e-14 et 1,6e-14, sous la
 # précision qu'assure la postcondition (1e-8 sur lambda, environ 5e-9 sur
-# theta, lambda en theta^2). A reste variance_nulle (#333, #334). Le signal
-# ecart_minimal_detectable, déjà émis avant par theta- de X non_atteint, l'est
-# une fois, à l'identique (constat d'actuary).
-verifier("I #338 scénario de Q1 (recalcul indépendant) : âge 60, A (5000, 600), X (E_X, 1), ordre (A, X), E_X dans {5e-305, 5e-307} : theta+ de X produite, à 1e-10 de l'inverse exacte (1.142789047e+153 et 1.142789047e+154), postcondition <= 1e-8 ; theta- de X non_atteint ; A variance_nulle ; signal ecart_minimal_detectable une fois ; aucun avertissement de R", {
+# theta, lambda en theta^2). Attendus de A changés par #334 (spécification
+# d'actuary-approfondi, Q3, § 3, point 2) : v_A formé par sommes hors
+# diagonale vaut w_AX > 0, là où diag(A) - P'DP valait 0 (mesure adverse, C7 :
+# A variance_nulle avant #334, sur une copie de 517469f) ; A produite, z_A =
+# -z_X ; theta+ de A non_atteint ; theta- de A produite, à 1e-10 de la forme
+# close (1 - pi_X r) / (1 + pi_A r), r = sqrt(lambda_80 / (601 pi_A pi_X)),
+# soit 8.7505213868467016e-154 et 8.7505213868466907e-155 (écarts mesurés
+# 5,2e-14 et 1,6e-14). Une ligne d'avertissement ecart_minimal_detectable, de
+# nombre 2 (theta- de X et theta+ de A non_atteint ; 1 avant #334).
+verifier("I #338 scénario de Q1 (recalcul indépendant) : âge 60, A (5000, 600), X (E_X, 1), ordre (A, X), E_X dans {5e-305, 5e-307} : theta+ de X produite, à 1e-10 de l'inverse exacte (1.142789047e+153 et 1.142789047e+154), postcondition <= 1e-8 ; theta- de X non_atteint ; A produite (z_A = -z_X), theta+ de A non_atteint, theta- de A produite à 1e-10 de la forme close (#334) ; une ligne ecart_minimal_detectable, nombre 2 ; aucun avertissement de R", {
   e <- character(0)
   for (k in 1:2) {
     eX <- c(5e-305, 5e-307)[k]
@@ -1739,58 +1983,495 @@ verifier("I #338 scénario de Q1 (recalcul indépendant) : âge 60, A (5000, 600
     att <- (1 + g * pa) / (1 - g * px)
     th <- em$theta_80_superieur[x]
     et <- c(em$etat_superieur[x], em$etat_inferieur[x], em$etat_superieur[a], em$etat_inferieur[a])
-    if (!identical(et, c("produite", "non_atteint", "variance_nulle", "variance_nulle")))
+    if (!identical(et, c("produite", "non_atteint", "non_atteint", "produite")))
       e <- c(e, sprintf("E_X %g : états %s", eX, paste(et, collapse = "/")))
     else if (!isTRUE(proche(th, att, 1e-10, 0)) || !isTRUE(proche(th, c(1.142789047e153, 1.142789047e154)[k], 1e-9, 0)) ||
              !(abs(lambda_deux(601, px, pa, th) / L80_1 - 1) <= 1e-8))
       e <- c(e, sprintf("E_X %g : theta+ de X %s, attendu %s", eX, format(th, digits = 17), format(att, digits = 17)))
-    n_sig <- sum(r$avertissements$code == "ecart_minimal_detectable")
-    if (n_sig != 1L) e <- c(e, sprintf("E_X %g : %d signal(aux) ecart_minimal_detectable", eX, n_sig))
+    rr <- sqrt(L80_1 / (601 * pa * px))
+    th_a <- em$theta_80_inferieur[a]
+    if (!isTRUE(proche(th_a, (1 - px * rr) / (1 + pa * rr), 1e-10, 0)) ||
+        !isTRUE(proche(th_a, c(8.7505213868467016e-154, 8.7505213868466907e-155)[k], 1e-10, 0)))
+      e <- c(e, sprintf("E_X %g : theta- de A %s, attendu %s", eX, format(th_a, digits = 17),
+                        format((1 - px * rr) / (1 + pa * rr), digits = 17)))
+    sg <- r$resultat$segments[r$resultat$segments$portee == "global", ]
+    za <- sg$z[sg$segment == "A"]; zx <- sg$z[sg$segment == "X"]
+    if (!identical(sg$etat, c("produite", "produite")) || !is.finite(za) || !identical(za, -zx))
+      e <- c(e, sprintf("E_X %g : segments %s, z %s", eX, paste(sg$etat, collapse = "/"),
+                        paste(format(sg$z, digits = 17), collapse = "/")))
+    sig <- r$avertissements[r$avertissements$code == "ecart_minimal_detectable", , drop = FALSE]
+    if (nrow(sig) != 1L || !identical(sig$nombre, 2L))
+      e <- c(e, sprintf("E_X %g : %d ligne(s) ecart_minimal_detectable, nombre %s", eX, nrow(sig),
+                        paste(sig$nombre, collapse = ",")))
     if (length(av)) e <- c(e, sprintf("E_X %g : avertissements de R %s", eX, paste(av, collapse = " / ")))
   }
   if (length(e)) paste(e, collapse = " ; ") else TRUE
 })
-# Ordre (X, A) du même scénario : le test global s'arrête avant theta_80 sur
-# « Lapack routine dgesv: system is exactly singular » (V réduite par
-# soustraction, dépendance à l'ordre : défaut de #334), avant comme après #338.
-# Critère (avis d'actuary, Q3 de la reprise de #338) : invariance de toute la
-# table ecart_minimal à l'ordre des segments, sans figer l'état de A
-# (variance_nulle relève de #333) : pour chaque segment (apparié par son nom),
-# mêmes états des deux branches, theta égaux à 1e-10 en relatif quand l'état
-# est produite et NA tous deux sinon, même nombre de signaux
-# ecart_minimal_detectable ; plus, sur X, theta+ produite à 1e-10 de l'inverse
-# exacte et theta- non_atteint. Seul l'arrêt dgesv rend un écart décrit (échec
-# attendu) ; tout autre écart lève une erreur (ECHEC, pas un échec attendu).
-echec_attendu("I #338 scénario de Q1, ordre (X, A) : mêmes états et theta des deux segments qu'en ordre (A, X), sans arrêt dgesv", "#334", {
+# Ordre (X, A) du même scénario : avant #334, le test global s'arrêtait avant
+# theta_80 sur « Lapack routine dgesv: system is exactly singular » (V réduite
+# par soustraction, dépendance à l'ordre), avant comme après #338 ; échec
+# attendu {#334} jusqu'à #334, devenu succès inattendu (mesuré) puis test
+# ordinaire. Critère (avis d'actuary, Q3 de la reprise de #338 ; commentaire
+# M566 de #334) : invariance de toute la table ecart_minimal à l'ordre des
+# segments : pour chaque segment (apparié par son nom), mêmes états des deux
+# branches, theta égaux à 1e-10 en relatif quand l'état est produite et NA
+# tous deux sinon, même nombre de signaux ecart_minimal_detectable ; plus, sur
+# X, theta+ produite à 1e-10 de l'inverse exacte et theta- non_atteint ; plus
+# (spécification d'actuary-approfondi de #334, § 3, point 1) T égal dans les
+# deux ordres à 1e-12 en relatif (mesuré égal au bit), aucune erreur et aucun
+# NaN (T, p asymptotique, z, theta).
+verifier("I #338 scénario de Q1, ordre (X, A) : mêmes états et theta des deux segments qu'en ordre (A, X), T égal à 1e-12, sans arrêt ni NaN (#334)", {
   e <- character(0)
   for (eX in c(5e-305, 5e-307)) {
     d <- expo_seg(c("A", "X"), c(60, 60), c(5000, eX), c(600, 1))
     r_ax <- homog(d, "segment", c(60, 60), 60)
-    r <- tryCatch(homog(d[2:1, ], "segment", c(60, 60), 60), error = function(x)
-      if (grepl("dgesv", conditionMessage(x), fixed = TRUE)) conditionMessage(x) else stop(x))
+    r <- tryCatch(homog(d[2:1, ], "segment", c(60, 60), 60), error = function(x) conditionMessage(x))
     if (is.character(r)) { e <- c(e, sprintf("E_X %g : arrêt %s", eX, r)); next }
     em1 <- r_ax$resultat$ecart_minimal; em2 <- r$resultat$ecart_minimal
     k <- match(em1$segment, em2$segment)
-    if (nrow(em1) != nrow(em2) || anyNA(k)) stop(sprintf("E_X %g : segments différents d'un ordre à l'autre", eX))
+    if (nrow(em1) != nrow(em2) || anyNA(k)) { e <- c(e, sprintf("E_X %g : segments différents d'un ordre à l'autre", eX)); next }
     for (b in c("superieur", "inferieur")) {
       et1 <- em1[[paste0("etat_", b)]]; et2 <- em2[[paste0("etat_", b)]][k]
       th1 <- em1[[paste0("theta_80_", b)]]; th2 <- em2[[paste0("theta_80_", b)]][k]
       if (!identical(et1, et2))
-        stop(sprintf("E_X %g : états %s %s / %s", eX, b, paste(et1, collapse = ","), paste(et2, collapse = ",")))
+        e <- c(e, sprintf("E_X %g : états %s %s / %s", eX, b, paste(et1, collapse = ","), paste(et2, collapse = ",")))
       p <- et1 == "produite"
       if ((any(p) && !isTRUE(proche(th2[p], th1[p], 1e-10, 0))) || !all(is.na(th1[!p]) & is.na(th2[!p])))
-        stop(sprintf("E_X %g : theta %s %s / %s", eX, b, paste(format(th1, digits = 17, trim = TRUE), collapse = ","),
-                     paste(format(th2, digits = 17, trim = TRUE), collapse = ",")))
+        e <- c(e, sprintf("E_X %g : theta %s %s / %s", eX, b, paste(format(th1, digits = 17, trim = TRUE), collapse = ","),
+                          paste(format(th2, digits = 17, trim = TRUE), collapse = ",")))
     }
     n1 <- sum(r_ax$avertissements$code == "ecart_minimal_detectable")
     n2 <- sum(r$avertissements$code == "ecart_minimal_detectable")
-    if (n1 != n2) stop(sprintf("E_X %g : %d / %d signal(aux) ecart_minimal_detectable", eX, n1, n2))
+    if (n1 != n2) e <- c(e, sprintf("E_X %g : %d / %d signal(aux) ecart_minimal_detectable", eX, n1, n2))
     x <- match("X", em2$segment)
     Ec <- 5000 + eX; px <- eX / Ec; pa <- 5000 / Ec
     g <- sqrt(L80_1 / (601 * px * pa))
     if (!identical(c(em2$etat_superieur[x], em2$etat_inferieur[x]), c("produite", "non_atteint")) ||
         !isTRUE(proche(em2$theta_80_superieur[x], (1 + g * pa) / (1 - g * px), 1e-10, 0)))
-      stop(sprintf("E_X %g : X %s %s", eX, em2$etat_superieur[x], format(em2$theta_80_superieur[x], digits = 17)))
+      e <- c(e, sprintf("E_X %g : X %s %s", eX, em2$etat_superieur[x], format(em2$theta_80_superieur[x], digits = 17)))
+    t1 <- r_ax$resultat$tests; t2 <- r$resultat$tests
+    if (!identical(t1$etat, t2$etat) || !isTRUE(proche(t2$statistique, t1$statistique, 1e-12, 0)))
+      e <- c(e, sprintf("E_X %g : T %s / %s", eX, format(t1$statistique[1L], digits = 17), format(t2$statistique[1L], digits = 17)))
+    nan <- c(t1$statistique, t2$statistique, t1$p_asymptotique, t2$p_asymptotique, r_ax$resultat$segments$z,
+             r$resultat$segments$z, em1$theta_80_superieur, em1$theta_80_inferieur, em2$theta_80_superieur,
+             em2$theta_80_inferieur)
+    if (any(is.nan(nan))) e <- c(e, sprintf("E_X %g : NaN", eX))
   }
   if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
+
+# --- #334 : V réduite sans soustraction, élimination partagée (F334) ----------
+#
+# Spécification d'actuary-approfondi de #334 (Q3, § 1 à 3) ; état
+# precision_insuffisante du test (décision du mainteneur du 21/11/2026, M570,
+# P1 (a)). Natures des attendus : recalcul indépendant (solve() sur des
+# laplaciens construits bien conditionnés ; pseudo-inverse spectrale de V par
+# eigen()) ; valeur calculée à la main (forme close à deux segments en
+# strate unique) ; identité exacte (invariance à l'ordre des lignes,
+# antisymétrie de z à deux segments).
+
+verifier("I #334 eliminer_sans_soustraction() (recalcul indépendant) : laplaciens réduits construits (m = 1 à 6, poids dans [0,1 ; 10], r > 0) : pivots finis et > 0, evaluer(B) à 1e-12 de colSums(B * solve(V_g, B)) sur 5 colonnes signées ; m = 0 : 0 par colonne", {
+  e <- character(0)
+  tablexp:::sous_graine(20261122L, for (m in 1:6) {
+    W <- matrix(stats::runif(m * m, 0.1, 10), m, m); W <- (W + t(W)) / 2; diag(W) <- 0
+    r <- stats::runif(m, 0.1, 10)
+    Vg <- diag(rowSums(W) + r, m) - W
+    B <- matrix(stats::rnorm(5 * m, 0, 20), m, 5)
+    el <- tablexp:::eliminer_sans_soustraction(W, r)
+    ok <- proche(el$evaluer(B), colSums(B * solve(Vg, B)), 1e-12, 0)
+    if (!isTRUE(el$pivots) || !isTRUE(ok)) e <- c(e, sprintf("m = %d : pivots %s, %s", m, el$pivots, ok))
+  })
+  el0 <- tablexp:::eliminer_sans_soustraction(matrix(0, 0, 0), numeric(0))
+  if (!identical(el0$evaluer(matrix(0, 0, 3)), c(0, 0, 0)) || !isTRUE(el0$pivots)) e <- c(e, "m = 0")
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
+# Forme F334 (C3 du plan de B33) : une seule élimination, appelée par
+# score_homogeneite() et ecart_minimal_homogeneite() ; plus de solve() ni de
+# diag(A) - P'DP dans l'étape.
+verifier("I #334 F334 : eliminer_sans_soustraction() appelée une fois par score_homogeneite() et une fois par ecart_minimal_homogeneite() ; aucun solve() dans les deux fonctions", {
+  corps <- function(f) gsub("\\s+", " ", paste(deparse(body(get(f, asNamespace("tablexp"))), width.cutoff = 500L),
+                                                collapse = " "))
+  n <- function(f, motif) lengths(regmatches(corps(f), gregexpr(motif, corps(f), fixed = TRUE)))
+  tous(score = if (n("score_homogeneite", "eliminer_sans_soustraction(") == 1L) TRUE else "score_homogeneite()",
+       ecart = if (n("ecart_minimal_homogeneite", "eliminer_sans_soustraction(") == 1L) TRUE
+               else "ecart_minimal_homogeneite()",
+       solve = if (n("score_homogeneite", "solve(") == 0L && n("ecart_minimal_homogeneite", "solve(") == 0L) TRUE
+               else "solve() présent")
+})
+# Groupe de référence (Q3, § 1, point 3) : attendu A le plus grand, le plus
+# petit indice à égalité ; la p exacte porte sur le groupe retenu (garde).
+verifier("I #334 groupe de référence : attendu le plus grand (garde = groupes retenus) ; à égalité, le plus petit indice ; deux composantes, une référence chacune", {
+  sc1 <- tablexp:::score_homogeneite(c(1, 9), c(10, 90), c(1L, 1L), 1:2, 1L, 2L)
+  sc2 <- tablexp:::score_homogeneite(c(5, 5), c(50, 50), c(1L, 1L), 1:2, 1L, 2L)
+  sc3 <- tablexp:::score_homogeneite(c(2, 1, 1, 3, 1, 5), c(20, 30, 10, 10, 10, 80), c(1L, 1L, 1L, 2L, 2L, 2L),
+                                     c(1L, 2L, 3L, 4L, 5L, 6L), 2L, 6L)
+  tous(max = if (identical(sc1$garde, 1L)) TRUE else paste("garde", paste(sc1$garde, collapse = ",")),
+       egalite = if (identical(sc2$garde, 2L)) TRUE else paste("garde", paste(sc2$garde, collapse = ",")),
+       composantes = if (identical(sc3$garde, c(1L, 3L, 4L, 5L))) TRUE else paste("garde", paste(sc3$garde, collapse = ",")),
+       somme_u = if (isTRUE(proche(c(sum(sc3$U[1:3]), sum(sc3$U[4:6])), c(0, 0), 0, 1e-12))) TRUE else "U de somme non nulle")
+})
+# Cas du corps de #334 (spécification, § 2) : avant (copie de 517469f),
+# erreur dgesv ; après, T produite, valeur calculée à la main à une strate
+# informative (âge 62, 5 décès sur Y) : T = U_X^2 / v_X, U_X = -D pi_X, v_X =
+# D pi_X pi_Y, soit D pi_X / pi_Y.
+# Second cas (Q2 du visa d'actuary de l'étape (3)) : les 5 décès sur X ; T =
+# U_X^2 / v_X, U_X = D pi_Y, soit D pi_Y / pi_X = 5.5426917510853837e+18
+# (mesuré, égal à la forme close au bit) ; avant : erreur dgesv aussi.
+verifier("I #334 cas du corps de l'issue : S = 2, K = 3, E = (4.82e-07, 1.21e-08, 6.91e-15 ; 0, 0, 7.66e3), 5 décès à 62 sur le second segment : T = 5 pi_X / pi_Y = 4.5104438642297647e-18 à 1e-12, sans erreur ; X et Y produite, z antisymétriques ; 5 décès sur X : T = 5 pi_Y / pi_X = 5.5426917510853837e+18 à 1e-12", {
+  d2 <- expo_seg(rep(c("X", "Y"), each = 3L), rep(60:62, 2L), c(4.82e-07, 1.21e-08, 6.91e-15, 0, 0, 7.66e3), c(0, 0, 5, 0, 0, 0))
+  r2 <- tryCatch(homog(d2, "segment", c(60, 62), 60), error = function(x) conditionMessage(x))
+  if (is.character(r2)) return(paste("erreur (décès sur X) :", r2))
+  d <- expo_seg(rep(c("X", "Y"), each = 3L), rep(60:62, 2L), c(4.82e-07, 1.21e-08, 6.91e-15, 0, 0, 7.66e3), c(0, 0, 0, 0, 0, 5))
+  r <- tryCatch(homog(d, "segment", c(60, 62), 60), error = function(x) conditionMessage(x))
+  if (is.character(r)) return(paste("erreur :", r))
+  t <- r$resultat$tests; sg <- r$resultat$segments[r$resultat$segments$portee == "global", ]
+  px <- 6.91e-15 / (6.91e-15 + 7.66e3); py <- 7.66e3 / (6.91e-15 + 7.66e3)
+  tous(etat = if (identical(t$etat[1L], "produite")) TRUE else t$etat[1L],
+       t = proche(t$statistique[1L], 5 * px / py, 1e-12, 0),
+       t_spec = proche(t$statistique[1L], 4.5104438642297647e-18, 1e-12, 0),
+       t_x = proche(r2$resultat$tests$statistique[1L], 5 * py / px, 1e-12, 0),
+       t_x_spec = proche(r2$resultat$tests$statistique[1L], 5.5426917510853837e+18, 1e-12, 0),
+       segments = if (identical(sg$etat, c("produite", "produite")) && identical(sg$z[1L], -sg$z[2L])) TRUE
+                  else paste(sg$etat, collapse = "/"))
+})
+# Corps de #333 (F (1e5, 100), X (1e-11, 0)) : avant, T dépendait de l'ordre
+# (9.9999999999999984e-15 et 1.4210854715202004e-14) et z_F valait
+# 1.192e-07 au lieu de 1e-07 ; après, même T dans les deux ordres, z = +-1e-07
+# antisymétriques (valeur calculée à la main : z_X = -sqrt(D pi_X / pi_F)).
+verifier("I #334 corps de #333 : F (1e5, D_F), X (1e-11, D_X), (D_F, D_X) dans {(100, 0), (99, 1)}, deux ordres : T identique d'un ordre à l'autre, z_F = -z_X au bit, z à 1e-12 de la forme close", {
+  e <- character(0)
+  for (D in list(c(100, 0), c(99, 1))) {
+    pf <- 1e5 / (1e5 + 1e-11); px <- 1e-11 / (1e5 + 1e-11)
+    zx <- (D[2L] - 100 * px) / sqrt(100 * pf * px)
+    res <- lapply(list(1:2, 2:1), function(o) homog(expo_seg(c("F", "X"), c(60, 60), c(1e5, 1e-11), D)[o, ], "segment", c(60, 60), 60))
+    t <- vapply(res, function(r) r$resultat$tests$statistique[1L], 0)
+    for (r in res) {
+      sg <- r$resultat$segments[r$resultat$segments$portee == "global", ]
+      z_f <- sg$z[sg$segment == "F"]; z_x <- sg$z[sg$segment == "X"]
+      if (!identical(z_f, -z_x) || !isTRUE(proche(z_x, zx, 1e-12, 0)))
+        e <- c(e, sprintf("D %s : z %s / %s, attendu z_X %s", paste(D, collapse = "/"), format(z_f, digits = 17),
+                          format(z_x, digits = 17), format(zx, digits = 17)))
+    }
+    if (!identical(t[1L], t[2L])) e <- c(e, sprintf("D %s : T %s", paste(D, collapse = "/"), paste(format(t, digits = 17), collapse = " / ")))
+  }
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
+# Débordement (Q3, § 1, point 9) : pivots corrects, statistique au-delà du
+# plus grand double : T = +Inf, état produite, p asymptotique 0, p de
+# Monte-Carlo 1 / (B + 1) (B = 99). Avant : erreur dgesv (E_X <= 5e-308).
+verifier("I #334 débordement : A (5000, 600), X (E_X, 1), E_X dans {1e-308, 5e-310}, deux ordres : T = +Inf, état produite, p asymptotique 0, p de Monte-Carlo 0,01", {
+  e <- character(0)
+  for (eX in c(1e-308, 5e-310)) for (o in list(1:2, 2:1)) {
+    r <- tryCatch(homog(expo_seg(c("A", "X"), c(60, 60), c(5000, eX), c(600, 1))[o, ], "segment", c(60, 60), 60),
+                  error = function(x) conditionMessage(x))
+    if (is.character(r)) { e <- c(e, sprintf("E_X %g : erreur %s", eX, r)); next }
+    t <- r$resultat$tests[1L, ]
+    if (!identical(t$statistique, Inf) || !identical(t$etat, "produite") || !identical(t$p_asymptotique, 0) ||
+        !isTRUE(proche(t$p_monte_carlo, 1 / 100, 1e-14, 0)))
+      e <- c(e, sprintf("E_X %g ordre %s : T %s, %s, p %s, p MC %s", eX, paste(o, collapse = ""), t$statistique, t$etat,
+                        t$p_asymptotique, t$p_monte_carlo))
+  }
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
+# M570, P1 (a) : un pivot nul ou non fini (produits D_.c pi_jc pi_kc sous le
+# plus petit double) rend le test precision_insuffisante, décidé avant tout
+# tirage : T, p asymptotique, p exacte et p de Monte-Carlo NA, état de la p
+# exacte precision_insuffisante, aucun tirage (jeu cellules à 0) ; z produit
+# là où v > 0, sinon variance_nulle ; ecart_minimal hérite de l'état du test,
+# sans signal. Avant (copie de 517469f) : erreur dgesv dans tous ces cas.
+verifier("I #334 precision_insuffisante (M570, P1 (a)) : A (5000, 600), X (E_X, D_X), E_X dans {1.5e-323, 1e-323, 5e-324}, D_X dans {0, 1} ; et S = 3, J de part dénormalisée minimale : tests precision_insuffisante, T et p NA, aucun tirage ; z produit si v > 0 ; ecart_minimal precision_insuffisante ; aucun avertissement", {
+  e <- character(0)
+  cas <- c(lapply(c(1.5e-323, 1e-323, 5e-324), function(eX) lapply(0:1, function(dX)
+             list(nom = sprintf("E_X %g D_X %d", eX, dX), d = expo_seg(c("A", "X"), c(60, 60), c(5000, eX), c(600, dX)),
+                  z = c(A = NA, X = NA)))),
+           list(list(list(nom = "S = 3", d = expo_seg(c("A", "B", "J"), rep(60, 3), c(1, 1, 4.94e-324), c(1, 0, 0)),
+                           z = c(A = 1, B = -1, J = NA)))))
+  for (c_ in unlist(cas, recursive = FALSE)) {
+    av <- character(0)
+    r <- tryCatch(withCallingHandlers(homog(c_$d, "segment", c(60, 60), 60), warning = function(w) {
+      av <<- c(av, conditionMessage(w)); invokeRestart("muffleWarning")
+    }), error = function(x) conditionMessage(x))
+    if (is.character(r)) { e <- c(e, sprintf("%s : erreur %s", c_$nom, r)); next }
+    t <- r$resultat$tests; em <- r$resultat$ecart_minimal
+    sg <- r$resultat$segments[r$resultat$segments$portee == "global", ]
+    z <- sg$z[match(names(c_$z), sg$segment)]
+    pb <- c(if (!all(t$etat == "precision_insuffisante") || !all(t$etat_p_exacte == "precision_insuffisante")) "états des tests",
+            if (!all(is.na(c(t$statistique, t$p_asymptotique, t$p_exacte, t$p_monte_carlo, t$erreur_monte_carlo)))) "T ou p non NA",
+            if (!identical(r$resultat$monte_carlo$jeux$tirages_effectues, 0L)) "tirages",
+            if (!isTRUE(proche(z, unname(c_$z), 1e-12, 0)) ||
+                !identical(sg$etat[match(names(c_$z), sg$segment)], unname(ifelse(is.na(c_$z), "variance_nulle", "produite")))) "segments",
+            if (!all(c(em$etat_superieur, em$etat_inferieur) == "precision_insuffisante") ||
+                !all(is.na(c(em$theta_80_superieur, em$theta_80_inferieur)))) "ecart_minimal",
+            if (nrow(r$avertissements)) "avertissement du moteur", if (length(av)) "avertissement de R")
+    if (length(pb)) e <- c(e, sprintf("%s : %s", c_$nom, paste(pb, collapse = ", ")))
+  }
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
+# Quatre segments (Q3, § 2 et § 3, point 5) : six âges (60 à 65), deux
+# tranches (60, 63), Z non exposé à 60-61 ; six ordres des lignes. T
+# recalculé par la pseudo-inverse spectrale de V (eigen(), valeurs propres
+# au-delà de 1e-10 fois la plus grande ; mesuré 6,7e-16 sur le prototype
+# d'actuary) ; invariance de T, z et theta à 1e-12 et des états (p de
+# Monte-Carlo exclue : flux des lignes, #335, (I2)).
+EXPO_334 <- tablexp:::sous_graine(20261123L, {
+  g <- expand.grid(segment = c("W", "X", "Y", "Z"), age = 60:65, stringsAsFactors = FALSE)
+  g$exposition_centrale <- stats::runif(nrow(g), 200, 2000)
+  g$exposition_centrale[g$segment == "Z" & g$age <= 61] <- 0
+  g$evenements <- stats::rpois(nrow(g), g$exposition_centrale * 0.01 * c(W = 1, X = 1.2, Y = 0.9, Z = 1.1)[g$segment])
+  g
+})
+verifier("I #334 quatre segments, six ordres des lignes : T à 1e-12 de la pseudo-inverse spectrale de V ; T, z, theta_80 à 1e-12 et états identiques d'un ordre à l'autre", {
+  e <- character(0)
+  g <- EXPO_334
+  ref <- homog(g, "segment", c(60, 65), c(60, 63))
+  # T indépendant : strates informatives, V complète, pseudo-inverse spectrale.
+  U <- setNames(numeric(4), c("W", "X", "Y", "Z")); V <- matrix(0, 4, 4)
+  for (a in 60:65) {
+    l <- g[g$age == a, ]; Dc <- sum(l$evenements)
+    if (Dc == 0 || sum(l$exposition_centrale > 0) < 2L) next
+    pi <- l$exposition_centrale / sum(l$exposition_centrale)
+    U <- U + l$evenements - Dc * pi; V <- V + Dc * (diag(pi) - tcrossprod(pi))
+  }
+  ev <- eigen(V, symmetric = TRUE); k <- ev$values > 1e-10 * max(ev$values)
+  t_ind <- sum((crossprod(ev$vectors[, k], U))^2 / ev$values[k])
+  ok <- proche(ref$resultat$tests$statistique[1L], t_ind, 1e-12, 0)
+  if (!isTRUE(ok)) e <- c(e, paste("T indépendant :", ok))
+  cle <- function(r) {
+    s <- r$resultat$segments; o <- order(s$portee, s$tranche_debut, s$segment, method = "radix")
+    m <- r$resultat$ecart_minimal; om <- order(m$segment, method = "radix")
+    list(t = r$resultat$tests$statistique, et = r$resultat$tests$etat, z = s$z[o], es = s$etat[o],
+         th = c(m$theta_80_superieur[om], m$theta_80_inferieur[om]), em = c(m$etat_superieur[om], m$etat_inferieur[om]))
+  }
+  k0 <- cle(ref)
+  tablexp:::sous_graine(20261124L, for (i in 1:6) {
+    k1 <- cle(homog(g[sample.int(nrow(g)), ], "segment", c(60, 65), c(60, 63)))
+    pb <- c(if (!isTRUE(proche(k1$t, k0$t, 1e-12, 0))) "T", if (!isTRUE(proche(k1$z, k0$z, 1e-12, 0))) "z",
+            if (!isTRUE(proche(k1$th, k0$th, 1e-12, 0))) "theta",
+            if (!identical(c(k1$et, k1$es, k1$em), c(k0$et, k0$es, k0$em))) "états")
+    if (length(pb)) e <- c(e, sprintf("ordre %d : %s", i, paste(pb, collapse = ", ")))
+  })
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
+# États mêlés (m1 de l'audit de l'étape (3)) : A et B exposés de 60 à 63, J de
+# part dénormalisée minimale (4.94e-324) à 62-63 ; tranches (60, 62). Pivot
+# nul seulement dans la tranche 62-63 et dans le test global : global et
+# tranche 2 precision_insuffisante, tranche 1 produite, somme_tranches
+# precision_insuffisante (une tranche de ddl > 0 l'est ; tue le mutant all ->
+# any de pivots_somme, vérifié) ; le jeu cellules est tiré (B = 99) pour la
+# tranche produite, dont T est égal au bit à celui de la tranche seule.
+verifier("I #334 états mêlés (m1) : global et tranche 62-63 precision_insuffisante, tranche 60-61 produite (T égal au bit à l'appel sur la tranche seule), somme_tranches precision_insuffisante et T NA, 99 tirages du jeu cellules", {
+  d <- rbind(expo_seg(rep(c("A", "B"), each = 4L), rep(60:63, 2L), c(1000, 1100, 1200, 1300, 900, 950, 1000, 1050),
+                      c(5, 6, 7, 8, 4, 6, 5, 9)),
+             expo_seg(c("J", "J"), 62:63, c(4.94e-324, 4.94e-324), c(0, 0)))
+  r <- homog(d, "segment", c(60, 63), c(60, 62))
+  t <- r$resultat$tests
+  seule <- homog(d[d$age <= 61, ], "segment", c(60, 61), 60)$resultat$tests
+  tous(etats = if (identical(t$etat, c("precision_insuffisante", "produite", "precision_insuffisante",
+                                       "precision_insuffisante"))) TRUE else paste(t$etat, collapse = "/"),
+       somme = if (is.na(t$statistique[4L]) && is.na(t$p_monte_carlo[4L])) TRUE else "somme_tranches produite",
+       tranche = if (identical(t$statistique[2L], seule$statistique[1L])) TRUE
+                 else paste(format(t$statistique[2L], digits = 17), format(seule$statistique[1L], digits = 17)),
+       tirages = if (identical(r$resultat$monte_carlo$jeux$tirages_effectues, 99L)) TRUE else "tirages")
+})
+# p exacte sur le groupe retenu (#334 ; recommandation (i) d'actuary au visa
+# de l'étape (3)) : groupe 2 dominant (référence), plusieurs strates ;
+# recalcul indépendant par convolution directe des dbinom sur le groupe
+# miroir (groupe 2) : p = P(|O_2 - A_2| >= |o_2 - A_2|), égale en
+# arithmétique exacte (O_1 - A_1 = -(O_2 - A_2)), à 1e-12 en relatif.
+verifier("I #334 p exacte, groupe 2 dominant, quatre strates : groupe retenu 1 ; p à 1e-12 d'une convolution directe des dbinom sur le groupe miroir", {
+  E <- c(120, 900, 80, 700, 150, 1100, 60, 500); D <- c(2, 9, 0, 8, 3, 10, 1, 4)
+  sc <- tablexp:::score_homogeneite(D, E, rep(1:4, each = 2L), rep(1:2, 4L), 4L, 2L)
+  pe <- tablexp:::p_exacte_homogeneite(sc)
+  n <- D[c(1, 3, 5, 7)] + D[c(2, 4, 6, 8)]; p2 <- E[c(2, 4, 6, 8)] / (E[c(1, 3, 5, 7)] + E[c(2, 4, 6, 8)])
+  loi <- 1
+  for (j in seq_along(n)) {
+    b <- stats::dbinom(0:n[j], n[j], p2[j]); nl <- numeric(length(loi) + n[j])
+    for (k in seq_along(b)) nl[k:(k + length(loi) - 1L)] <- nl[k:(k + length(loi) - 1L)] + b[k] * loi
+    loi <- nl
+  }
+  a2 <- sum(n * p2); o2 <- sum(D[c(2, 4, 6, 8)]); k <- seq_along(loi) - 1
+  p_ind <- min(1, sum(loi[abs(k - a2) >= abs(o2 - a2) - 1e-10 * a2]))
+  tous(garde = if (identical(sc$garde, 1L)) TRUE else paste("garde", sc$garde),
+       etat = if (identical(pe$etat, "produite")) TRUE else pe$etat,
+       p = proche(pe$p, p_ind, 1e-12, 0))
+})
+# Convention de la frontière (recommandation (ii) d'actuary) : l'égalité
+# |k - A_1| = |o_1 - A_1| est jugée à 1e-10 A_1 près, A_1 attendu du groupe
+# retenu (le plus petit). Une strate, D = 10, E = (0,25 + 2e-11 ; 0,75 -
+# 2e-11), o_1 = 1 : A_1 = 2,5000000002, |4 - A_1| = 1,4999999998 <
+# 1,5000000002 - 2,5e-10 : k = 4 exclu, p = 0.32215213773465651 (mesuré).
+# Avant #334 (copie de 517469f), groupe retenu 2, tolérance 7,5e-10 : k = 4
+# inclus, p = 0.46815013885664886 (mesuré).
+verifier("I #334 p exacte à la frontière (convention 1e-10 A_garde) : une strate, D = 10, E = (0,25 + 2e-11 ; 0,75 - 2e-11), o_1 = 1 : groupe retenu 1, k = 4 exclu, p = 0.32215213773465651 à 1e-12", {
+  sc <- tablexp:::score_homogeneite(c(1, 9), c(0.25 + 2e-11, 0.75 - 2e-11), c(1L, 1L), 1:2, 1L, 2L)
+  pe <- tablexp:::p_exacte_homogeneite(sc)
+  p_main <- sum(stats::dbinom(c(0:1, 5:10), 10, (0.25 + 2e-11) / 1))
+  tous(garde = if (identical(sc$garde, 1L)) TRUE else paste("garde", sc$garde),
+       p = proche(pe$p, 0.32215213773465651, 1e-12, 0),
+       main = proche(pe$p, p_main, 1e-12, 0))
+})
+
+# --- #333 : variance_nulle après #334 ; part arrondie à 0 ---------------------
+#
+# Spécification d'actuary-approfondi de #333 (Q4) ; texte de statut de
+# theta_80 (M570). Natures des attendus : valeur calculée à la main (formes
+# closes à deux segments en strate unique, sur les parts telles que
+# représentées : theta = (1 +- q r) / (1 -+ p r), r = sqrt(lambda_80 / (D p
+# q)), p part du segment, q celle de l'autre ; z_X = (O_X - D pi_X) / sqrt(D
+# pi_X pi_F)) ; constat de mesure pour les états.
+
+# Cas du corps (Q4, § 2) : pi_F = 1 exactement en double (1e5 / (1e5 + E_X)
+# == 1 pour E_X = 5e-12 et 1e-12). Mesure adverse (C7), sur une copie de
+# 517469f : F variance_nulle (z NA, deux branches variance_nulle) en ordre
+# (F, X), erreur dgesv en ordre (X, F) ; depuis #334 (v_F = w_FX > 0) : F
+# produite, theta+ de F non_atteint, theta- de F produite ; X theta+
+# produite, theta- non_atteint ; signal de nombre 2. Aucun changement au
+# commit de #333 (mesuré, f18d9ec et après).
+verifier("I #333 corps : F (1e5, D_F), X (E_X, D_X), E_X dans {5e-12, 1e-12}, (D_F, D_X) dans {(100, 0), (99, 1)}, deux ordres : F et X produite, z_F = -z_X à 1e-10 de la forme close ; theta- de F et theta+ de X produite à 1e-10 de la forme close, theta+ de F et theta- de X non_atteint ; signal de nombre 2", {
+  e <- character(0)
+  for (eX in c(5e-12, 1e-12)) for (D in list(c(100, 0), c(99, 1))) for (o in list(1:2, 2:1)) {
+    nom <- sprintf("E_X %g D %s ordre %s", eX, paste(D, collapse = "/"), paste(o, collapse = ""))
+    r <- tryCatch(homog(expo_seg(c("F", "X"), c(60, 60), c(1e5, eX), D)[o, ], "segment", c(60, 60), 60),
+                  error = function(x) conditionMessage(x))
+    if (is.character(r)) { e <- c(e, sprintf("%s : erreur %s", nom, r)); next }
+    pf <- 1e5 / (1e5 + eX); px <- eX / (1e5 + eX); rr <- sqrt(L80_1 / (100 * pf * px))
+    sg <- r$resultat$segments[r$resultat$segments$portee == "global", ]; em <- r$resultat$ecart_minimal
+    zf <- sg$z[sg$segment == "F"]; zx <- sg$z[sg$segment == "X"]
+    f <- match("F", em$segment); x <- match("X", em$segment)
+    et <- c(sg$etat[match(c("F", "X"), sg$segment)], em$etat_superieur[f], em$etat_inferieur[f], em$etat_superieur[x],
+            em$etat_inferieur[x])
+    sig <- r$avertissements$nombre[r$avertissements$code == "ecart_minimal_detectable"]
+    pb <- c(if (!identical(et, c("produite", "produite", "non_atteint", "produite", "produite", "non_atteint"))) paste(et, collapse = "/"),
+            if (!isTRUE(proche(zx, (D[2L] - 100 * px) / sqrt(100 * px * pf), 1e-10, 0)) || !identical(zf, -zx)) "z",
+            if (!isTRUE(proche(em$theta_80_inferieur[f], (1 - px * rr) / (1 + pf * rr), 1e-10, 0))) "theta- de F",
+            if (!isTRUE(proche(em$theta_80_superieur[x], (1 + pf * rr) / (1 - px * rr), 1e-10, 0))) "theta+ de X",
+            if (!identical(sig, 2L)) "signal")
+    if (length(pb)) e <- c(e, sprintf("%s : %s", nom, paste(pb, collapse = ", ")))
+  }
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
+# Variante (commentaire de #333 ; Q4, § 3) : A (5000, 600 ; 100, 2), X
+# (E_X60, 0 ; 100, 1), âges 60 et 61. Part de X à 60 arrondie à 0 pour E_X60
+# dans {4.94e-323, 9.88e-324} : la limite lambda(+-infini) n'est pas
+# déterminée par le calcul (terme de la strate 60 perdu) : theta- de A et
+# theta+ de X precision_insuffisante (avant, sur une copie de f18d9ec :
+# non_atteint, signal à tort) ; theta+ de A et theta- de X non_atteint
+# (inchangés) ; T = 1/3 (contribution vraie de la strate 60 sous 1e-320) ;
+# nombre 2 (autre branche non_atteint). Témoin E_X60 = 5e-315 (part ~1e-318,
+# représentable) : la règle ne joue pas ; theta- de A produite,
+# 6.4677876288876102e-316 (mesuré, inchangé), theta+ de X
+# precision_insuffisante par une autre cause (inchangé).
+verifier("I #333 part arrondie à 0 : A (5000, 600 ; 100, 2), X (E_X60, 0 ; 100, 1), deux ordres ; E_X60 dans {4.94e-323, 9.88e-324} : theta- de A et theta+ de X precision_insuffisante, theta+ de A et theta- de X non_atteint, T = 1/3 à 1e-15, nombre 2 ; témoin 5e-315 : theta- de A produite 6.4677876288876102e-316 à 1e-10", {
+  e <- character(0)
+  for (eX in c(4.94e-323, 9.88e-324, 5e-315)) for (o in list(1:4, c(3L, 4L, 1L, 2L))) {
+    nom <- sprintf("E_X60 %g ordre %s", eX, paste(o, collapse = ""))
+    r <- homog(expo_seg(c("A", "A", "X", "X"), c(60, 61, 60, 61), c(5000, 100, eX, 100), c(600, 2, 0, 1))[o, ],
+               "segment", c(60, 61), 60)
+    em <- r$resultat$ecart_minimal; a <- match("A", em$segment); x <- match("X", em$segment)
+    et <- c(em$etat_superieur[a], em$etat_inferieur[a], em$etat_superieur[x], em$etat_inferieur[x])
+    att <- if (eX < 1e-320) c("non_atteint", "precision_insuffisante", "precision_insuffisante", "non_atteint")
+           else c("non_atteint", "produite", "precision_insuffisante", "non_atteint")
+    pb <- c(if (!identical(et, att)) paste(et, collapse = "/"),
+            if (!isTRUE(proche(r$resultat$tests$statistique[1L], 1 / 3, 1e-15, 0))) "T",
+            if (!identical(r$avertissements$nombre[r$avertissements$code == "ecart_minimal_detectable"], 2L)) "signal",
+            if (eX > 1e-320 && !isTRUE(proche(em$theta_80_inferieur[a], 6.4677876288876102e-316, 1e-10, 0))) "theta- de A")
+    if (length(pb)) e <- c(e, sprintf("%s : %s", nom, paste(pb, collapse = ", ")))
+  }
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
+
+# --- #348 : total des événements gardé avant tout tirage ----------------------
+#
+# Spécification d'actuary-approfondi de #348 (Q5 ; forme F348). Avant (copie
+# de 0990bab) : erreur de R « invalid second argument 'size' » de
+# rmultinom(), précédée de l'avertissement « NAs introduced by coercion to
+# integer range ». Après : refus homogeneite / denombrement_hors_plage avant
+# tout score et tout tirage, gardes dans leur ordre (valeur calculée à la
+# main : 2e9 + 2e9 + 1 + 1).
+refus_ou_erreur_348 <- function(expr) {
+  av <- character(0)
+  r <- tryCatch(withCallingHandlers(expr, warning = function(w) { av <<- c(av, conditionMessage(w)); invokeRestart("muffleWarning") }),
+                refus_tablexp = function(x) x, error = function(e) e)
+  list(r = r, av = av)
+}
+# controle() est masquée plus haut par une fonction de même nom (test du
+# statut theta_80_superieur, évalué dans l'environnement du fichier) : forme
+# propre ici.
+refus_348 <- function(r, module, motif)
+  if (!inherits(r, "refus_tablexp")) "aucun refus levé" else if (!identical(c(r$module, r$motif), c(module, motif)))
+    sprintf("refus %s / %s au lieu de %s / %s", r$module, r$motif, module, motif) else TRUE
+verifier("I #348 homogénéité : deux segments, 2e9 événements par ligne à 60 et 1 à 61 (total 4000000002) : refus homogeneite / denombrement_hors_plage, grandeur evenements_total, valeur 4000000002, limite .Machine$integer.max ; aucune erreur ni aucun avertissement de R", {
+  d <- expo_seg(c("A", "B", "A", "B"), c(60, 60, 61, 61), rep(1e10, 4L), c(2e9, 2e9, 1, 1))
+  x <- refus_ou_erreur_348(homog(d, "segment", c(60, 61), 60, B = 19))
+  r <- x$r
+  tous(refus = if (inherits(r, "refus_tablexp")) TRUE
+               else if (inherits(r, "error")) paste("erreur de R :", conditionMessage(r)) else "aucun refus",
+       motif = refus_348(r, "homogeneite", "denombrement_hors_plage"),
+       grandeur = if (identical(r$details$grandeur, "evenements_total") && identical(r$details$valeur, 4000000002) &&
+                      identical(r$details$limite, .Machine$integer.max)) TRUE else "détails du refus",
+       avertissements = if (!length(x$av)) TRUE else paste(x$av, collapse = " / "))
+})
+verifier("I #348 homogénéité, ordre des gardes conservé : 2e9 + 2e9 événements hors de la plage (âge 70), plage 60 seule : refus evenements_hors_plage (valeur 4e9), comme avant", {
+  d <- expo_seg(c("A", "B", "A", "B"), c(60, 60, 70, 70), rep(1e10, 4L), c(5, 3, 2e9, 2e9))
+  r <- refus_ou_erreur_348(homog(d, "segment", c(60, 60), 60, B = 19))$r
+  tous(motif = refus_348(r, "homogeneite", "denombrement_hors_plage"),
+       grandeur = if (identical(r$details$grandeur, "evenements_hors_plage") && identical(r$details$valeur, 4e9)) TRUE
+                  else paste(r$details$grandeur, r$details$valeur))
+})
+verifier("I #348 replications_multinomiales() : effectif au-delà de .Machine$integer.max -> erreur de programmation avant tout tirage (complément défensif), sans avertissement de R", {
+  x <- refus_ou_erreur_348(tablexp:::replications_multinomiales(c(1, 1), c(1L, 1L), 3e9, 2, 1L,
+                                                                 function(Dm) list(t = colSums(Dm))))
+  tous(erreur = if (inherits(x$r, "error") && grepl("replications_multinomiales() : groupes, poids ou effectifs invalides",
+                                                    conditionMessage(x$r), fixed = TRUE)) TRUE
+                else if (inherits(x$r, "error")) conditionMessage(x$r) else "aucune erreur",
+       avertissements = if (!length(x$av)) TRUE else paste(x$av, collapse = " / "))
+})
+# Garde avancée devant segments/observes (m1 de l'audit de l'étape (5) ;
+# spécification, Q5, § 2) : un seul segment, 2e9 + 1e9 événements. Avant
+# (copie de 0990bab) : refus sur segments/observes (portee()) ; après :
+# evenements_total, même motif (valeur 3e9, calculée à la main).
+verifier("I #348 garde avancée : un segment, 2e9 + 1e9 événements (âges 60 et 61) : refus homogeneite / denombrement_hors_plage, grandeur evenements_total (et non plus segments/observes), valeur 3e9", {
+  r <- refus_ou_erreur_348(homog(expo_seg(c("A", "A"), 60:61, c(1e10, 1e10), c(2e9, 1e9)), "segment", c(60, 61), 60,
+                                 B = 19))$r
+  tous(motif = refus_348(r, "homogeneite", "denombrement_hors_plage"),
+       grandeur = if (identical(r$details$grandeur, "evenements_total") && identical(r$details$valeur, 3e9)) TRUE
+                  else paste(r$details$grandeur, r$details$valeur))
+})
+# Ordre des deux premières gardes (m2) : cellule 60 fautive (E = 0, 2e9 + 2e9
+# décès) et 2e9 + 2e9 décès hors plage (âge 70) : les deux décomptes
+# dépassent l'entier maximal ; la première garde dans l'ordre est citée
+# (mesuré, identique à 0990bab).
+verifier("I #348 ordre des gardes : événements sans exposition dans la plage (4e9) et hors plage (4e9) au-delà de l'entier maximal : refus sur evenements_cellules_evenement_sans_exposition, la première dans l'ordre", {
+  d <- expo_seg(c("A", "B", "A", "B", "A", "B"), c(60, 60, 61, 61, 70, 70), c(0, 0, 1e10, 1e10, 1e10, 1e10),
+                c(2e9, 2e9, 5, 3, 2e9, 2e9))
+  r <- refus_ou_erreur_348(homog(d, "segment", c(60, 61), 60, B = 19))$r
+  tous(motif = refus_348(r, "homogeneite", "denombrement_hors_plage"),
+       grandeur = if (identical(r$details$grandeur, "evenements_cellules_evenement_sans_exposition") &&
+                      identical(r$details$valeur, 4e9)) TRUE else paste(r$details$grandeur, r$details$valeur))
+})
+
+# Symétrie de W (revue finale de B33, m1, voie (b) recommandée par actuary) :
+# crossprod() ne garantit pas w_jk == w_kj au bit selon le BLAS ;
+# score_homogeneite() symétrise W, d'où v_1 = v_2 et U_1 = -U_2 à deux
+# segments, donc z opposés au bit. Cas de l'audit (avant, sur une copie de
+# 98818fb : W asymétrique, z = -0.085734547871258518 / 0.085734547871258504)
+# et 300 cas tirés (deux segments, 2 à 6 âges, expositions de 10 à 1e5 en
+# échelle logarithmique ; avant : 77 cas en défaut sur ce poste). Identité
+# exacte : la propriété ne dépend d'aucun BLAS.
+verifier("I #334 W symétrique au bit et z opposés au bit à deux segments : cas de l'audit (âges 60 à 65) et 300 cas tirés sous une graine locale", {
+  d <- expo_seg(rep(c("a", "b"), each = 6L), rep(60:65, 2L),
+                c(92.39, 227.3, 65.18, 20.55, 33260, 67200, 608.1, 510.4, 223.1, 233.8, 125.9, 317.1),
+                c(2, 3, 6, 3, 4, 2, 6, 4, 6, 1, 3, 5))
+  sg <- homog(d, "segment", c(60, 65), 60, B = 19)$resultat$segments
+  sg <- sg[sg$portee == "global", ]
+  sc <- tablexp:::score_homogeneite(d$evenements, d$exposition_centrale, rep(1:6, 2L), rep(1:2, each = 6L), 6L, 2L)
+  defauts <- tablexp:::sous_graine(20261122L, sum(vapply(1:300, function(i) {
+    K <- sample(2:6, 1L); E <- exp(stats::runif(2L * K, log(10), log(1e5))); D <- stats::rpois(2L * K, 3)
+    s <- tablexp:::score_homogeneite(D, E, rep(seq_len(K), 2L), rep(1:2, each = K), K, 2L)
+    z <- s$U / sqrt(s$v)
+    !identical(s$W, t(s$W)) || (s$ddl > 0 && !identical(z[1L], -z[2L]))
+  }, NA)))
+  tous(w = if (identical(sc$W, t(sc$W))) TRUE else "W asymétrique (cas de l'audit)",
+       z = if (identical(sg$z[1L], -sg$z[2L])) TRUE else paste(format(sg$z, digits = 17), collapse = " / "),
+       tires = if (defauts == 0L) TRUE else sprintf("%d cas sur 300 en défaut", defauts))
 })
