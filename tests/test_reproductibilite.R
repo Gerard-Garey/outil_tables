@@ -523,6 +523,33 @@ transition_334 <- function(plans) {
                                positions = k)))
 }
 TRANSITIONS_EN_COURS <- c(TRANSITIONS_EN_COURS, list(transition_334(c("R11", "R12"))))
+# Transition #333, cause « part arrondie à 0 » de precision_insuffisante
+# nommée dans le statut de theta_80 (B33, étape (4) ; spécification
+# d'actuary-approfondi de #333, Q4, § 3 ; M570) : texte des deux statuts
+# ecart_minimal (theta_80_superieur, theta_80_inferieur) de R11 et R12, en
+# « valeur de chaîne » aux positions lues par les colonnes sœurs de la
+# référence ; une substitution commune aux deux branches, en échappements
+# \u, par apres_334() (même garde). Positions distinctes de celles de #334.
+# Aucune valeur ne change (aucune part arrondie à 0 dans R11 et R12, mesuré).
+# À clore par la régénération (R) de B33, avec transition_333() et
+# SUBST_333.
+SUBST_333 <- c(
+  "positif, limite ind\u00e9termin\u00e9e, r\u00e9solution non converg\u00e9e",
+  paste("positif, limite ind\u00e9termin\u00e9e (dont une part d'exposition arrondie \u00e0 0 dans une strate o\u00f9 le segment et un",
+        "autre segment sont expos\u00e9s), r\u00e9solution non converg\u00e9e"))
+transition_333 <- function(plans) {
+  ref <- lire_reference(file.path(DOSSIER_REFERENCES, paste0(plans[1L], ".tsv")))$valeurs
+  st <- CHEMIN_STATUTS_334
+  k <- match(c("theta_80_superieur", "theta_80_inferieur"), ref[[paste0(st, "grandeur")]])
+  if (anyNA(k) || !identical(ref[[paste0(st, "table")]][k], c("ecart_minimal", "ecart_minimal")))
+    stop("transition_333() : statuts ecart_minimal absents de la r\u00e9f\u00e9rence (erreur de programmation)")
+  apres <- vapply(ref[[paste0(st, "statut")]][k], apres_334, "", subst = SUBST_333, USE.NAMES = FALSE)
+  Encoding(apres) <- "UTF-8"
+  list(issue = "#333", plans = plans,
+       changements = list(list(chemin = paste0(st, "statut"), nature = "valeur de chaîne", valeurs = apres,
+                               positions = k)))
+}
+TRANSITIONS_EN_COURS <- c(TRANSITIONS_EN_COURS, list(transition_333(c("R11", "R12"))))
 
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
 CHAMPS_CHANGEMENT <- list(type = c("de", "vers"), valeur = c("valeurs", "positions"),

@@ -1831,10 +1831,13 @@ ETATS_P_EXACTE_HOMOGENEITE <- c("produite", "plus_de_deux_groupes", "convolution
 # qui y porte des décès (reprise de l'audit, m1) ; segment_sans_exposition
 # (E_s = 0 sur la portée, sans décès : hors du test, hors de ddl, O = A = 0) ;
 # evenement_sans_exposition (portée dont une cellule porte un événement sans
-# exposition : z non produit) ; variance_nulle (V_ss nulle ; en arithmétique
-# exacte, segment exposé dans aucune strate informative : cellules où il est
-# seul exposé, ou sans décès ; z et theta_80 non définis ; aucun signal ;
-# spécification d'actuary-approfondi de #336, D8) ; produite.
+# exposition : z non produit) ; variance_nulle (V_ss, somme des w_sk sans
+# soustraction (#334), nulle en double précision ; en arithmétique exacte,
+# segment exposé dans aucune strate informative : cellules où il est seul
+# exposé, ou sans décès ; par arrondi seulement quand tous les produits
+# D_.c pi_sc pi_kc sont sous le plus petit double (parts d'exposition
+# infimes) ; z et theta_80 non définis ; aucun signal ; spécification
+# d'actuary-approfondi de #336, D8, et de #333, Q4, § 1) ; produite.
 ETATS_SEGMENTS_HOMOGENEITE <- c("produite", "segment_sans_exposition", "evenement_sans_exposition", "variance_nulle")
 # Mention d'indépendance des unités (M278, #159), en fin de chaque statut
 # d'une loi.
@@ -1882,7 +1885,10 @@ SEUIL_ECART_MINIMAL <- 1.25
 # limite +Inf compte au-delà, #338), ou precision_insuffisante quand la
 # racine n'est pas calculable par cette méthode en double précision à cette
 # tolérance, qu'elle soit ou non représentable (#340) : pivot de
-# l'élimination non fini ou non positif (les deux branches), limite NA, NaN
+# l'élimination non fini ou non positif (les deux branches), part
+# d'exposition arrondie à 0 dans une strate où le segment et un autre
+# segment sont exposés (limite non déterminée par le calcul : part du
+# segment, branche + ; part des autres, branche - ; #333), limite NA, NaN
 # ou -Inf, lambda_s encore au plus lambda_80 en |log theta| = 1024 (limite
 # au-delà du seuil ; garde défensive), non-convergence d'uniroot (#339),
 # postcondition non tenue (theta non fini, nul ou égal à 1, ou résidu au-delà
@@ -1942,7 +1948,8 @@ statut_ecart_minimal <- function(superieur) {
         if (superieur) "lorsque theta tend vers l'infini ;" else "lorsque theta tend vers 0 ;",
         "état precision_insuffisante (NA) quand la racine n'est pas calculable par cette méthode en double",
         "précision à cette tolérance, qu'elle soit ou non représentable (pivot de l'élimination non fini ou non",
-        "positif, limite indéterminée, résolution non convergée, ou postcondition |lambda_s(theta_80) / lambda_80 -",
+        "positif, limite indéterminée (dont une part d'exposition arrondie à 0 dans une strate où le segment et un",
+        "autre segment sont exposés), résolution non convergée, ou postcondition |lambda_s(theta_80) / lambda_80 -",
         "1| <= 1e-8 non tenue) ; unités d'observation indépendantes ; sous l'unité contrat, les décès sont",
         "sur-dispersés et theta_80 est trop proche de 1 (écart minimal détectable sous-estimé)")
 }
@@ -2400,9 +2407,17 @@ ecart_minimal_homogeneite <- function(sc, etat_test, etats_segments, S) {
     Pg <- P[, garde, drop = FALSE]
     lambda <- function(u) el$evaluer(crossprod(h_pond(u, Pg), sc$effectifs))
     pivots <- el$pivots
-    b_sup <- resoudre_branche_ecart_minimal(lambda, 1, lam80, seuil, pivots)
+    # Part arrondie à 0 (#333 ; spécification d'actuary-approfondi, Q4, § 3) :
+    # dans une strate informative où s et un autre segment ont une ligne
+    # utilisée (E > 0), une part calculée nulle perd le terme de la strate
+    # dans la limite lambda_s(+-infini), qui n'est donc pas déterminée par le
+    # calcul : part de s nulle, branche + precision_insuffisante ; part des
+    # autres nulle, branche -. Sans signal (M551 (3)) ; aucun état nouveau.
+    deux <- tabulate(ru[dans_s], n) > 0 & tabulate(ru[!dans_s], n) > 0
+    nul <- list(theta = NA_real_, etat = "precision_insuffisante")
+    b_sup <- if (any(deux & pis == 0)) nul else resoudre_branche_ecart_minimal(lambda, 1, lam80, seuil, pivots)
     sup[s] <- b_sup$theta; e_sup[s] <- b_sup$etat
-    b_inf <- resoudre_branche_ecart_minimal(lambda, -1, lam80, seuil, pivots)
+    b_inf <- if (any(deux & autres == 0)) nul else resoudre_branche_ecart_minimal(lambda, -1, lam80, seuil, pivots)
     inf[s] <- b_inf$theta; e_inf[s] <- b_inf$etat
   }
   list(superieur = sup, etat_superieur = e_sup, inferieur = inf, etat_inferieur = e_inf, lambda_80 = lam80)

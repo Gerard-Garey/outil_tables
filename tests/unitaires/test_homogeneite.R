@@ -864,7 +864,9 @@ verifier("I paramètres de l'étape (F218) : niveau_ecart_minimal, puissance_eca
 # méthode, qu'elle soit ou non représentable), puis par le sens de l'erreur
 # de la branche + (#331, spécification d'actuary-approfondi, Q5, corrigée à
 # la reprise : prudente, optimiste ou de sens non établi ; branche -
-# inchangée), et ses quatre substitutions pour theta_80_inferieur.
+# inchangée), et ses quatre substitutions pour theta_80_inferieur. Cause
+# « part d'exposition arrondie à 0 » de precision_insuffisante nommée par #333
+# (spécification d'actuary-approfondi, Q4, § 3 ; M570).
 STATUT_SUP_218 <- paste(
   "approximation asymptotique : plus petit theta > 1 tel que lambda_s(theta) >= lambda_80, theta multipliant la force",
   "du seul segment s dans chaque cellule ; lambda_s(theta) = delta_s(theta)' V^- delta_s(theta), delta_s(theta) = somme",
@@ -887,7 +889,8 @@ STATUT_SUP_218 <- paste(
   "(NA) quand lambda_s(theta) reste au plus lambda_80 (1 + 1e-8), tolérance relative de la résolution numérique,",
   "lorsque theta tend vers l'infini ; état precision_insuffisante (NA) quand la racine n'est pas calculable par cette",
   "méthode en double précision à cette tolérance, qu'elle soit ou non représentable (pivot de l'élimination non fini",
-  "ou non positif, limite indéterminée, résolution non convergée, ou postcondition |lambda_s(theta_80) / lambda_80 - 1|",
+  "ou non positif, limite indéterminée (dont une part d'exposition arrondie à 0 dans une strate où le segment et un",
+  "autre segment sont exposés), résolution non convergée, ou postcondition |lambda_s(theta_80) / lambda_80 - 1|",
   "<= 1e-8 non tenue) ; unités d'observation indépendantes ; sous l'unité contrat, les décès sont sur-dispersés et",
   "theta_80 est trop proche de 1 (écart minimal détectable sous-estimé)")
 verifier("I STATUTS_HOMOGENEITE (littéral de la spécification, § 7) : deux lignes ecart_minimal en fin (theta_80_superieur, theta_80_inferieur), textes exacts, inférieur par les quatre substitutions ; 15 lignes, UTF-8", {
@@ -2306,4 +2309,73 @@ verifier("I #334 p exacte à la frontière (convention 1e-10 A_garde) : une stra
   tous(garde = if (identical(sc$garde, 1L)) TRUE else paste("garde", sc$garde),
        p = proche(pe$p, 0.32215213773465651, 1e-12, 0),
        main = proche(pe$p, p_main, 1e-12, 0))
+})
+
+# --- #333 : variance_nulle après #334 ; part arrondie à 0 ---------------------
+#
+# Spécification d'actuary-approfondi de #333 (Q4) ; texte de statut de
+# theta_80 (M570). Natures des attendus : valeur calculée à la main (formes
+# closes à deux segments en strate unique, sur les parts telles que
+# représentées : theta = (1 +- q r) / (1 -+ p r), r = sqrt(lambda_80 / (D p
+# q)), p part du segment, q celle de l'autre ; z_X = (O_X - D pi_X) / sqrt(D
+# pi_X pi_F)) ; constat de mesure pour les états.
+
+# Cas du corps (Q4, § 2) : pi_F = 1 exactement en double (1e5 / (1e5 + E_X)
+# == 1 pour E_X = 5e-12 et 1e-12). Mesure adverse (C7), sur une copie de
+# 517469f : F variance_nulle (z NA, deux branches variance_nulle) en ordre
+# (F, X), erreur dgesv en ordre (X, F) ; depuis #334 (v_F = w_FX > 0) : F
+# produite, theta+ de F non_atteint, theta- de F produite ; X theta+
+# produite, theta- non_atteint ; signal de nombre 2. Aucun changement au
+# commit de #333 (mesuré, f18d9ec et après).
+verifier("I #333 corps : F (1e5, D_F), X (E_X, D_X), E_X dans {5e-12, 1e-12}, (D_F, D_X) dans {(100, 0), (99, 1)}, deux ordres : F et X produite, z_F = -z_X à 1e-10 de la forme close ; theta- de F et theta+ de X produite à 1e-10 de la forme close, theta+ de F et theta- de X non_atteint ; signal de nombre 2", {
+  e <- character(0)
+  for (eX in c(5e-12, 1e-12)) for (D in list(c(100, 0), c(99, 1))) for (o in list(1:2, 2:1)) {
+    nom <- sprintf("E_X %g D %s ordre %s", eX, paste(D, collapse = "/"), paste(o, collapse = ""))
+    r <- tryCatch(homog(expo_seg(c("F", "X"), c(60, 60), c(1e5, eX), D)[o, ], "segment", c(60, 60), 60),
+                  error = function(x) conditionMessage(x))
+    if (is.character(r)) { e <- c(e, sprintf("%s : erreur %s", nom, r)); next }
+    pf <- 1e5 / (1e5 + eX); px <- eX / (1e5 + eX); rr <- sqrt(L80_1 / (100 * pf * px))
+    sg <- r$resultat$segments[r$resultat$segments$portee == "global", ]; em <- r$resultat$ecart_minimal
+    zf <- sg$z[sg$segment == "F"]; zx <- sg$z[sg$segment == "X"]
+    f <- match("F", em$segment); x <- match("X", em$segment)
+    et <- c(sg$etat[match(c("F", "X"), sg$segment)], em$etat_superieur[f], em$etat_inferieur[f], em$etat_superieur[x],
+            em$etat_inferieur[x])
+    sig <- r$avertissements$nombre[r$avertissements$code == "ecart_minimal_detectable"]
+    pb <- c(if (!identical(et, c("produite", "produite", "non_atteint", "produite", "produite", "non_atteint"))) paste(et, collapse = "/"),
+            if (!isTRUE(proche(zx, (D[2L] - 100 * px) / sqrt(100 * px * pf), 1e-10, 0)) || !identical(zf, -zx)) "z",
+            if (!isTRUE(proche(em$theta_80_inferieur[f], (1 - px * rr) / (1 + pf * rr), 1e-10, 0))) "theta- de F",
+            if (!isTRUE(proche(em$theta_80_superieur[x], (1 + pf * rr) / (1 - px * rr), 1e-10, 0))) "theta+ de X",
+            if (!identical(sig, 2L)) "signal")
+    if (length(pb)) e <- c(e, sprintf("%s : %s", nom, paste(pb, collapse = ", ")))
+  }
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
+})
+# Variante (commentaire de #333 ; Q4, § 3) : A (5000, 600 ; 100, 2), X
+# (E_X60, 0 ; 100, 1), âges 60 et 61. Part de X à 60 arrondie à 0 pour E_X60
+# dans {4.94e-323, 9.88e-324} : la limite lambda(+-infini) n'est pas
+# déterminée par le calcul (terme de la strate 60 perdu) : theta- de A et
+# theta+ de X precision_insuffisante (avant, sur une copie de f18d9ec :
+# non_atteint, signal à tort) ; theta+ de A et theta- de X non_atteint
+# (inchangés) ; T = 1/3 (contribution vraie de la strate 60 sous 1e-320) ;
+# nombre 2 (autre branche non_atteint). Témoin E_X60 = 5e-315 (part ~1e-318,
+# représentable) : la règle ne joue pas ; theta- de A produite,
+# 6.4677876288876102e-316 (mesuré, inchangé), theta+ de X
+# precision_insuffisante par une autre cause (inchangé).
+verifier("I #333 part arrondie à 0 : A (5000, 600 ; 100, 2), X (E_X60, 0 ; 100, 1), deux ordres ; E_X60 dans {4.94e-323, 9.88e-324} : theta- de A et theta+ de X precision_insuffisante, theta+ de A et theta- de X non_atteint, T = 1/3 à 1e-15, nombre 2 ; témoin 5e-315 : theta- de A produite 6.4677876288876102e-316 à 1e-10", {
+  e <- character(0)
+  for (eX in c(4.94e-323, 9.88e-324, 5e-315)) for (o in list(1:4, c(3L, 4L, 1L, 2L))) {
+    nom <- sprintf("E_X60 %g ordre %s", eX, paste(o, collapse = ""))
+    r <- homog(expo_seg(c("A", "A", "X", "X"), c(60, 61, 60, 61), c(5000, 100, eX, 100), c(600, 2, 0, 1))[o, ],
+               "segment", c(60, 61), 60)
+    em <- r$resultat$ecart_minimal; a <- match("A", em$segment); x <- match("X", em$segment)
+    et <- c(em$etat_superieur[a], em$etat_inferieur[a], em$etat_superieur[x], em$etat_inferieur[x])
+    att <- if (eX < 1e-320) c("non_atteint", "precision_insuffisante", "precision_insuffisante", "non_atteint")
+           else c("non_atteint", "produite", "precision_insuffisante", "non_atteint")
+    pb <- c(if (!identical(et, att)) paste(et, collapse = "/"),
+            if (!isTRUE(proche(r$resultat$tests$statistique[1L], 1 / 3, 1e-15, 0))) "T",
+            if (!identical(r$avertissements$nombre[r$avertissements$code == "ecart_minimal_detectable"], 2L)) "signal",
+            if (eX > 1e-320 && !isTRUE(proche(em$theta_80_inferieur[a], 6.4677876288876102e-316, 1e-10, 0))) "theta- de A")
+    if (length(pb)) e <- c(e, sprintf("%s : %s", nom, paste(pb, collapse = ", ")))
+  }
+  if (length(e)) paste(e, collapse = " ; ") else TRUE
 })
