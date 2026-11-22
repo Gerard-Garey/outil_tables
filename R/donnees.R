@@ -2055,7 +2055,8 @@ SUJETS_LIGNES_EXTRAITES <- c(
 # colonnes_lues(), et celui de l'entrée : des noms identiques n'ont pas même
 # nombre quand length() de la classe ment, `[.data.frame` rendant alors une
 # liste plus courte que son attribut names, que decomptes_colonnes() ne
-# parcourt pas ; une colonne
+# parcourt pas : le constat est alors le seul constat commun de
+# constat_colonnes_lues(), #345, même si les noms diffèrent aussi ; une colonne
 # dont la méthode « [ » rend NULL est retirée sans signal par `[.data.frame`,
 # et le contrôle (2) lirait alors les noms décalés) ; (2)
 # chacune de ses colonnes, toutes, compte ce nombre de lignes (règle de
@@ -2164,8 +2165,11 @@ controler_lignes_extraites <- function(donnees, extraites, numeros, roles, etape
       formuler("comptent %s au lieu de %d",
                if (is.na(nc)) "un nombre de lignes illisible" else formuler("%d ligne(s)", nc), attendu)
     else if (ecart_colonnes)
+      # Liste incohérente (#345) : le constat commun de F344 remplace tout le constat des noms, même si les noms
+      # diffèrent aussi de ceux de l'entrée (une liste incohérente n'a pas de colonnes nommées comparables).
       formuler("comptent %d ligne(s) comme demandé mais n'ont pas les colonnes des données (%s)",
-               nc, paste(colonnes_ecart_citees(nom_c, nom_d, premiere), collapse = " ; "))
+               nc, if (coherente) paste(colonnes_ecart_citees(nom_c, nom_d, premiere), collapse = " ; ")
+                   else constat_colonnes_lues(lues))
     else if (length(k))
       formuler("comptent %d ligne(s) comme demandé mais leurs colonnes ne comptent pas toutes ce nombre de lignes (%s)",
                nc, paste(colonnes_decompte_citees(k, dec, classes), collapse = " ; "))

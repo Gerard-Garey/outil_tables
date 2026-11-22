@@ -1117,9 +1117,12 @@ verifier("#322 les m\u00e9thodes de session sont retir\u00e9es de globalenv()",
 # l'extraction sont ceux de l'entrée, et decomptes_colonnes() levait l'erreur R
 # « 'names' attribute [8] must be the same length as the vector [1] » (mesuré
 # sur dab4345 ; à faa0709, refus donnees_mal_formees par le nombre de colonnes).
-# Même refus, même message et mêmes details qu'à faa0709, sous le module de
-# l'étape appelante : appel direct de l'outil (donnees, importance_exclusions),
-# preparer_donnees() et construire_table(). Témoin : un environnement classé
+# Même refus et mêmes details qu'à faa0709, sous le module de l'étape
+# appelante : appel direct de l'outil (donnees, importance_exclusions),
+# preparer_donnees() et construire_table() ; constat amendé par #345 (« liste
+# de 1 colonne(s) pour 8 nom(s) de colonne », constat commun de F344, au lieu
+# de « mêmes noms de colonnes, dans un autre ordre ou répétés », texte de
+# faa0709 à e14d33e), message exact sur les trois chemins. Témoin : un environnement classé
 # « data.frame » rendu par `[` est le refus (0), non l'erreur R « cannot
 # unclass an environment » (mesuré avant la correction : le refus lisait les
 # noms avant le contrôle de forme).
@@ -1139,10 +1142,14 @@ local({
   verifier("#322 revue finale : length(unclass()) de l'extraction du témoin k322klen (1) diffère de celui des noms (8), égal à celui de l'entrée",
            identical(vapply(list(dk[-2L, , drop = FALSE]), function(e) c(length(unclass(e)), length(attr(e, "names", exact = TRUE))),
                             integer(2L))[, 1L], c(1L, 8L)) && length(unclass(dk)) == 8L)
-  PREF_E <- "Les lignes conservées, extraites des données par la méthode « [ » de la classe "
-  SUFF_E <- " : le moteur ne corrige pas une extraction fausse ; passer un data.frame dont la méthode « [ » rend exactement les lignes demandées (ou qui n'a pas de méthode « [ » propre)."
+  PREF_E <- "Les lignes conserv\u00e9es, extraites des donn\u00e9es par la m\u00e9thode \u00ab [ \u00bb de la classe "
+  SUFF_E <- " : le moteur ne corrige pas une extraction fausse ; passer un data.frame dont la m\u00e9thode \u00ab [ \u00bb rend exactement les lignes demand\u00e9es (ou qui n'a pas de m\u00e9thode \u00ab [ \u00bb propre)."
   msg <- paste0(PREF_E, "k322klen/data.frame, comptent 3 ligne(s) comme demand\u00e9 mais n'ont pas les colonnes des donn\u00e9es ",
-                "(m\u00eames noms de colonnes, dans un autre ordre ou r\u00e9p\u00e9t\u00e9s)", SUFF_E)
+                "(liste de 1 colonne(s) pour 8 nom(s) de colonne)", SUFF_E)
+  SUJET_IE <- paste0("Les lignes relues par l'\u00e9tape \u00ab importance_exclusions \u00bb (lignes exclues et, sous ",
+                     "l'unit\u00e9 t\u00eate, lignes conserv\u00e9es des m\u00eames t\u00eates)")
+  details_k <- list(classe = class(dk), classe_rendue = class(dk), lignes = 3L, attendu = 3L, colonnes = character(0),
+                    colonne = character(0), position = integer(0), lignes_colonne = numeric(0))
   chemins <- list(
     outil = function(x) tablexp:::controler_lignes_extraites(x, x[-2L, , drop = FALSE], c(1L, 3L, 4L), ROLES),
     preparer_donnees = function(x) prep(x, exclusions = "entree_manquante"),
@@ -1153,18 +1160,17 @@ local({
              if (is.null(r)) "aucun refus"
              else if (!inherits(r, "refus_tablexp")) sprintf("condition %s : %s", class(r)[1L], conditionMessage(r))
              else if (!identical(r$module, "donnees") || !identical(r$motif, "donnees_mal_formees")) sprintf("%s / %s", r$module, r$motif)
-             else if (!grepl("n'ont pas les colonnes des données (", conditionMessage(r), fixed = TRUE)) paste("message :", conditionMessage(r))
-             else if (!identical(Encoding(conditionMessage(r)), "UTF-8")) "message non marqué UTF-8"
-             else if (!identical(r$details$classe, class(dk)) || !identical(r$details$classe_rendue, class(dk)) ||
-                      !identical(r$details$lignes, 3L) || !identical(r$details$attendu, 3L) ||
-                      !identical(r$details$colonne, character(0)) || !identical(r$details$colonnes, character(0)))
-               paste("details :", paste(deparse(r$details), collapse = " "))
+             else if (!identical(conditionMessage(r), msg)) paste("message :", conditionMessage(r))
+             else if (!identical(Encoding(conditionMessage(r)), "UTF-8")) "message non marqu\u00e9 UTF-8"
+             else if (!identical(r$details, details_k)) paste("details :", paste(deparse(r$details), collapse = " "))
              else TRUE)
   }
   r <- attrape(tablexp:::controler_lignes_extraites(dk, dk[-2L, , drop = FALSE], c(1L, 3L, 4L), ROLES, etape = "importance_exclusions"))
-  verifier("#322 revue finale, outil, etape importance_exclusions : même refus sous le module importance_exclusions",
+  verifier("#322 revue finale, outil, etape importance_exclusions : m\u00eame refus sous le module importance_exclusions (constat de #345)",
            inherits(r, "refus_tablexp") && identical(r$module, "importance_exclusions") && identical(r$motif, "donnees_mal_formees") &&
-             grepl("n'ont pas les colonnes des données (", conditionMessage(r), fixed = TRUE))
+             identical(conditionMessage(r),
+                       sub("Les lignes conserv\u00e9es", SUJET_IE, msg, fixed = TRUE)) &&
+             identical(r$details, details_k))
   # Témoin : entrée de classe exactement « data.frame », extraction faite sous un length.data.frame qui ment
   # (posé dans globalenv() le temps de l'extraction seul, puis retiré) : même cause, variante sans classe de colonne
   # attribuée (le nombre de colonnes de la liste, 1, n'est pas celui des noms, 8), sans erreur R.
@@ -1204,6 +1210,95 @@ local({
 })
 verifier("#322 revue finale : les méthodes de session sont retirées de globalenv()",
          !any(vapply(c("length.k322klen", "[.k322env"), exists, logical(1L), envir = globalenv(), inherits = FALSE)))
+# Constat du refus (1 bis) d'une extraction dont la liste n'a pas autant
+# d'éléments que ses noms (#345 ; spécification d'actuary-approfondi,
+# commentaire de #345) : le constat commun de F344 (constat_colonnes_lues(),
+# « liste de N colonne(s) pour M nom(s) de colonne ») remplace toute la
+# parenthèse, même si les noms diffèrent aussi de ceux de l'entrée ; motif,
+# module et details inchangés. Entrée exactement data.frame, extraction tirée
+# d'une classe dont length() ment. Avant (mesuré à e14d33e) : « mêmes noms de
+# colonnes, dans un autre ordre ou répétés » (corps de l'issue), « absente(s) :
+# « b » ; en trop : « z » » (noms différents), « 3 colonne(s) au lieu de 2 ;
+# en trop : « c » » (liste de 2 éléments, égale au nombre de colonnes de
+# l'entrée, pour 3 noms : tue le mutant qui jugerait la cohérence sur le nombre
+# de colonnes de l'entrée). Témoins : extraction juste admise ; liste cohérente
+# aux noms différents, constat des noms inchangé.
+local({
+  m <- list(`length.k345a` = function(x) 1L, `length.k345z` = function(x) 1L, `length.k345d` = function(x) 2L)
+  for (n in names(m)) assign(n, m[[n]], envir = globalenv())
+  on.exit(rm(list = names(m), envir = globalenv()))
+  attrape <- function(expr) tryCatch({ force(expr); NULL }, refus_tablexp = function(r) r, error = function(e) e)
+  d <- data.frame(a = 1:3, b = 4:6)
+  extraire <- function(x, cl) { x <- structure(x, class = c(cl, "data.frame")); x[1:3, , drop = FALSE] }
+  ea <- extraire(d, "k345a")
+  ez <- extraire(data.frame(a = 1:3, z = 4:6), "k345z")
+  ed <- extraire(data.frame(a = 1:3, b = 4:6, c = 7:9), "k345d")
+  verifier("#345 formes des extractions : listes de 1, 1 et 2 \u00e9l\u00e9ments pour 2, 2 et 3 noms",
+           identical(lapply(list(ea, ez, ed), function(e) list(length(unclass(e)), attr(e, "names", exact = TRUE))),
+                     list(list(1L, c("a", "b")), list(1L, c("a", "z")), list(2L, c("a", "b", "c")))))
+  PREF <- "Les lignes conserv\u00e9es, extraites des donn\u00e9es par la m\u00e9thode \u00ab [ \u00bb de la classe data.frame, "
+  SUJET_IE <- paste0("Les lignes relues par l'\u00e9tape \u00ab importance_exclusions \u00bb (lignes exclues et, sous ",
+                     "l'unit\u00e9 t\u00eate, lignes conserv\u00e9es des m\u00eames t\u00eates), extraites des donn\u00e9es par la ",
+                     "m\u00e9thode \u00ab [ \u00bb de la classe data.frame, ")
+  MILIEU <- "comptent 3 ligne(s) comme demand\u00e9 mais n'ont pas les colonnes des donn\u00e9es ("
+  SUFF <- paste0(") : le moteur ne corrige pas une extraction fausse ; passer un data.frame dont la m\u00e9thode \u00ab [ \u00bb ",
+                 "rend exactement les lignes demand\u00e9es (ou qui n'a pas de m\u00e9thode \u00ab [ \u00bb propre).")
+  details <- function(cl, colonne) list(classe = "data.frame", classe_rendue = c(cl, "data.frame"), lignes = 3L, attendu = 3L,
+                                        colonnes = character(0), colonne = colonne, position = integer(0),
+                                        lignes_colonne = numeric(0))
+  cas <- list(
+    list(nom = "corps de l'issue (1 colonne pour 2 noms)", ex = ea, etape = "donnees",
+         msg = paste0(PREF, MILIEU, "liste de 1 colonne(s) pour 2 nom(s) de colonne", SUFF), details = details("k345a", character(0))),
+    list(nom = "liste incoh\u00e9rente et noms diff\u00e9rents (a, z)", ex = ez, etape = "donnees",
+         msg = paste0(PREF, MILIEU, "liste de 1 colonne(s) pour 2 nom(s) de colonne", SUFF), details = details("k345z", "b")),
+    list(nom = "liste de 2 \u00e9l\u00e9ments (nombre de colonnes de l'entr\u00e9e) pour 3 noms", ex = ed, etape = "donnees",
+         msg = paste0(PREF, MILIEU, "liste de 2 colonne(s) pour 3 nom(s) de colonne", SUFF), details = details("k345d", character(0))),
+    list(nom = "etape importance_exclusions, noms diff\u00e9rents", ex = ez, etape = "importance_exclusions",
+         msg = paste0(SUJET_IE, MILIEU, "liste de 1 colonne(s) pour 2 nom(s) de colonne", SUFF), details = details("k345z", "b")))
+  for (cc in cas) {
+    r <- attrape(tablexp:::controler_lignes_extraites(d, cc$ex, 1:3, c(age = "a"), etape = cc$etape))
+    verifier(sprintf("#345 %s -> refus donnees_mal_formees, constat commun de F344, message et details exacts", cc$nom),
+             if (is.null(r)) "aucun refus"
+             else if (!inherits(r, "refus_tablexp")) sprintf("condition %s : %s", class(r)[1L], conditionMessage(r))
+             else if (!identical(r$module, cc$etape) || !identical(r$motif, "donnees_mal_formees")) sprintf("%s / %s", r$module, r$motif)
+             else if (!identical(conditionMessage(r), cc$msg)) paste("message :", conditionMessage(r))
+             else if (!identical(Encoding(conditionMessage(r)), "UTF-8")) "message non marqu\u00e9 UTF-8"
+             else if (!identical(r$details, cc$details)) paste("details :", paste(deparse(r$details), collapse = " "))
+             else TRUE)
+  }
+  # Témoin d'ordre : liste incohérente et décompte de lignes faux (2 pour 3) : refus (1), avant le (1 bis) ; le
+  # constat commun ne remonte pas avant le décompte des lignes.
+  e2 <- structure(d, class = c("k345a", "data.frame"))[1:2, , drop = FALSE]
+  r <- attrape(tablexp:::controler_lignes_extraites(d, e2, 1:3, c(age = "a")))
+  verifier("#345 t\u00e9moin d'ordre : liste incoh\u00e9rente (1 pour 2) et 2 lignes pour 3 -> refus (1) du d\u00e9compte, non le constat commun",
+           if (!identical(c(length(unclass(e2)), length(attr(e2, "names", exact = TRUE))), c(1L, 2L))) "extraction de forme inattendue"
+           else if (!inherits(r, "refus_tablexp")) "aucun refus"
+           else if (!identical(conditionMessage(r),
+                               paste0(PREF, "comptent 2 ligne(s) au lieu de 3", sub(")", "", SUFF, fixed = TRUE))))
+             paste("message :", conditionMessage(r))
+           else identical(r$details, list(classe = "data.frame", classe_rendue = c("k345a", "data.frame"), lignes = 2L,
+                                          attendu = 3L, colonnes = character(0), colonne = character(0),
+                                          position = integer(0), lignes_colonne = numeric(0))))
+  # Témoins : extraction juste (admise) ; liste cohérente aux noms différents (constat des noms, inchangé).
+  r <- attrape(tablexp:::controler_lignes_extraites(d, d[1:3, , drop = FALSE], 1:3, c(age = "a")))
+  verifier("#345 t\u00e9moin : extraction juste -> admise", if (is.null(r)) TRUE else paste("condition :", conditionMessage(r)))
+  r <- attrape(tablexp:::controler_lignes_extraites(d, data.frame(a = 1:3, z = 4:6), 1:3, c(age = "a")))
+  verifier("#345 t\u00e9moin : liste coh\u00e9rente aux noms diff\u00e9rents -> constat des noms inchang\u00e9",
+           inherits(r, "refus_tablexp") &&
+             identical(conditionMessage(r),
+                       paste0(sub("data.frame, ", "data.frame, qui applique \u00e0 chaque colonne la m\u00e9thode \u00ab [ \u00bb de sa classe, ",
+                                  PREF, fixed = TRUE),
+                              MILIEU, "absente(s) : \u00ab b \u00bb ; en trop : \u00ab z \u00bb ; colonne \u00ab b \u00bb (position 2, classe ",
+                              "integer), premi\u00e8re position o\u00f9 l'extraction s'\u00e9carte des donn\u00e9es) : le moteur ne corrige ",
+                              "pas une extraction fausse ; passer un data.frame dont les colonnes cit\u00e9es (classe integer) ont une ",
+                              "m\u00e9thode \u00ab [ \u00bb qui rend exactement les lignes demand\u00e9es (ou n'ont pas de m\u00e9thode ",
+                              "\u00ab [ \u00bb propre).")) &&
+             identical(r$details, list(classe = "data.frame", classe_rendue = "data.frame", lignes = 3L, attendu = 3L,
+                                       colonnes = character(0), colonne = "b", position = integer(0),
+                                       lignes_colonne = numeric(0))))
+})
+verifier("#345 les m\u00e9thodes de session sont retir\u00e9es de globalenv()",
+         !any(vapply(c("length.k345a", "length.k345z", "length.k345d"), exists, logical(1L), envir = globalenv(), inherits = FALSE)))
 # Cohérence de la liste des colonnes et de ses noms à l'entrée (#344, F344 ;
 # spécification d'actuary-approfondi, commentaire de #344) : sous une classe
 # dont length() ment, `[.data.frame` rend une liste de 1 (ou 3) élément(s)
