@@ -466,90 +466,12 @@ TRANSITIONS_EN_COURS <- list()
 # transition_340(), transition_331(), apres_340(), apres_331(),
 # statuts_apres_b32(), substituer_b32() et les constantes *_340, *_331 et
 # CHEMIN_STATUTS_B32 retirées.
-# Transition #334, V réduite sans soustraction (B33, étape (3) ; spécification
-# d'actuary-approfondi de #334, Q3, § 4, et Q6 ; état precision_insuffisante
-# du test, M570, P1 (a) ; groupe retenu de la p exacte, réserve d'actuary au
-# visa de l'étape (3), Q1) : texte des statuts de statistique et de
-# p_exacte (table tests) et de z (table segments) de R11 et R12, en « valeur
-# de chaîne » aux positions lues par les colonnes sœurs de la référence ;
-# texte après tiré du texte avant de la référence par une substitution par
-# statut, écrite ici en échappements \u (UTF-8 en toute locale, POSIX
-# comprise), sans lire le package. T, p asymptotique et z changent au dernier
-# bit (écart relatif au plus 4e-14, mesuré), sous leur tolérance 1e-10 : non
-# déclarés ; l'empreinte du résultat n'est comparée que par jeton. Aucune
-# autre grandeur ne change. À clore par la régénération (R) de B33, avec
-# transition_334(), apres_334() et les constantes *_334.
-SUBST_334 <- list(
-  statistique = c(
-    paste("arithm\u00e9tique flottante, syst\u00e8me lin\u00e9aire r\u00e9solu sur V r\u00e9duite (un groupe de r\u00e9f\u00e9rence par",
-          "composante connexe du graphe groupes-strates) : approximation num\u00e9rique"),
-    paste("arithm\u00e9tique flottante : par composante connexe du graphe groupes-strates, le groupe d'attendu A le plus",
-          "grand (le plus petit indice \u00e0 \u00e9galit\u00e9) est la r\u00e9f\u00e9rence retir\u00e9e ; V r\u00e9duite factoris\u00e9e par",
-          "\u00e9limination sans soustraction (w_jk = somme sur les strates informatives de D_. pi_j pi_k, pivots form\u00e9s de",
-          "sommes de termes positifs), T = somme des y_i^2 / d_i, y obtenu de U des groupes retenus : approximation",
-          "num\u00e9rique ; T = +Inf quand la statistique d\u00e9passe le plus grand double ; \u00e9tat precision_insuffisante (T",
-          "et p-valeurs NA) quand un pivot de l'\u00e9limination n'est pas fini et strictement positif")),
-  p_exacte = c(
-    "Bin(D_., pi_1), p = P(",
-    paste("Bin(D_., pi_1), groupe 1 : le groupe retenu, d'attendu A le plus petit, la r\u00e9f\u00e9rence (attendu le plus",
-          "grand, le plus petit indice \u00e0 \u00e9galit\u00e9) \u00e9tant retir\u00e9e comme pour statistique ; p = P(")),
-  z = c(
-    "E tenue pour fixe ; aucune p-valeur produite ;",
-    paste("E tenue pour fixe ; V_ss = somme des w_sk (k diff\u00e9rent de s), sans soustraction ; U du groupe de",
-          "r\u00e9f\u00e9rence de sa composante pris \u00e9gal \u00e0 moins la somme des U des autres groupes (identit\u00e9 exacte) ;",
-          "aucune p-valeur produite ;")))
-# Substitution unique de `subst[1]` par `subst[2]` dans `avant` ; garde de la
-# r\u00e9f\u00e9rence d\u00e9j\u00e0 r\u00e9g\u00e9n\u00e9r\u00e9e : le fragment nouveau ne doit pas y figurer.
-apres_334 <- function(avant, subst) {
-  if (grepl(subst[2L], avant, fixed = TRUE))
-    stop("apres_334() : texte nouveau d\u00e9j\u00e0 pr\u00e9sent ; r\u00e9f\u00e9rence d\u00e9j\u00e0 r\u00e9g\u00e9n\u00e9r\u00e9e ? retirer transition_334() et les constantes *_334")
-  if (lengths(regmatches(avant, gregexpr(subst[1L], avant, fixed = TRUE))) != 1L)
-    stop(sprintf("apres_334() : \u00ab %s \u00bb absent ou r\u00e9p\u00e9t\u00e9 (erreur de programmation)", subst[1L]))
-  sub(subst[1L], subst[2L], avant, fixed = TRUE)
-}
-CHEMIN_STATUTS_334 <- "etapes/homogeneite/parametres/statuts/"
-transition_334 <- function(plans) {
-  ref <- lire_reference(file.path(DOSSIER_REFERENCES, paste0(plans[1L], ".tsv")))$valeurs
-  st <- CHEMIN_STATUTS_334
-  k <- match(c("statistique", "p_exacte", "z"), ref[[paste0(st, "grandeur")]])
-  if (anyNA(k) || !identical(ref[[paste0(st, "table")]][k], c("tests", "tests", "segments")))
-    stop("transition_334() : statuts de statistique, p_exacte et z absents de la r\u00e9f\u00e9rence (erreur de programmation)")
-  avant <- ref[[paste0(st, "statut")]][k]
-  apres <- c(apres_334(avant[1L], SUBST_334$statistique), apres_334(avant[2L], SUBST_334$p_exacte),
-             apres_334(avant[3L], SUBST_334$z))
-  Encoding(apres) <- "UTF-8"
-  list(issue = "#334", plans = plans,
-       changements = list(list(chemin = paste0(st, "statut"), nature = "valeur de chaîne", valeurs = apres,
-                               positions = k)))
-}
-TRANSITIONS_EN_COURS <- c(TRANSITIONS_EN_COURS, list(transition_334(c("R11", "R12"))))
-# Transition #333, cause « part arrondie à 0 » de precision_insuffisante
-# nommée dans le statut de theta_80 (B33, étape (4) ; spécification
-# d'actuary-approfondi de #333, Q4, § 3 ; M570) : texte des deux statuts
-# ecart_minimal (theta_80_superieur, theta_80_inferieur) de R11 et R12, en
-# « valeur de chaîne » aux positions lues par les colonnes sœurs de la
-# référence ; une substitution commune aux deux branches, en échappements
-# \u, par apres_334() (même garde). Positions distinctes de celles de #334.
-# Aucune valeur ne change (aucune part arrondie à 0 dans R11 et R12, mesuré).
-# À clore par la régénération (R) de B33, avec transition_333() et
-# SUBST_333.
-SUBST_333 <- c(
-  "positif, limite ind\u00e9termin\u00e9e, r\u00e9solution non converg\u00e9e",
-  paste("positif, limite ind\u00e9termin\u00e9e (dont une part d'exposition arrondie \u00e0 0 dans une strate o\u00f9 le segment et un",
-        "autre segment sont expos\u00e9s), r\u00e9solution non converg\u00e9e"))
-transition_333 <- function(plans) {
-  ref <- lire_reference(file.path(DOSSIER_REFERENCES, paste0(plans[1L], ".tsv")))$valeurs
-  st <- CHEMIN_STATUTS_334
-  k <- match(c("theta_80_superieur", "theta_80_inferieur"), ref[[paste0(st, "grandeur")]])
-  if (anyNA(k) || !identical(ref[[paste0(st, "table")]][k], c("ecart_minimal", "ecart_minimal")))
-    stop("transition_333() : statuts ecart_minimal absents de la r\u00e9f\u00e9rence (erreur de programmation)")
-  apres <- vapply(ref[[paste0(st, "statut")]][k], apres_334, "", subst = SUBST_333, USE.NAMES = FALSE)
-  Encoding(apres) <- "UTF-8"
-  list(issue = "#333", plans = plans,
-       changements = list(list(chemin = paste0(st, "statut"), nature = "valeur de chaîne", valeurs = apres,
-                               positions = k)))
-}
-TRANSITIONS_EN_COURS <- c(TRANSITIONS_EN_COURS, list(transition_333(c("R11", "R12"))))
+# Transitions #334 (V réduite sans soustraction : statuts de statistique,
+# p_exacte et z) et #333 (cause « part arrondie à 0 » des deux statuts
+# ecart_minimal) de B33, sur R11 et R12, closes par la régénération (R) de
+# B33 (exécution 45021813451, sur 5aa23d7) : transition_334(),
+# transition_333(), apres_334() et les constantes SUBST_334, SUBST_333 et
+# CHEMIN_STATUTS_334 retirées.
 
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
 CHAMPS_CHANGEMENT <- list(type = c("de", "vers"), valeur = c("valeurs", "positions"),
