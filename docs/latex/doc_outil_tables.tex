@@ -13250,7 +13250,8 @@ ne redonnent pas le total des événements est une erreur de programmation.\par}
     sens est un \emph{résultat exact} d'algèbre matricielle, conditionnel
     à $\lambda$ et à $W$ tenue pour fixe~: sous une sur-dispersion
     $\varphi \ge 1$, la quasi-vraisemblance remplace $W$ par $W/\varphi$,
-    et $W/\varphi + P \preceq W + P$ au sens de Loewner donne $(W/\varphi +
+    et $W/\varphi + P \preceq W + P$ au sens de Loewner, ces deux
+    matrices étant définies positives, donne $(W/\varphi +
     P)^{-1} \succeq (W + P)^{-1}$, donc des éléments diagonaux, et des
     demi-largeurs, plus grands~; il ne dit rien de la couverture
     fréquentiste, déjà non établie. Le module \code{lissage} précédant
@@ -13260,7 +13261,12 @@ ne redonnent pas le total des événements est une erreur de programmation.\par}
     \code{segments/parametre\_lissage} et \code{segments/laml} ne portent
     pas la mention~: l'un est un maximiseur, l'autre la valeur d'un
     critère, et aucune n'affirme de loi~; l'effet de la sur-dispersion sur
-    $\hat\lambda$ n'est pas établi par une source lue~; \code{regle\_force},
+    $\hat\lambda$ n'est pas établi par une source lue (V.~A.~Djeundje Biatat et I.~D.~Currie, «~Smoothing dispersed counts
+    with applications to mortality data~», \emph{Annals of Actuarial
+    Science} 5(1), 2011, p.~33-52, doi:10.1017/S1748499510000047~: référence
+    vérifiée, contenu non lu sur ce point), et un constat de
+    simulation sur un seul plan (spécification de l'issue~\#329, §~1) ne
+    fonde aucune conséquence générale~; \code{regle\_force},
     transformation exacte, hypothèse même de l'estimateur d'entrée~;
     \code{segments/parametre\_lissage} (sous \code{laml} seulement)~:
     maximiseur local d'un critère approché, unimodalité non établie,
