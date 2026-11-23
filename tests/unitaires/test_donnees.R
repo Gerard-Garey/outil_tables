@@ -433,6 +433,30 @@ local({
   verifier("#342 segment : facteur bien form\u00e9 et integer admis par controler_roles()",
            is.null(attrape(tablexp:::controler_roles(avec(seg = fac(c(1L, 2L, 2L, 1L), c("a", "b"))), RS, "sexe"))) &&
              is.null(attrape(tablexp:::controler_roles(avec(seg = c(1L, 2L, 2L, 1L)), RS, "sexe"))))
+  # Rôle segment mal formé de bout en bout, par construire_table() : segment
+  # dans la segmentation du plan et segment déclaré mais hors de la
+  # segmentation (réserve 2 du visa d'actuary, étape (3)). Avant #342 (mesuré
+  # sur 7c800c0 et dd541a6, les quatre combinaisons) : erreur R « malformed
+  # factor », appel as.character.factor(x).
+  SEG <- list(dans = c("sexe", "segment"), hors = "sexe")
+  seg_mal <- list("code 3 pour deux niveaux" = fac(c(1L, 2L, 3L, 1L), c("a", "b")),
+                  "codes doubles (unserialize)" = unserialize(charToRaw(sub("\n781\n", "\n782\n",
+                    rawToChar(serialize(fac(c(1L, 2L, 1L, 1L), c("a", "b")), NULL, ascii = TRUE)), fixed = TRUE))))
+  verifier("#342 segment aux codes doubles : classe factor, codes de type double 1, 2, 1, 1, niveaux a, b",
+           identical(oldClass(seg_mal[[2L]]), "factor") && identical(typeof(unclass(seg_mal[[2L]])), "double") &&
+             identical(attr(seg_mal[[2L]], "levels", exact = TRUE), c("a", "b")) &&
+             identical(as.vector(unclass(seg_mal[[2L]])), c(1, 2, 1, 1)))
+  for (k in names(seg_mal))
+    for (z in names(SEG))
+      verifier(sprintf("#342 segment %s, %s la segmentation du plan : construire_table() -> refus type_incompatible exact, pas une erreur R",
+                       k, if (z == "dans") "dans" else "hors de"),
+               exact(attrape(construire_table(avec(seg = seg_mal[[k]]), RS, modifyList(plan342(character(0)), list(segmentation = SEG[[z]])))),
+                     message_attendu(partie("segment", "seg", "character, factor, integer", paste0("factor", MF))),
+                     list(role = "segment", colonne = "seg", type_attendu = "character, factor, integer")))
+  for (z in names(SEG))
+    verifier(sprintf("#342 segment en facteur bien form\u00e9, %s la segmentation du plan : construit", if (z == "dans") "dans" else "hors de"),
+             is.null(attrape(construire_table(avec(seg = fac(c(1L, 2L, 1L, 1L), c("a", "b"))), RS,
+                                              modifyList(plan342(character(0)), list(segmentation = SEG[[z]]))))))
   # Partie « reçu » réservée aux facteurs mal formés des types categorie et
   # categorie_ou_entier : facteur (bien ou mal formé) pour id_tete, et integer
   # pour sexe, gardent leur seule classe.
