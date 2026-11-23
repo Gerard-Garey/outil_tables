@@ -15691,23 +15691,35 @@ n'étant appariée (différence voulue avec l'étape \code{validation}).\par}
     loi est rendue sur son support~: aucun vecteur de longueur
     proportionnelle à $n$ n'est formé, ni par le calcul du coût ni par la
     convolution. Une strate seule, sans produit de convolution, est donc
-    toujours calculée~: son support compte au plus 1\,775\,728~valeurs
-    ($n = 2^{31} - 1$, $p = 0{,}5$, le total des événements étant gardé
-    sous l'entier maximal, issue~\#348)~; avant l'issue, une strate de
+    toujours calculée~: son support compte au plus 1\,775\,728~valeurs,
+    à $n = 2^{31} - 1$ (le total des événements étant gardé sous l'entier
+    maximal, issue~\#348) et $p = 0{,}5$, où la largeur du support,
+    d'ordre $\sqrt{np(1-p)}$, est la plus grande (mesuré aussi à $p =
+    0{,}3$~; $0{,}1$~; $0{,}01$~; $10^{-3}$~; $10^{-6}$~: supports plus
+    courts, 1\,627\,578~; 1\,065\,807~; 353\,753~; 112\,460~;
+    3\,529~valeurs)~; avant l'issue, une strate de
     $10^9 + 10^9$~décès arrêtait le calcul sur une erreur d'allocation de
     R. Les termes non nuls et leur ordre de sommation étant inchangés,
-    coûts, lois et p-valeurs des cas calculés auparavant sont identiques
-    au bit près, et aucun état ni texte de statut ne change.
+    coûts, lois et p-valeurs des cas calculés auparavant sont restés
+    identiques au bit près (\emph{constat} sur 100~cas tirés et
+    240~supports, tests ci-dessous), et aucun état ni texte de statut ne
+    change.
     \textbf{Statut de la contiguïté du support}~: en arithmétique réelle,
-    le support est un intervalle (la loi binomiale est log-concave), ce que
-    la bisection suppose~; en double, la contiguïté est \emph{mesurée},
-    non démontrée~: aux frontières, la log-densité vaut environ $-745$
-    (bord des nombres dénormalisés) et la pente du logarithme de la
+    la loi binomiale est log-concave, donc unimodale, et tout ensemble
+    $\{k : f(k) > s\}$ est un intervalle~; si \code{dbinom()} rendait
+    $f(k)$ correctement arrondi, l'ensemble des $k$ de densité calculée
+    positive serait donc exactement un intervalle, ce que la bisection
+    suppose~; \code{dbinom()} n'étant pas correctement arrondie, la
+    contiguïté en double est \emph{mesurée}, non démontrée~: aux
+    frontières, la log-densité vaut environ $-745$ (seuil d'arrondi à
+    zéro, sous le plus petit dénormalisé positif, environ $4{,}9 \cdot
+    10^{-324}$) et la pente du logarithme de la
     densité entre voisins est au moins $1{,}65 \cdot 10^{-3}$, très
     au-dessus du bruit de calcul, au plus $1{,}3 \cdot 10^{-12}$ (mesure
     d'\code{actuary} du 23/11/2026 sur 44~frontières, $n$ de $10^6$ à
     $2^{31} - 1$, $p$ de $10^{-6}$ à $1 - 10^{-6}$~; même pente minimale
-    remesurée sur 54~frontières)~; selon la même mesure, un défaut
+    remesurée par \code{docwriter}, commit \code{f37cc5c}, sur
+    54~frontières)~; selon la même mesure, un défaut
     éventuel n'omettrait qu'une masse inférieure à $10^{-316}$, sans effet
     sur aucune p-valeur ni aucun verdict. L'identité du support avec
     celui de \code{dbinom(0:n, n, p)} est vérifiée par les tests de la
