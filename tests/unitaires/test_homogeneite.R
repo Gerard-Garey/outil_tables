@@ -2520,3 +2520,100 @@ verifier("I #350 C4 homogénéité, une strate (âge 60), deux segments de E = 5
     pbinom = proche(tb$p_exacte[1:2], rep(p_pbinom, 2L), 1e-12, 0),
     mesure = proche(tb$p_exacte[1:2], rep(0.26356799567030476, 2L), 1e-15, 0))
 })
+
+# --- #353 : expositions non finies ou hors de la plage de calcul -------------
+#
+# Spécification d'actuary-approfondi de #353 (commentaire 7103024220, § 4 à
+# § 6 ; M579, option (a) ; ADR 0009, annotation du 23/11/2026). Avant (corps
+# de #353, copie de dd541a6 ; spécification, § 1, à 1d8b48a) : appel direct
+# à E = Inf -> z et attendus NaN à l'état « produite » ; construire_table()
+# sous les agrégats, cellule 60 à 1e308 + 1e308 -> erreur de R « no
+# positive probabilities » de rmultinom() ; segment F à 1e308 + 1e308 -> z
+# = -/+7,98e152 « produite » ; une cellule à 1e308 -> z = -/+3,496029
+# « produite » ; replications_multinomiales() à poids Inf ou NaN -> erreurs
+# de R. Après : erreur de programmation de calculer_homogeneite(), refus
+# exposition / exposition_hors_plage (total des expositions déclarées au-delà
+# de .Machine$double.xmax / 2), messages propres de
+# replications_multinomiales(). Natures : états, motifs et messages (valeur
+# calculée à la main) ; témoin : z = -/+0,7090792 et T = 0,5027933 (mesures
+# de la spécification, § 1, à 1e-6), état produite.
+P_353 <- list(transition = list(depart = "vivant", arrivee = "deces"),
+              periode = list(debut = as.Date("2015-01-01"), fin = as.Date("2024-12-31")),
+              delai_declaration = 0, segmentation = "sexe", graine = 1L,
+              etapes = list(donnees = list(exclusions = character(0)),
+                            exposition = list(convention = "dernier_anniversaire", par_annee = FALSE),
+                            homogeneite = list(plage_ages = c(60, 61), tranches_age = 60, replications = 99)))
+R_353 <- c(sexe = "sexe", age = "age", exposition_centrale = "ec", evenements = "d")
+A_353 <- function(ec) data.frame(sexe = c("F", "H", "F", "H"), age = c(60, 60, 61, 61), ec = ec, d = c(3, 5, 4, 6))
+construire_353 <- function(ec) refus_ou_erreur_348(construire_table(A_353(ec), R_353, P_353))
+refus_353 <- function(x, valeur) {
+  r <- x$r
+  if (inherits(r, "refus_tablexp")) {
+    ok <- refus_348(r, "exposition", "exposition_hors_plage")
+    if (!isTRUE(ok)) return(ok)
+    if (!identical(r$details, list(role = "exposition_centrale", valeur = valeur, limite = .Machine$double.xmax / 2)))
+      return(paste("détails :", paste(unlist(r$details), collapse = ", ")))
+    if (length(x$av)) return(paste("avertissements de R :", paste(x$av, collapse = " / ")))
+    TRUE
+  } else if (inherits(r, "error")) paste("erreur de R :", conditionMessage(r)) else "aucun refus levé"
+}
+# Message d'erreur de programmation (stop() d'un littéral non ASCII, hors
+# texte_moteur() : codage selon la locale d'installation) : comparé sur ses
+# deux fragments ASCII.
+erreur_e_a_353 <- function(e)
+  startsWith(conditionMessage(e), "calculer_homogeneite() : exposition agr") &&
+    endsWith(conditionMessage(e), " non finie ou hors de la plage de calcul (erreur de programmation).")
+verifier("I #353 appel direct, E = (Inf, 1000, 900, 1100) : erreur de programmation de calculer_homogeneite() (exposition agrégée non finie), au lieu de z et attendus NaN à l'état produite", {
+  ex <- data.frame(sexe = c("F", "H", "F", "H"), age = c(60L, 60L, 61L, 61L), evenements = c(3L, 5L, 4L, 6L),
+                   exposition_centrale = c(Inf, 1000, 900, 1100))
+  x <- refus_ou_erreur_348(tablexp:::calculer_homogeneite(ex, "sexe", FALSE, "annee_civile", c(60L, 61L), 60L, 99L, 1L))
+  if (inherits(x$r, "error") && !inherits(x$r, "refus_tablexp") && erreur_e_a_353(x$r) && !length(x$av)) TRUE
+  else if (inherits(x$r, "error")) conditionMessage(x$r) else "aucune erreur (résultat produit)"
+})
+verifier("I #353 appel direct, expositions finies de somme au-delà de .Machine$double.xmax / 2 (cellule 60 : 1e308 + 1e308 entre segments, E_s infini) : même erreur de programmation, avant tout tirage", {
+  ex <- data.frame(sexe = c("F", "H", "F", "H"), age = c(60L, 60L, 61L, 61L), evenements = c(3L, 5L, 4L, 6L),
+                   exposition_centrale = c(1e308, 1e308, 900, 1100))
+  x <- refus_ou_erreur_348(tablexp:::calculer_homogeneite(ex, "sexe", FALSE, "annee_civile", c(60L, 61L), 60L, 99L, 1L))
+  if (inherits(x$r, "error") && !inherits(x$r, "refus_tablexp") && erreur_e_a_353(x$r) && !length(x$av)) TRUE
+  else if (inherits(x$r, "error")) conditionMessage(x$r) else "aucune erreur (résultat produit)"
+})
+verifier("I #353 construire_table(), agrégats, cellule 60 à 1e308 + 1e308 (E_s infini) : refus exposition / exposition_hors_plage, valeur Inf, message « non fini », au lieu de l'erreur de R de rmultinom()", {
+  x <- construire_353(c(1e308, 1e308, 900, 1100))
+  ok <- refus_353(x, Inf)
+  if (!isTRUE(ok)) ok else if (grepl("(non fini ; au plus 8.9884656743115785e+307, moitié du plus grand réel en double précision)",
+                                      conditionMessage(x$r), fixed = TRUE)) TRUE else conditionMessage(x$r)
+})
+verifier("I #353 construire_table(), agrégats, segment F à 1e308 + 1e308 (exposition de segment infinie) : refus exposition / exposition_hors_plage, valeur Inf, au lieu de z = -/+7,98e152 à l'état produite", {
+  refus_353(construire_353(c(1e308, 1000, 1e308, 1100)), Inf)
+})
+verifier("I #353 construire_table(), agrégats, une seule cellule à 1e308 (total fini, au-delà de .Machine$double.xmax / 2) : refus exposition / exposition_hors_plage, valeur 1e308 citée « 1e+308 » (changement de comportement accepté, M579 : produite avant, z = -/+3,496029)", {
+  x <- construire_353(c(1e308, 1000, 900, 1100))
+  ok <- refus_353(x, 1e308 + 1000 + 900 + 1100)
+  if (!isTRUE(ok)) ok else if (grepl("(1e+308 ; au plus 8.9884656743115785e+307,", conditionMessage(x$r), fixed = TRUE)) TRUE
+  else conditionMessage(x$r)
+})
+verifier("I #353 témoin (1000, 1000, 900, 1100) : inchangé, z = -/+0,7090792 et T = 0,5027933 (1e-6), état produite ; total à la borne (.Machine$double.xmax / 2 - 3000 sur une cellule) : construit, état produite", {
+  x <- construire_353(c(1000, 1000, 900, 1100))
+  y <- construire_353(c(.Machine$double.xmax / 2 - 3000, 1000, 900, 1100))
+  if (inherits(x$r, "condition")) return(paste("témoin :", conditionMessage(x$r)))
+  if (inherits(y$r, "condition")) return(paste("borne :", conditionMessage(y$r)))
+  s <- x$r$etapes$homogeneite$resultat$segments; t <- x$r$etapes$homogeneite$resultat$tests
+  sy <- y$r$etapes$homogeneite$resultat$segments
+  tous(z = proche(s$z, rep(c(-0.7090792, 0.7090792), 2L), 1e-6, 0),
+       t = proche(t$statistique, rep(0.5027933, 3L), 1e-6, 0),
+       etats = if (all(s$etat == "produite") && all(t$etat == "produite")) TRUE else paste(s$etat, collapse = ", "),
+       borne = if (all(sy$etat == "produite") && all(is.finite(sy$z)) && all(is.finite(sy$exposition_centrale))) TRUE
+               else paste(sy$etat, collapse = ", "))
+})
+verifier("I #353 replications_multinomiales() : poids Inf, poids NaN -> message propre (groupes, poids ou effectifs invalides) ; poids finis de somme de groupe infinie (1e308 + 1e308) -> message propre (somme des poids d'un groupe non finie) ; aucune erreur de R ni avertissement", {
+  f <- function(Dm) list(s = colSums(Dm))
+  essai <- function(w) refus_ou_erreur_348(tablexp:::replications_multinomiales(w, c(1L, 1L), 8L, 3L, 1L, f))
+  attendu <- function(x, texte)
+    if (inherits(x$r, "error") && identical(conditionMessage(x$r), texte) && !length(x$av)) TRUE
+    else if (inherits(x$r, "error")) conditionMessage(x$r) else "aucune erreur"
+  invalides <- "replications_multinomiales() : groupes, poids ou effectifs invalides (erreur de programmation)."
+  tous(inf = attendu(essai(c(Inf, 1000)), invalides),
+       nan = attendu(essai(c(NaN, 1)), invalides),
+       somme = attendu(essai(c(1e308, 1e308)),
+                       "replications_multinomiales() : somme des poids d'un groupe non finie (erreur de programmation)."))
+})

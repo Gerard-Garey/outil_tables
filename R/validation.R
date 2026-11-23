@@ -966,18 +966,24 @@ replications_poisson <- function(A, B, graine, statistiques, elements_bloc = ELE
 # cellule où se répartir (erreur de programmation, contrôlée avant tout
 # tirage). Un effectif au-delà de .Machine$integer.max (size de rmultinom())
 # est aussi une erreur de programmation : les appelants rangent le total des
-# événements en integer avant tout tirage (#348).
+# événements en integer avant tout tirage (#348). Un poids non fini (NaN
+# compris) ou une somme de poids d'un groupe non finie est aussi une erreur
+# de programmation (#353) : les appelants tirent sur des expositions dont le
+# total est gardé à l'étape exposition (LIMITE_SOMMES_DOUBLE, M579).
 replications_multinomiales <- function(poids, groupe, effectifs, B, graine, statistiques,
                                        elements_bloc = ELEMENTS_BLOC_REPLICATIONS) {
   n <- length(poids)
   G <- length(effectifs)
-  if (length(groupe) != n || anyNA(groupe) || any(groupe < 1L | groupe > G) || any(!(poids > 0)) ||
-      anyNA(effectifs) || any(effectifs < 0) || any(effectifs > .Machine$integer.max))
+  if (length(groupe) != n || anyNA(groupe) || any(groupe < 1L | groupe > G) || !all(is.finite(poids)) ||
+      any(!(poids > 0)) || anyNA(effectifs) || any(effectifs < 0) || any(effectifs > .Machine$integer.max))
     stop("replications_multinomiales() : groupes, poids ou effectifs invalides (erreur de programmation).",
          call. = FALSE)
   idx <- lapply(seq_len(G), function(g) which(groupe == g))
   if (any(!lengths(idx) & effectifs > 0))
     stop("replications_multinomiales() : groupe d'effectif positif sans cellule (erreur de programmation).",
+         call. = FALSE)
+  if (!all(is.finite(vapply(idx, function(i) sum(poids[i]), numeric(1L)))))
+    stop("replications_multinomiales() : somme des poids d'un groupe non finie (erreur de programmation).",
          call. = FALSE)
   pi_g <- lapply(idx, function(i) poids[i] / sum(poids[i]))
   taille <- max(1, floor(elements_bloc / max(1, n)))
@@ -2611,6 +2617,15 @@ calculer_homogeneite <- function(exposition, segmentation, par_annee, convention
   n_a <- length(prem)
   D_a <- somme_par(D[i_s], a, n_a)
   E_a <- somme_par(E[i_s], a, n_a)
+  # Garde défensive (#353 ; spécification d'actuary-approfondi, § 5.1) :
+  # sous construire_table(), le total des expositions est gardé à l'étape
+  # exposition (refus exposition_hors_plage, M579) ; un appel direct avec
+  # une exposition non finie, ou dont la somme dépasse LIMITE_SOMMES_DOUBLE
+  # (strate, segment ou groupe de tirage infini), s'arrête ici, avant tout
+  # score.
+  if (!all(is.finite(E_a)) || !(sum(E_a) <= LIMITE_SOMMES_DOUBLE))
+    stop(paste("calculer_homogeneite() : exposition agrégée non finie ou hors de la plage de calcul",
+               "(erreur de programmation)."), call. = FALSE)
   cel_a <- cel[prem]
   sg_a <- sg[prem]
   tranche_a <- tranche[prem]
@@ -2748,6 +2763,10 @@ calculer_homogeneite <- function(exposition, segmentation, par_annee, convention
   # l_toutes : lignes de la plage de la portée (cellules fautives comprises) ;
   # l_a : lignes agrégées de la portée.
   portee <- function(nom, debut, fin, sc, l_toutes, l_a, faute) {
+    # Variance non définie : inatteignable après la garde de E_a (#353) ;
+    # sinon un indice NA écarterait l'état variance_nulle sans le dire.
+    if (anyNA(sc$v))
+      stop("calculer_homogeneite() : variance du score non définie (erreur de programmation).", call. = FALSE)
     e_tout <- somme_par(E[l_toutes], sg[l_toutes], S)
     d_tout <- somme_par(D[l_toutes], sg[l_toutes], S)
     d <- data.frame(portee = rep(nom, S), stringsAsFactors = FALSE)
