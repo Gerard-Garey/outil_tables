@@ -14725,7 +14725,10 @@ période (exact sous le modèle de Poisson par tête dans ce cas), ce qui rend l
 rapport figé le mentionne (section~\ref{sec:rapport-fige}). Ce sens de
 l'erreur des tests est un énoncé \emph{asymptotique} (attendus grands)~:
 à petits attendus, un test peut être conservateur (issues~\#359
-et~\#361, ouvertes~; exemple chiffré ci-dessous). Dans
+et~\#361, ouvertes~; exemple chiffré ci-dessous). Le texte de la
+conséquence \code{tests} rendu dans les statuts («~les tests sont
+anti-conservateurs~», ci-dessous) ne porte pas encore cette réserve
+(issue~\#359). Dans
 \code{STATUTS\_VALIDATION} (relations \code{independante} et
 \code{ajustee\_hors\_outil}), le statut de chacune des 22~grandeurs qui affirment une loi se termine par cette
 hypothèse (issue~\#159), écrite «~unités d'observation indépendantes~;
@@ -14767,7 +14770,7 @@ $1 - e^{-A(1 - w/2)} < 1 - e^{-A}$, seul $D \ge 1$ comptant), mais 0,03694
 et 0,08171 à $A = 0{,}3$~; la valeur sous Poisson surestime dans le premier
 cas et sous-estime dans le second. Le même calcul à $A = 0{,}05$ donne au
 test unilatéral \code{smr}/\allowbreak\code{p\_superieure}, qui rejette dès
-$O \ge 1$, un niveau réel de 0,03681 contre 0,04877~: conservateur (issue~\#359).
+$O \ge 1$ au niveau 0,05, un niveau réel de 0,03681 contre 0,04877~: conservateur (issue~\#359).
 Dans les deux lignes des sous-groupes, la mention précède le
 texte propre à la relation \code{ajustee\_hors\_outil}. Les autres
 grandeurs (décomptes et grandeurs descriptives, degrés de liberté, SMR
@@ -17740,9 +17743,11 @@ comparateur~2) se terminent par l'hypothèse d'indépendance des unités
 (issue~\#159)~: «~unités d'observation indépendantes~; sous l'unité
 contrat, les décès sont sur-dispersés et l'intervalle est trop étroit~»,
 ou, pour le rapport de variance, «~\ldots{} et $\operatorname{Var}(\hat A)$
-est sous-estimée~» (résultat exact~: $\hat A$ est une combinaison
-linéaire de cellules indépendantes, dont chaque variance est multipliée
-par $\varphi_c \ge 1$)~; ces textes sont ceux des natures
+est sous-estimée~» (résultat exact~: $\hat A = \sum_c
+(E^c_{e,c}/E^c_{r,c}) D_{r,c}$ est une combinaison à coefficients
+positifs~; sous le modèle de Poisson composé, chaque variance est
+multipliée par $\varphi_c \ge 1$, et les covariances entre cellules,
+nulles sous Poisson, sont positives ou nulles ($\kappa_{11} \ge 0$))~; ces textes sont ceux des natures
 \code{intervalle} et \code{variance} de la source commune
 \code{mention\_independance()} (section~\ref{sec:validation-statistiques},
 issue~\#330)~; pour le comparateur~2, la mention précède le texte
