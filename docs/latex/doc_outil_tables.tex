@@ -4464,7 +4464,16 @@ et ceux de l'étape \code{exposition}
 sur la table qu'elle forme (\code{trop\_de\_cellules},
 \code{evenements\_hors\_plage}, \code{denombrement\_hors\_plage} et
 \code{periode\_sans\_exposition},
-section~\ref{sec:troncature-censure}), sont levés pendant l'étape, après
+section~\ref{sec:troncature-censure}), et ceux de l'étape \code{donnees}
+sur les lignes reçues (\code{base\_vide}, refus par défaut
+\code{ligne\_invalide}, \code{aucune\_ligne\_conservee}, refus
+\code{donnees\_mal\_formees} du contrôle de l'extraction des lignes
+conservées, distinct du refus de même motif du contrôle des lignes reçues,
+levé avant la première étape par \code{controler\_roles()},
+section~\ref{sec:controles-donnees}~; refus \code{inventaire\_sans\_ligne}
+sous la recette \code{stocks\_successifs} et garde de capacité
+\code{dates\_hors\_plage} de la fusion par tête,
+section~\ref{sec:unite-observation}), sont levés pendant l'étape, après
 celles qui la précèdent (l'étape
 \code{importance\_exclusions} ne lève aucun refus sur ses cellules, et
 les gardes \code{denombrement\_hors\_plage} des étapes en aval de
