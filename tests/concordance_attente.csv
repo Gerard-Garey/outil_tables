@@ -1,1 +1,2 @@
 type,nom,issue,motif
+entree,fonctions-validation:mention_independance,#330,"fonction interne nouvelle (F330, #330) ; entrée du catalogue écrite par docwriter au commit docs: de #330 (règle 9)"

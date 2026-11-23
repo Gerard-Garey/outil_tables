@@ -66,9 +66,14 @@ verifier("A STATUTS_VALIDATION_POSITIONNEE : mêmes (statistique, grandeur, sous
     grepl("loi non corrigée de l'estimation de theta", k("wilcoxon", "p_exacte"), fixed = TRUE) &&
     !any(grepl("Liddell|Garwood|Byar|Wilson|Hilferty|Clopper|Pearson \\(", b$statut)) &&
     all(grepl("sous l'unité contrat, les décès sont sur-dispersés et les tests sont anti-conservateurs",
-              c(k("residus", "esperance_au_dela_2"), k("khi2_pearson", "p_asymptotique"), k("deviance", "p_monte_carlo"),
-                k("deviance", "p_asymptotique"),
-                k("sous_groupes", "bornes_exactes"), k("sous_groupes", "p_valeurs")), fixed = TRUE)) &&
+              c(k("khi2_pearson", "p_asymptotique"), k("deviance", "p_monte_carlo"), k("deviance", "p_asymptotique"),
+                k("sous_groupes", "p_valeurs")), fixed = TRUE)) &&
+    # Conséquence par nature (#330) : valeur sous H0 (i) pour les espérances
+    # conditionnelles, intervalle pour les bornes des sous-groupes.
+    grepl("sur-dispers\u00e9s et la valeur sous H0 (i) diff\u00e8re de celle de la loi r\u00e9elle",
+          k("residus", "esperance_au_dela_2"), fixed = TRUE) &&
+    grepl("sur-dispers\u00e9s et l'intervalle est trop \u00e9troit", k("sous_groupes", "bornes_exactes"),
+          fixed = TRUE) &&
     grepl("couverture >= niveau (intervalle exact conservatif)", k("sous_groupes", "bornes_exactes"), fixed = TRUE) &&
     grepl("si n - S = 0 (une cellule retenue par segment)", k("khi2_pearson", "ddl"), fixed = TRUE)
 })
@@ -94,7 +99,9 @@ verifier("A STATUTS_VALIDATION_POSITIONNEE (M309) : Wilcoxon, R2 et distance nom
   # sous_groupes/bornes_exactes, p_valeurs et p_valeurs_asymptotiques ;
   # avant #215 : 7c535735fdb65e7aa57c22f86d60ffb3) puis par #159 (mention
   # d'indépendance des unités sur les 22 lignes de loi ; avant #159 :
-  # 736e637e156df8d409b6943d333fe741),
+  # 736e637e156df8d409b6943d333fe741) puis par #330 (conséquence de la
+  # mention selon la nature de la grandeur, 9 lignes ; avant #330 :
+  # 4b66eb3d650c8a0483869866dce8cf12),
   # valeur écrite en dur (identité exacte) : octets bruts des
   # chaînes (charToRaw, sans conversion), champs séparés par une tabulation,
   # lignes par un saut de ligne ; indépendante de la locale d'installation
@@ -122,7 +129,7 @@ verifier("A STATUTS_VALIDATION_POSITIONNEE (M309) : Wilcoxon, R2 et distance nom
                         grepl("pbinom ; table positionnée sur ces données", k("signes", "p_exacte"), fixed = TRUE,
                               useBytes = TRUE))
                       TRUE else paste(grep("[^ ];", b$statut, useBytes = TRUE, value = TRUE), collapse = " | "),
-    independante = if (identical(unname(tools::md5sum(f)), "4b66eb3d650c8a0483869866dce8cf12")) TRUE
+    independante = if (identical(unname(tools::md5sum(f)), "8b23686a0db0aed8993e24c8fdbc62b4")) TRUE
                    else "STATUTS_VALIDATION modifié")
 })
 verifier("A statuts_validation() : switch à trois valeurs, erreur de programmation par défaut", tous(

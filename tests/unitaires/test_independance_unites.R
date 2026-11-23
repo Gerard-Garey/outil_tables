@@ -35,21 +35,58 @@ ecart_159 <- function(d, avec) {
   else paste(sprintf("%s : %d au lieu de %d", k[n != att], n[n != att], att[n != att]), collapse = " ; ")
 }
 
-TESTS_159 <- c(
-  "residus/esperance_au_dela_2", "residus/esperance_au_dela_3",
-  "khi2_pearson/variance_h0", "khi2_pearson/p_asymptotique", "khi2_pearson/p_monte_carlo",
-  "deviance/p_asymptotique", "deviance/p_monte_carlo",
-  "smr/p_inferieure", "smr/p_superieure", "smr/p_centrale", "smr/z_racine_cubique", "smr/p_racine_cubique",
-  "signes/esperance_positifs_h0", "signes/p_monte_carlo", "runs/p_monte_carlo", "wilcoxon/p_monte_carlo",
-  "fluctuation/esperance_hors_intervalle_exact", "fluctuation/esperance_hors_intervalle_asymptotique",
-  "sous_groupes/p_valeurs")
-INTERVALLES_159 <- c("smr/borne_inf_exacte", "smr/borne_sup_exacte", "sous_groupes/bornes_exactes")
-SMR_NON_PRODUITS_159 <- c("smr/borne_inf_exacte", "smr/borne_sup_exacte", "smr/p_inferieure", "smr/p_superieure",
-                          "smr/p_centrale", "smr/z_racine_cubique", "smr/p_racine_cubique")
-M_TESTS_159 <- paste("unités d'observation indépendantes ; sous l'unité contrat, les décès",
-                     "sont sur-dispersés et les tests sont anti-conservateurs")
-M_INTERVALLE_159 <- paste("unités d'observation indépendantes ; sous l'unité contrat, les décès",
-                          "sont sur-dispersés et l'intervalle est trop étroit")
+# Nature de la conséquence de chaque ligne marquée (#330, F330 ;
+# spécification d'actuary-approfondi, #330, commentaire 7102990712, § 1 et
+# § 2) : préfixe commun M_PREFIXE_330 (marqueur et cause) suivi de la
+# conséquence de la nature ; khi2_pearson/variance_h0 est `variance` sous
+# STATUTS_VALIDATION, `valeur_h0` sous STATUTS_VALIDATION_POSITIONNEE
+# (conditionnement par O_s). Textes en échappements \u (UTF-8 en toute locale).
+M_PREFIXE_330 <- paste("unit\u00e9s d'observation ind\u00e9pendantes ; sous l'unit\u00e9 contrat, les d\u00e9c\u00e8s",
+                       "sont sur-dispers\u00e9s et ")
+CONSEQUENCES_330 <- c(
+  tests = "les tests sont anti-conservateurs",
+  intervalle = "l'intervalle est trop \u00e9troit",
+  variance_x2 = "Var(X2) est sous-estim\u00e9e",
+  variance_a = "Var(A^) est sous-estim\u00e9e",
+  valeur_h0 = "la valeur sous H0 (i) diff\u00e8re de celle de la loi r\u00e9elle, dans un sens non \u00e9tabli en g\u00e9n\u00e9ral",
+  niveau = "le niveau n'est plus garanti")
+mention_330 <- function(n) paste0(M_PREFIXE_330, CONSEQUENCES_330[[n]])
+ESPERANCES_330 <- c("residus/esperance_au_dela_2", "residus/esperance_au_dela_3", "signes/esperance_positifs_h0",
+                    "fluctuation/esperance_hors_intervalle_exact",
+                    "fluctuation/esperance_hors_intervalle_asymptotique")
+NIVEAU_330 <- c("signes/p_monte_carlo", "runs/p_monte_carlo", "wilcoxon/p_monte_carlo")
+# STATUTS_VALIDATION : 10 + 3 + 1 + 5 + 3 = 22 lignes de loi.
+NATURES_V_330 <- list(
+  tests = c("khi2_pearson/p_asymptotique", "khi2_pearson/p_monte_carlo", "deviance/p_asymptotique",
+            "deviance/p_monte_carlo", "smr/p_inferieure", "smr/p_superieure", "smr/p_centrale",
+            "smr/z_racine_cubique", "smr/p_racine_cubique", "sous_groupes/p_valeurs"),
+  intervalle = c("smr/borne_inf_exacte", "smr/borne_sup_exacte", "sous_groupes/bornes_exactes"),
+  variance_x2 = "khi2_pearson/variance_h0",
+  valeur_h0 = ESPERANCES_330,
+  niveau = NIVEAU_330)
+# STATUTS_VALIDATION_POSITIONNEE : 6 + 1 + 6 + 3 = 16 lignes de loi.
+NATURES_P_330 <- list(
+  tests = c("khi2_pearson/p_asymptotique", "khi2_pearson/p_monte_carlo", "deviance/p_asymptotique",
+            "deviance/p_monte_carlo", "sous_groupes/p_valeurs", "sous_groupes/p_valeurs_asymptotiques"),
+  intervalle = "sous_groupes/bornes_exactes",
+  valeur_h0 = c(ESPERANCES_330, "khi2_pearson/variance_h0"),
+  niveau = NIVEAU_330)
+# STATUTS_IMPORTANCE : 3 + 1 = 4 lignes de loi.
+NATURES_I_330 <- list(
+  intervalle = c("smr_comparateur_1/bornes_exactes", "smr_comparateur_1/bornes_asymptotiques",
+                 "smr_comparateur_2/bornes"),
+  variance_a = "smr_comparateur_1/rapport_variance")
+LOI_V_330 <- unlist(NATURES_V_330, use.names = FALSE)
+# Lignes de `d` (clés `cle_159`) dont le statut ne contient pas la mention de
+# leur nature selon `natures` ; character(0) si toutes la portent.
+sans_mention_330 <- function(d, natures) {
+  k <- cle_159(d); st <- enc2utf8(d$statut)
+  unlist(lapply(names(natures), function(n) {
+    i <- match(natures[[n]], k)
+    natures[[n]][is.na(i) | !grepl(mention_330(n), st[i], fixed = TRUE)]
+  }))
+}
+M_TESTS_159 <- mention_330("tests")
 
 # Écart de la table `d` (forme de STATUTS_BRUT) à l'attendu par position :
 # 1 sur les lignes 2, 3, 5, 6, 8, 9, 11 et 12, 0 ailleurs ; TRUE ou le texte.
@@ -73,34 +110,58 @@ verifier("#159 C3 STATUTS_BRUT (littéral de la spécification) : mention en fin
                  !fin(s$statut[12L], m_int))
   if (all(tous)) TRUE else paste("échec :", paste(names(tous)[!tous], collapse = ", "))
 })
-verifier("#159 C3 STATUTS_VALIDATION (littéral de la spécification) : marqueur une fois sur les 22 lignes de loi, jamais ailleurs ; texte des tests ou de l'intervalle selon la ligne",
+verifier("#330 C3 mention_independance() (litt\u00e9ral de la sp\u00e9cification) : pr\u00e9fixe commun suivi de la cons\u00e9quence exacte de chacune des cinq natures, objet de la variance repris", {
+  f <- tablexp:::mention_independance
+  obt <- enc2utf8(c(f("tests"), f("intervalle"), f("variance", "Var(X2)"), f("variance", "Var(A^)"), f("valeur_h0"),
+                    f("niveau")))
+  att <- vapply(c("tests", "intervalle", "variance_x2", "variance_a", "valeur_h0", "niveau"), mention_330, "")
+  if (identical(obt, unname(att))) TRUE else paste("obtenu :", paste(obt, collapse = " | "))
+})
+verifier("#330 C3 mention_independance() (litt\u00e9ral de la sp\u00e9cification) : nature inconnue, variance sans objet et objet hors de la nature variance refus\u00e9s (erreur de programmation)", {
+  f <- tablexp:::mention_independance
+  r <- c(inconnue = inherits(try(f("esperance"), silent = TRUE), "try-error"),
+         variance_sans_objet = inherits(try(f("variance"), silent = TRUE), "try-error"),
+         objet_hors_variance = inherits(try(f("tests", "Var(X2)"), silent = TRUE), "try-error"),
+         objet_vide_hors_variance = inherits(try(f("tests", ""), silent = TRUE), "try-error"),
+         objet_na_hors_variance = inherits(try(f("niveau", NA_character_), silent = TRUE), "try-error"),
+         objet_numerique_hors_variance = inherits(try(f("intervalle", 1), silent = TRUE), "try-error"),
+         objet_numerique_variance = inherits(try(f("variance", 1), silent = TRUE), "try-error"))
+  if (all(r)) TRUE else paste("non refus\u00e9 :", paste(names(r)[!r], collapse = ", "))
+})
+verifier("#159 #330 C3 STATUTS_VALIDATION (litt\u00e9ral de la sp\u00e9cification) : marqueur une fois sur les 22 lignes de loi, jamais ailleurs ; cons\u00e9quence de la nature de chaque ligne (10 tests, 3 intervalles, 1 variance Var(X2), 5 valeurs sous H0 (i), 3 niveaux) ; mention en fin de statut, avant la relation ajustee_hors_outil pour les deux lignes sous_groupes",
   {
     s <- tablexp:::STATUTS_VALIDATION; k <- cle_159(s); st <- enc2utf8(s$statut)
-    e <- ecart_159(s, c(TESTS_159, INTERVALLES_159))
+    e <- ecart_159(s, LOI_V_330)
+    sg <- c("sous_groupes/p_valeurs", "sous_groupes/bornes_exactes")
+    fin <- unlist(lapply(names(NATURES_V_330), function(n) {
+      g <- setdiff(NATURES_V_330[[n]], sg); g[!endsWith(st[match(g, k)], mention_330(n))]
+    }))
     if (!isTRUE(e)) e
-    else if (!all(grepl(M_TESTS_159, st[k %in% TESTS_159], fixed = TRUE)) ||
-             !all(grepl(M_INTERVALLE_159, st[k %in% INTERVALLES_159], fixed = TRUE))) "texte de la mention"
-    else if (!all(grepl(paste(M_TESTS_159, "; relation ajustee_hors_outil"), st[k == "sous_groupes/p_valeurs"], fixed = TRUE)) ||
-             !grepl(paste(M_INTERVALLE_159, "; relation ajustee_hors_outil"), st[k == "sous_groupes/bornes_exactes"], fixed = TRUE))
+    else if (length(m <- sans_mention_330(s, NATURES_V_330))) paste("cons\u00e9quence absente :", paste(m, collapse = ", "))
+    else if (length(fin)) paste("mention hors de la fin du statut :", paste(fin, collapse = ", "))
+    else if (!grepl(paste(mention_330("tests"), "; relation ajustee_hors_outil"), st[k == "sous_groupes/p_valeurs"], fixed = TRUE) ||
+             !grepl(paste(mention_330("intervalle"), "; relation ajustee_hors_outil"), st[k == "sous_groupes/bornes_exactes"], fixed = TRUE))
       "sous_groupes : mention avant la relation ajustee_hors_outil"
     else TRUE
   })
-verifier("#159 C3 STATUTS_VALIDATION_POSITIONNEE (littéral de la spécification) : marqueur une fois sur les 16 lignes (22 lignes de loi moins les 7 lignes smr non produites, plus sous_groupes/p_valeurs_asymptotiques), jamais ailleurs (aucun doublon)",
-         ecart_159(tablexp:::STATUTS_VALIDATION_POSITIONNEE,
-                   c(setdiff(c(TESTS_159, INTERVALLES_159), SMR_NON_PRODUITS_159), "sous_groupes/p_valeurs_asymptotiques")))
+verifier("#159 #330 C3 STATUTS_VALIDATION_POSITIONNEE (litt\u00e9ral de la sp\u00e9cification) : marqueur une fois sur les 16 lignes (22 lignes de loi moins les 7 lignes smr non produites, plus sous_groupes/p_valeurs_asymptotiques), jamais ailleurs (aucun doublon) ; cons\u00e9quence de la nature de chaque ligne (6 tests, 1 intervalle, 6 valeurs sous H0 (i) dont khi2_pearson/variance_h0, 3 niveaux)", {
+  s <- tablexp:::STATUTS_VALIDATION_POSITIONNEE
+  e <- ecart_159(s, unlist(NATURES_P_330, use.names = FALSE))
+  if (!isTRUE(e)) e
+  else if (length(m <- sans_mention_330(s, NATURES_P_330))) paste("cons\u00e9quence absente :", paste(m, collapse = ", "))
+  else TRUE
+})
 verifier("#159 C3 STATUTS_VALIDATION_LISSEE (littéral de la spécification) : marqueur sur aucune ligne (lissage hors périmètre, #329)",
          ecart_159(tablexp:::STATUTS_VALIDATION_LISSEE, character(0)))
-verifier("#159 C3 STATUTS_IMPORTANCE (littéral de la spécification) : marqueur une fois sur les 4 lignes de loi (bornes du comparateur 1, rapport_variance, bornes du comparateur 2), jamais ailleurs", {
+verifier("#159 #330 C3 STATUTS_IMPORTANCE (litt\u00e9ral de la sp\u00e9cification) : marqueur une fois sur les 4 lignes de loi (bornes du comparateur 1, rapport_variance, bornes du comparateur 2), jamais ailleurs ; cons\u00e9quence de la nature (3 intervalles, 1 variance Var(A^)) ; mention en fin de statut, avant la relation ajustee_hors_outil pour smr_comparateur_2/bornes", {
   s <- tablexp:::STATUTS_IMPORTANCE; k <- cle_159(s); st <- enc2utf8(s$statut)
-  e <- ecart_159(s, c("smr_comparateur_1/bornes_exactes", "smr_comparateur_1/bornes_asymptotiques",
-                      "smr_comparateur_1/rapport_variance", "smr_comparateur_2/bornes"))
+  e <- ecart_159(s, unlist(NATURES_I_330, use.names = FALSE))
   if (!isTRUE(e)) e
+  else if (length(m <- sans_mention_330(s, NATURES_I_330))) paste("cons\u00e9quence absente :", paste(m, collapse = ", "))
   else if (!all(endsWith(st[k %in% c("smr_comparateur_1/bornes_exactes", "smr_comparateur_1/bornes_asymptotiques")],
-                         paste(";", M_INTERVALLE_159))) ||
-           !endsWith(st[k == "smr_comparateur_1/rapport_variance"],
-                     paste("; unités d'observation indépendantes ; sous l'unité contrat, les décès",
-                           "sont sur-dispersés et Var(A^) est sous-estimée")) ||
-           !grepl(paste(M_INTERVALLE_159, "; relation ajustee_hors_outil"), st[k == "smr_comparateur_2/bornes"], fixed = TRUE))
+                         paste(";", mention_330("intervalle")))) ||
+           !endsWith(st[k == "smr_comparateur_1/rapport_variance"], paste(";", mention_330("variance_a"))) ||
+           !grepl(paste(mention_330("intervalle"), "; relation ajustee_hors_outil"), st[k == "smr_comparateur_2/bornes"], fixed = TRUE))
     "texte ou place de la mention"
   else TRUE
 })
@@ -142,7 +203,7 @@ verifier("#159 C3 témoin (valeur calculée à la main) : copie de STATUTS_VALID
   retrait$statut[i] <- sub(paste(" ;", M_TESTS_159), "", enc2utf8(retrait$statut[i]), fixed = TRUE)
   ajout <- d; j <- which(k == "deviance/ddl")
   ajout$statut[j] <- paste(ajout$statut[j], ";", M_TESTS_159)
-  e1 <- ecart_159(retrait, c(TESTS_159, INTERVALLES_159)); e2 <- ecart_159(ajout, c(TESTS_159, INTERVALLES_159))
+  e1 <- ecart_159(retrait, LOI_V_330); e2 <- ecart_159(ajout, LOI_V_330)
   if (identical(e1, "smr/p_centrale : 0 au lieu de 1") && identical(e2, "deviance/ddl : 1 au lieu de 0")) TRUE
   else paste("obtenu :", format(e1), "|", format(e2))
 })
@@ -150,4 +211,11 @@ verifier("#159 C3 témoin (valeur calculée à la main) : copie de STATUTS_VALID
   d <- tablexp:::STATUTS_VALIDATION_POSITIONNEE; i <- which(cle_159(d) == "deviance/p_monte_carlo")
   d$statut[i] <- paste(d$statut[i], ";", M_TESTS_159)
   if (identical(max(compter_159(d$statut)), 2L)) TRUE else "doublon non compté"
+})
+verifier("#330 C3 t\u00e9moin (valeur calcul\u00e9e \u00e0 la main) : copie de STATUTS_VALIDATION_POSITIONNEE dont sous_groupes/bornes_exactes reprend la cons\u00e9quence des tests (d\u00e9faut de #330) -> ligne signal\u00e9e par sans_mention_330(), d\u00e9compte du marqueur inchang\u00e9", {
+  d <- tablexp:::STATUTS_VALIDATION_POSITIONNEE; i <- which(cle_159(d) == "sous_groupes/bornes_exactes")
+  d$statut[i] <- sub(mention_330("intervalle"), mention_330("tests"), enc2utf8(d$statut[i]), fixed = TRUE)
+  m <- sans_mention_330(d, NATURES_P_330)
+  if (identical(m, "sous_groupes/bornes_exactes") && isTRUE(ecart_159(d, unlist(NATURES_P_330, use.names = FALSE)))) TRUE
+  else paste("obtenu :", paste(m, collapse = ", "))
 })
