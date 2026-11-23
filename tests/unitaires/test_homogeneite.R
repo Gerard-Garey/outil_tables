@@ -2475,3 +2475,48 @@ verifier("I #334 W symétrique au bit et z opposés au bit à deux segments : ca
        z = if (identical(sg$z[1L], -sg$z[2L])) TRUE else paste(format(sg$z, digits = 17), collapse = " / "),
        tires = if (defauts == 0L) TRUE else sprintf("%d cas sur 300 en défaut", defauts))
 })
+
+# --- #350 : p exacte d'une strate de 1e9 + 1e9 décès, calculée sur son support
+#
+# Règle (A) de la spécification d'actuary-approfondi de #350 (commentaire
+# 7103012151, § 3 et § 6, test 3 ; M580) : le support de chaque binomiale se
+# calcule par bisection (support_binomiale()), sans dbinom(0:n) ; une seule
+# strate est calculée sur son support (aucun état nouveau). Avant (copie de
+# 1f0109a, sous ulimit -v 4000000) : « cannot allocate vector of size 14.9
+# Gb ». Natures : valeur calculée à la main (T = U^2 / V, U = -25 000, V =
+# 2 000 050 000 x 0,25) ; recoupement indépendant par pbinom() (O_1 ~
+# Bin(2 000 050 000 ; 0,5), queues k <= 1e9 et k >= 1 000 050 000) ; mesure
+# de mémoire par gc() (Vcells, maximum depuis la remise à zéro, moins l'usage
+# à la remise à zéro ; ce maximum compte aussi les objets non encore collectés,
+# 314 Mb mesurés dans la batterie complète contre moins de 200 Mb seul, d'où
+# une borne large, très en deçà des 14,9 Gb de l'allocation d'avant).
+verifier("I #350 C4 homogénéité, une strate (âge 60), deux segments de E = 5e10 : décès (1e9, 1e9) -> global et tranche T = 0, p exacte 1, produite ; décès (1e9, 1e9 + 50 000) -> T = 6,25e8 / 500 012 500 (1e-12), p exacte produite, égale à pbinom (1e-12) et à la mesure 0.26356799567030476 (1e-15) ; somme_tranches non_produite_par_cette_version ; aucune erreur de R ; moins de 2 000 Mb et 30 s par appel", {
+  essai <- function(D2) {
+    g0 <- gc(reset = TRUE); t0 <- proc.time()[["elapsed"]]
+    r <- tryCatch(homog(expo_seg(c("F", "H"), c(60, 60), c(5e10, 5e10), c(1e9, D2)), "segment", c(60, 60), 60, B = 19),
+                  error = function(e) e)
+    # Colonnes lues par nom (R_MAX_VSIZE ajoute « limit (Mb) » et décale les
+    # positions ; audit de l'étape (3)).
+    g1 <- gc()
+    list(r = r, mb = g1[2L, match("max used", colnames(g1)) + 1L] - g0[2L, match("used", colnames(g0)) + 1L],
+         s = proc.time()[["elapsed"]] - t0)
+  }
+  a <- essai(1e9); b <- essai(1e9 + 50000)
+  for (x in list(a, b)) {
+    if (inherits(x$r, "error")) return(paste("erreur de R :", conditionMessage(x$r)))
+    if (!(x$mb <= 2000 && x$s <= 30)) return(sprintf("mémoire %.1f Mb, durée %.2f s", x$mb, x$s))
+  }
+  ta <- a$r$resultat$tests; tb <- b$r$resultat$tests
+  n <- 2e9 + 5e4
+  p_pbinom <- stats::pbinom(1e9, n, 0.5) + stats::pbinom(1000049999, n, 0.5, lower.tail = FALSE)
+  tous(
+    egaux = if (identical(ta$statistique[1:2], c(0, 0)) && identical(ta$p_exacte[1:2], c(1, 1)) &&
+                identical(ta$etat_p_exacte, c("produite", "produite", "non_produite_par_cette_version"))) TRUE
+            else "cas (1e9, 1e9)",
+    etats = if (identical(tb$test, c("global", "tranche", "somme_tranches")) &&
+                identical(tb$etat_p_exacte, c("produite", "produite", "non_produite_par_cette_version"))) TRUE
+            else paste(tb$etat_p_exacte, collapse = ", "),
+    statistique = proche(tb$statistique[1:2], rep(6.25e8 / 500012500, 2L), 1e-12, 0),
+    pbinom = proche(tb$p_exacte[1:2], rep(p_pbinom, 2L), 1e-12, 0),
+    mesure = proche(tb$p_exacte[1:2], rep(0.26356799567030476, 2L), 1e-15, 0))
+})

@@ -30,8 +30,10 @@
 #    STATUTS_VALIDATION_LISSEE) ;
 #  - replications_poisson() et replications_multinomiales() (sous
 #    sous_graine()), pvaleur_monte_carlo() ;
-#  - loi_somme_binomiales() : loi d'une somme de binomiales indépendantes
-#    (convolution, brique partagée avec #168, F3) ;
+#  - support_binomiale(), binomiale_elaguee(), cout_convolution_binomiales(),
+#    loi_somme_binomiales() : loi d'une somme de binomiales indépendantes
+#    (convolution sur les supports, brique partagée avec #168, F3 ; aucune
+#    allocation proportionnelle à n, #350) ;
 #  - p_somme_binomiales_normale() : p-valeurs asymptotiques de cette somme
 #    (approximation normale, correction de continuité ; #178) ;
 #  - statistiques_validation() : S1 à S12 sur les cellules (cœur partagé avec
@@ -136,8 +138,13 @@ ELEMENTS_BLOC_REPLICATIONS <- 2^22
 # segments ; F3, M185 ; audit A2) : coût calculé avant la convolution par
 # cout_convolution_binomiales() ; au-delà, p-valeurs exactes NA, p-valeurs
 # asymptotiques par p_somme_binomiales_normale() (convolution_au_dela_n_max ;
-# #178). Mesures (hôte cloud Linux, R 4.3.3,
-# 07/11/2026 ; débit d'environ 1,1 à 1,4e8 produits/s) :
+# #178). Le coût se calcule sur les longueurs des supports
+# (support_binomiale(), sans former dbinom(0:n) ; #350) ; une binomiale
+# seule n'a aucun produit et se calcule sur son support : 1 775 728 éléments
+# au plus à n = .Machine$integer.max (garde du total des événements), en p =
+# 0,5, sur 164 valeurs de p de 1e-12 à 1 - 1e-12 ; dbinom sur ce support en
+# 0,11 s (mesuré le 23/11/2026, même hôte). Mesures (hôte cloud Linux, R
+# 4.3.3, 07/11/2026 ; débit d'environ 1,1 à 1,4e8 produits/s) :
 #   segments x n_s, pi                        produits        durée
 #   2 x 50 000, 0,5                           73 599 241      0,61 s
 #   3 x (20 000, 30 000, 10 000), (0,2 ; 0,7 ; 0,4)
@@ -990,21 +997,67 @@ replications_multinomiales <- function(poids, groupe, effectifs, B, graine, stat
   })
 }
 
-# dbinom(0:n, n, p) réduite à l'intervalle de ses valeurs non nulles en
-# double (les valeurs retirées sont des zéros exacts de dbinom) : list(d,
-# debut = première valeur de X gardée).
+# Support {k : dbinom(k, n, p) > 0 en double} de Bin(n, p), sans former
+# dbinom(0:n) (#350, règle (A) de la spécification d'actuary-approfondi,
+# M580) : c(a, b), bornes entières du support. p = 0 ou n = 0 : c(0, 0) ;
+# p = 1 : c(n, n) ; sinon bisection de chaque côté du mode m = (n + 1) p
+# arrondi à l'entier inférieur, borné à [0, n], sur le prédicat dbinom(k, n,
+# p) > 0 : O(log n) évaluations scalaires, aucune allocation proportionnelle
+# à n. Le support est un intervalle : contiguïté exacte en arithmétique
+# réelle (log-concavité), mesurée en double : sur 44 frontières (n de 1e6 à
+# 2^31 - 1, p de 1e-6 à 1 - 1e-6), toutes à log-densité d'environ -745,
+# pente de log dbinom entre voisins >= 1,65e-3 contre un bruit de calcul <=
+# 1,3e-12 (mesuré le 23/11/2026, actuary) ; un défaut éventuel ne pourrait
+# omettre qu'une masse < 1e-316, sans effet sur aucune p ni aucun verdict.
+# Identité avec which(dbinom(0:n, n, p) > 0) mesurée sur 240 cas, n <= 5e6
+# (spécification, § 2). Un mode de densité nulle en double est
+# une erreur de programmation (inatteignable : P(X = m) >= 1 / (n + 1)).
+support_binomiale <- function(n, p) {
+  if (n == 0 || p == 0) return(c(0, 0))
+  if (p == 1) return(c(n, n))
+  positive <- function(k) stats::dbinom(k, n, p) > 0
+  m <- min(n, max(0, floor((n + 1) * p)))
+  if (!positive(m))
+    stop("support_binomiale() : densité nulle au mode (erreur de programmation).", call. = FALSE)
+  # Gauche : plus petit k de [0, m] de densité positive (dbinom(bas) = 0,
+  # dbinom(haut) > 0).
+  if (positive(0)) a <- 0 else {
+    bas <- 0; haut <- m
+    while (haut - bas > 1) {
+      milieu <- floor((bas + haut) / 2)
+      if (positive(milieu)) haut <- milieu else bas <- milieu
+    }
+    a <- haut
+  }
+  # Droite : plus grand k de [m, n] de densité positive (dbinom(bas) > 0,
+  # dbinom(haut) = 0).
+  if (positive(n)) b <- n else {
+    bas <- m; haut <- n
+    while (haut - bas > 1) {
+      milieu <- floor((bas + haut) / 2)
+      if (positive(milieu)) bas <- milieu else haut <- milieu
+    }
+    b <- bas
+  }
+  c(a, b)
+}
+
+# dbinom(k, n, p) sur le support de Bin(n, p) (support_binomiale() ; les
+# valeurs hors du support sont des zéros exacts de dbinom, #350) : list(d,
+# debut = première valeur de X gardée). Identique élément par élément à
+# dbinom(0:n, n, p) restreint à ses valeurs non nulles.
 binomiale_elaguee <- function(n, p) {
-  d <- stats::dbinom(0:n, n, p)
-  nz <- which(d > 0)
-  list(d = d[nz[1L]:nz[length(nz)]], debut = nz[1L] - 1)
+  s <- support_binomiale(n, p)
+  list(d = stats::dbinom(s[1L]:s[2L], n, p), debut = s[1L])
 }
 
 # Coût de loi_somme_binomiales(n, p), calculé avant la convolution (audit
 # A2) : somme sur k >= 2 de len(loi_(k-1)) x len(d_k), len(d_k) longueur
-# élaguée de dbinom, len(loi_k) = somme des len(d_j), j <= k, moins (k - 1) ;
-# en O(somme des n_s).
+# du support de Bin(n_k, p_k) (support_binomiale() : aucun vecteur dbinom
+# formé, #350), len(loi_k) = somme des len(d_j), j <= k, moins (k - 1) ; en
+# O(somme des log n_s) évaluations de dbinom.
 cout_convolution_binomiales <- function(n, p) {
-  l <- vapply(seq_along(n), function(s) length(binomiale_elaguee(n[s], p[s])$d), 0)
+  l <- vapply(seq_along(n), function(s) diff(support_binomiale(n[s], p[s])) + 1, 0)
   if (length(l) < 2L) return(0)
   cumul <- cumsum(l) - (seq_along(l) - 1)
   sum(cumul[-length(l)] * l[-1L])
@@ -1013,9 +1066,12 @@ cout_convolution_binomiales <- function(n, p) {
 # Loi d'une somme de binomiales indépendantes Bin(n_s, p_s) (F3 ; brique
 # partagée avec #168) : convolution directe des dbinom élaguées
 # (binomiale_elaguee()) ; approximation numérique (dbinom, sommes de
-# produits). Rend le vecteur P(X = 0), ..., P(X = somme des n_s), avec
-# l'attribut `produits` : nombre de produits effectués (égal à
-# cout_convolution_binomiales()).
+# produits). Rend la loi sur son support (#350) : le vecteur P(X = debut),
+# ..., P(X = debut + longueur - 1), hors duquel P(X = k) est un zéro exact
+# (aucun vecteur de longueur somme des n_s + 1 n'est formé), avec les
+# attributs `debut` et `produits` (nombre de produits effectués, égal à
+# cout_convolution_binomiales()). L'appelant indexe par k = debut +
+# seq_along(loi) - 1.
 loi_somme_binomiales <- function(n, p) {
   loi <- 1
   debut <- 0
@@ -1035,10 +1091,9 @@ loi_somme_binomiales <- function(n, p) {
     }
     loi <- v
   }
-  r <- numeric(sum(n) + 1)
-  r[debut + seq_along(loi)] <- loi
-  attr(r, "produits") <- produits
-  r
+  attr(loi, "debut") <- debut
+  attr(loi, "produits") <- produits
+  loi
 }
 
 # p-valeurs asymptotiques d'une somme X de binomiales indépendantes Bin(n_s,
@@ -1515,6 +1570,7 @@ sous_groupes_validation <- function(cellules, segment, segments_cles, tranche, t
 #     de n_max (N_MAX_PRODUITS_CONVOLUTION ; autre valeur pour les seuls
 #     tests) : p-valeurs exactes et bornes NA, p-valeurs asymptotiques
 #     (p_somme_binomiales_normale() ; #178), état convolution_au_dela_n_max ;
+#     loi rendue sur son support, indexée par son attribut debut (#350) ;
 #     une ligne ne porte jamais à la fois une p exacte et une p asymptotique ;
 #   - groupe sans cellule retenue : NA, état aucune_cellule_retenue.
 # Colonnes p_*_asymptotique NA hors de l'état convolution_au_dela_n_max.
@@ -1566,8 +1622,9 @@ sous_groupes_positionnee <- function(nom, cle, n_g, segment, ret, Dr, Ar, O, At,
       next
     } else {
       loi <- loi_somme_binomiales(Os[j], pib)
-      pinf <- min(1, sum(loi[seq_len(ob + 1)]))
-      psup <- min(1, sum(loi[(ob + 1):length(loi)]))
+      k_loi <- attr(loi, "debut") + seq_along(loi) - 1
+      pinf <- min(1, sum(loi[k_loi <= ob]))
+      psup <- min(1, sum(loi[k_loi >= ob]))
       r$etat[k] <- "bornes_non_definies"
     }
     r$p_inferieure[k] <- pinf
@@ -2259,7 +2316,9 @@ score_homogeneite <- function(D, E, strate, groupe, K, G) {
 # retirée comme pour la statistique ; #334), p = P(|O_1 - A_1| >= |o_1 -
 # A_1|), égalité à TOLERANCE_RESIDU_NUL x A_1 près ; en arithmétique exacte,
 # O_1 - A_1 = -(O_2 - A_2) : p ne dépend du groupe retenu que par cette
-# tolérance (rapportée à A_1) et par l'arrondi ;
+# tolérance (rapportée à A_1) et par l'arrondi ; loi rendue sur son support,
+# indexée par son attribut debut (une seule strate, même de 1e9 décès, est
+# calculée sur son support, sans allocation proportionnelle à n ; #350) ;
 # coût au-delà de N_MAX_PRODUITS_CONVOLUTION : état
 # convolution_au_dela_n_max. Rend list(p, etat).
 p_exacte_homogeneite <- function(sc) {
@@ -2268,7 +2327,7 @@ p_exacte_homogeneite <- function(sc) {
   if (cout_convolution_binomiales(e$n, e$p) > N_MAX_PRODUITS_CONVOLUTION)
     return(list(p = NA_real_, etat = "convolution_au_dela_n_max"))
   loi <- loi_somme_binomiales(e$n, e$p)
-  k <- seq_along(loi) - 1
+  k <- attr(loi, "debut") + seq_along(loi) - 1
   ext <- abs(k - e$a) >= abs(e$o - e$a) - TOLERANCE_RESIDU_NUL * e$a
   list(p = min(1, sum(loi[ext])), etat = "produite")
 }
