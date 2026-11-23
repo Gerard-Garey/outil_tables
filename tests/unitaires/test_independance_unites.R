@@ -25,9 +25,11 @@ compter_159 <- function(x)
     vapply(gregexpr(m, x, fixed = TRUE, useBytes = TRUE), function(g) sum(g > 0L), 0L))))
 cle_159 <- function(d) paste(d[[1L]], d[[2L]], sep = "/")
 # Écart entre les décomptes de `d` et l'attendu : 1 sur les clés `avec`, 0
-# ailleurs ; TRUE ou le texte de l'écart.
-ecart_159 <- function(d, avec) {
-  n <- compter_159(d$statut); k <- cle_159(d)
+# ailleurs ; TRUE ou le texte de l'écart. Clés `k` : cle_159(d) par défaut,
+# d$grandeur pour STATUTS_LISSAGE_POISSON (colonnes grandeur et statut seules,
+# #329 ; cle_159() y donnerait grandeur/statut).
+ecart_159 <- function(d, avec, k = cle_159(d)) {
+  n <- compter_159(d$statut)
   inconnues <- setdiff(avec, k)
   if (length(inconnues)) return(paste("clés absentes :", paste(inconnues, collapse = ", ")))
   att <- as.integer(k %in% avec)
@@ -151,8 +153,24 @@ verifier("#159 #330 C3 STATUTS_VALIDATION_POSITIONNEE (litt\u00e9ral de la sp\u0
   else if (length(m <- sans_mention_330(s, NATURES_P_330))) paste("cons\u00e9quence absente :", paste(m, collapse = ", "))
   else TRUE
 })
-verifier("#159 C3 STATUTS_VALIDATION_LISSEE (littéral de la spécification) : marqueur sur aucune ligne (lissage hors périmètre, #329)",
+verifier("#159 #329 C3 STATUTS_VALIDATION_LISSEE (littéral de la spécification) : marqueur sur aucune ligne (relation lissee non retenue, #329, § 3)",
          ecart_159(tablexp:::STATUTS_VALIDATION_LISSEE, character(0)))
+# STATUTS_LISSAGE_POISSON (#329 ; spécification d'actuary-approfondi, #329,
+# commentaire 7102999392, § 1, § 2 et § 4) : 2 lignes de loi sur 12, nature
+# intervalle, lues par grandeur seule ; fragment propre à R/lissage.R (lissage
+# précède validation), égal à l'octet à mention_independance("intervalle").
+BORNES_329 <- c("table_lissee/borne_inf_credibilite", "table_lissee/borne_sup_credibilite")
+verifier("#329 C3 STATUTS_LISSAGE_POISSON (litt\u00e9ral de la sp\u00e9cification) : 12 lignes ; marqueur une fois sur les deux bornes de cr\u00e9dibilit\u00e9, jamais ailleurs (parametre_lissage et laml comprises) ; mention de la nature intervalle en fin de statut, texte exact et identique \u00e0 l'octet \u00e0 mention_independance(\"intervalle\")", {
+  s <- tablexp:::STATUTS_LISSAGE_POISSON; st <- enc2utf8(s$statut[match(BORNES_329, s$grandeur)])
+  e <- ecart_159(s, BORNES_329, s$grandeur)
+  m <- enc2utf8(tablexp:::mention_independance("intervalle"))
+  if (nrow(s) != 12L || !identical(names(s), c("grandeur", "statut"))) "STATUTS_LISSAGE_POISSON : 12 lignes, colonnes grandeur et statut attendues"
+  else if (!isTRUE(e)) e
+  else if (!identical(m, mention_330("intervalle"))) "mention_independance(\"intervalle\") diff\u00e8re du litt\u00e9ral"
+  else if (!all(endsWith(st, paste(";", mention_330("intervalle"))))) "texte ou place de la mention (litt\u00e9ral)"
+  else if (!all(endsWith(st, paste(";", m)))) "fragment diff\u00e9rent de mention_independance(\"intervalle\")"
+  else TRUE
+})
 verifier("#159 #330 C3 STATUTS_IMPORTANCE (litt\u00e9ral de la sp\u00e9cification) : marqueur une fois sur les 4 lignes de loi (bornes du comparateur 1, rapport_variance, bornes du comparateur 2), jamais ailleurs ; cons\u00e9quence de la nature (3 intervalles, 1 variance Var(A^)) ; mention en fin de statut, avant la relation ajustee_hors_outil pour smr_comparateur_2/bornes", {
   s <- tablexp:::STATUTS_IMPORTANCE; k <- cle_159(s); st <- enc2utf8(s$statut)
   e <- ecart_159(s, unlist(NATURES_I_330, use.names = FALSE))
@@ -166,12 +184,12 @@ verifier("#159 #330 C3 STATUTS_IMPORTANCE (litt\u00e9ral de la sp\u00e9cificatio
   else TRUE
 })
 TABLES_159 <- c("STATUTS_BRUT", "STATUTS_VALIDATION", "STATUTS_VALIDATION_POSITIONNEE", "STATUTS_VALIDATION_LISSEE",
-                "STATUTS_IMPORTANCE", "STATUTS_POSITIONNEMENT", "STATUTS_HOMOGENEITE")
-verifier("#159 C3 garde générale (littéral de la spécification) : marqueur au plus une fois sur toute ligne des sept tables de statuts, θ_80 de l'homogénéité compris", {
+                "STATUTS_IMPORTANCE", "STATUTS_POSITIONNEMENT", "STATUTS_HOMOGENEITE", "STATUTS_LISSAGE_POISSON")
+verifier("#159 C3 garde générale (littéral de la spécification) : marqueur au plus une fois sur toute ligne des huit tables de statuts, θ_80 de l'homogénéité compris", {
   m <- vapply(TABLES_159, function(n) max(compter_159(get(n, envir = asNamespace("tablexp"))$statut)), 0L)
   if (all(m <= 1L)) TRUE else paste(sprintf("%s : %d", names(m)[m > 1L], m[m > 1L]), collapse = " ; ")
 })
-verifier("#159 C3 sous LC_ALL=C (identité exacte) : décomptes du marqueur par ligne des sept tables égaux à ceux de la session (sous-processus)", {
+verifier("#159 C3 sous LC_ALL=C (identité exacte) : décomptes du marqueur par ligne des huit tables égaux à ceux de la session (sous-processus)", {
   f <- tempfile(fileext = ".R"); on.exit(unlink(f))
   writeLines(c(
     'suppressMessages(library(tablexp, lib.loc = Sys.getenv("TABLEXP_BIBLIOTHEQUE")))',
@@ -218,4 +236,15 @@ verifier("#330 C3 t\u00e9moin (valeur calcul\u00e9e \u00e0 la main) : copie de S
   m <- sans_mention_330(d, NATURES_P_330)
   if (identical(m, "sous_groupes/bornes_exactes") && isTRUE(ecart_159(d, unlist(NATURES_P_330, use.names = FALSE)))) TRUE
   else paste("obtenu :", paste(m, collapse = ", "))
+})
+verifier("#329 C3 t\u00e9moin (valeur calcul\u00e9e \u00e0 la main) : copie de STATUTS_LISSAGE_POISSON dont borne_inf_credibilite perd sa mention, puis copie dont segments/parametre_lissage la re\u00e7oit -> \u00e9cart signal\u00e9 sur la ligne (cl\u00e9 grandeur)", {
+  d <- tablexp:::STATUTS_LISSAGE_POISSON
+  retrait <- d; i <- which(d$grandeur == BORNES_329[1L])
+  retrait$statut[i] <- sub(paste(" ;", mention_330("intervalle")), "", enc2utf8(retrait$statut[i]), fixed = TRUE)
+  ajout <- d; j <- which(d$grandeur == "segments/parametre_lissage")
+  ajout$statut[j] <- paste(ajout$statut[j], ";", mention_330("intervalle"))
+  e1 <- ecart_159(retrait, BORNES_329, retrait$grandeur); e2 <- ecart_159(ajout, BORNES_329, ajout$grandeur)
+  if (identical(e1, "table_lissee/borne_inf_credibilite : 0 au lieu de 1") &&
+      identical(e2, "segments/parametre_lissage : 1 au lieu de 0")) TRUE
+  else paste("obtenu :", format(e1), "|", format(e2))
 })

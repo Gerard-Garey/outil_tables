@@ -520,6 +520,32 @@ transition_330 <- function(plan, positionnee) {
 }
 TRANSITIONS_EN_COURS <- c(TRANSITIONS_EN_COURS, list(transition_330("R8", FALSE), transition_330("R9", FALSE),
                                                      transition_330("R10", TRUE)))
+# Transition #329, mention d'indépendance en fin de statut des deux bornes de
+# crédibilité de wh_poisson (B35, étape (2) ; spécification
+# d'actuary-approfondi, #329, commentaire 7102999392, § 2 et § 5) : texte de
+# etapes/lissage/parametres/statuts/statut (R16, R17) aux positions des
+# grandeurs table_lissee/borne_inf_credibilite et borne_sup_credibilite, lues
+# par la colonne sœur grandeur de la référence (3 et 4), en « valeur de
+# chaîne » ; texte après = texte avant + " ; " + M_330 + « l'intervalle est
+# trop étroit » (CONSEQUENCES_330), sans lire le package. R15 (wh_quadratique)
+# et les autres plans ne changent pas. À clore par la régénération (R) de B35,
+# avec transition_329() et la constante GRANDEURS_329.
+GRANDEURS_329 <- c("table_lissee/borne_inf_credibilite", "table_lissee/borne_sup_credibilite")
+transition_329 <- function(plan) {
+  ref <- lire_reference(file.path(DOSSIER_REFERENCES, paste0(plan, ".tsv")))$valeurs
+  st <- "etapes/lissage/parametres/statuts/"
+  k <- match(GRANDEURS_329, ref[[paste0(st, "grandeur")]])
+  if (anyNA(k)) stop("transition_329() : bornes de crédibilité absentes de la référence (erreur de programmation)")
+  m <- paste0(M_330, CONSEQUENCES_330[["intervalle"]])
+  avant <- ref[[paste0(st, "statut")]][k]
+  if (any(grepl(m, avant, fixed = TRUE)))
+    stop("transition_329() : mention déjà présente ; référence déjà régénérée ? retirer transition_329() et GRANDEURS_329")
+  apres <- paste(avant, ";", m)
+  Encoding(apres) <- "UTF-8"
+  list(issue = "#329", plans = plan,
+       changements = list(list(chemin = paste0(st, "statut"), nature = "valeur de chaîne", valeurs = apres, positions = k)))
+}
+TRANSITIONS_EN_COURS <- c(TRANSITIONS_EN_COURS, list(transition_329("R16"), transition_329("R17")))
 # Transition #218 de la correction de theta_80 (B30, constat C1 de la revue
 # finale, c35eb9d) close par la seconde régénération (R′) de R1 à R17
 # (exécution 44698750703, sur c35eb9d) : transition_218c(), apres_218c() et

@@ -370,7 +370,7 @@ verifier("F lissage_systeme_rang_deficient sous wh_poisson : lambda = 1e20, z = 
 
 X1 <- construire_table(jeu(), ROLES, plan_l())
 L1 <- X1$etapes$lissage
-verifier("G etapes$lissage$parametres sous declare : paramètres du plan dans l'ordre du catalogue, puis convention, estimateur_brut (poisson), echelle_penalite (ln_mu), regle_force, hypothese, reference_methode, constantes (4 lignes), statuts (sans segments/parametre_lissage ; bornes de crédibilité sans constat de couverture versé, #246)", {
+verifier("G etapes$lissage$parametres sous declare : paramètres du plan dans l'ordre du catalogue, puis convention, estimateur_brut (poisson), echelle_penalite (ln_mu), regle_force, hypothese, reference_methode, constantes (4 lignes), statuts (sans segments/parametre_lissage ; bornes de crédibilité sans constat de couverture versé, #246, suivi de la mention d'indépendance, nature intervalle, #329)", {
   p <- L1$parametres
   identical(names(p), c("methode", "plage_ages", "ordre_difference", "critere_lissage", "niveau", "parametre_lissage",
                         "convention", "estimateur_brut", "echelle_penalite", "regle_force", "hypothese",
@@ -383,7 +383,9 @@ verifier("G etapes$lissage$parametres sous declare : paramètres du plan dans l'
     grepl("theta_0 = 0 aux cellules sans exposition", p$hypothese, fixed = TRUE) &&
     all(endsWith(p$statuts$statut[p$statuts$grandeur %in% c("table_lissee/borne_inf_credibilite",
                                                              "table_lissee/borne_sup_credibilite")],
-                 "couverture fréquentiste non établie (aucun constat de simulation versé)")) &&
+                 paste("couverture fréquentiste non établie (aucun constat de simulation versé) ; unités d'observation",
+                       "indépendantes ; sous l'unité contrat, les décès sont sur-dispersés et l'intervalle est trop",
+                       "étroit"))) &&
     !any(grepl("documenté", p$statuts$statut, fixed = TRUE))
 })
 XL <- construire_table(jeu(), ROLES, plan_l(lissage = LAML))
