@@ -968,8 +968,13 @@ replications_poisson <- function(A, B, graine, statistiques, elements_bloc = ELE
 # est aussi une erreur de programmation : les appelants rangent le total des
 # événements en integer avant tout tirage (#348). Un poids non fini (NaN
 # compris) ou une somme de poids d'un groupe non finie est aussi une erreur
-# de programmation (#353) : les appelants tirent sur des expositions dont le
-# total est gardé à l'étape exposition (LIMITE_SOMMES_DOUBLE, M579).
+# de programmation (#353) pour les appelants de l'homogénéité, qui tirent
+# sur des expositions dont le total est gardé à l'étape exposition
+# (LIMITE_SOMMES_DOUBLE, M579). L'appelant positionnee de
+# statistiques_validation() est hors de cette garde : il tire sur les
+# attendus Ar = theta^ E^c mu~, produits que LIMITE_SOMMES_DOUBLE ne couvre
+# pas (#360) ; sur ce chemin, l'erreur « poids ou effectifs invalides » peut
+# venir d'une entrée.
 replications_multinomiales <- function(poids, groupe, effectifs, B, graine, statistiques,
                                        elements_bloc = ELEMENTS_BLOC_REPLICATIONS) {
   n <- length(poids)
@@ -1009,12 +1014,19 @@ replications_multinomiales <- function(poids, groupe, effectifs, B, graine, stat
 # p = 1 : c(n, n) ; sinon bisection de chaque côté du mode m = (n + 1) p
 # arrondi à l'entier inférieur, borné à [0, n], sur le prédicat dbinom(k, n,
 # p) > 0 : O(log n) évaluations scalaires, aucune allocation proportionnelle
-# à n. Le support est un intervalle : contiguïté exacte en arithmétique
-# réelle (log-concavité), mesurée en double : sur 44 frontières (n de 1e6 à
-# 2^31 - 1, p de 1e-6 à 1 - 1e-6), toutes à log-densité d'environ -745,
-# pente de log dbinom entre voisins >= 1,65e-3 contre un bruit de calcul <=
-# 1,3e-12 (mesuré le 23/11/2026, actuary) ; un défaut éventuel ne pourrait
-# omettre qu'une masse < 1e-316, sans effet sur aucune p ni aucun verdict.
+# à n. Statut de la contiguïté : en arithmétique réelle, le support de
+# Bin(n, p), 0 < p < 1, est {0..n} ; la loi est log-concave, donc
+# unimodale, et tout {k : f(k) > s} est un intervalle. Si dbinom() était
+# correctement arrondie, {k : dbinom(k, n, p) > 0} serait donc exactement un
+# intervalle, ce que suppose la bisection ; elle ne l'est pas : la
+# contiguïté en double est mesurée, non démontrée. Seuil : l'arrondi à zéro,
+# sous 2^-1075 (environ 2,5e-324, moitié du plus petit dénormalisé positif).
+# Sur 44
+# frontières (n de 1e6 à 2^31 - 1, p de 1e-6 à 1 - 1e-6), toutes à
+# log-densité d'environ -745, pente de log dbinom entre voisins >= 1,65e-3
+# contre un bruit de calcul <= 1,3e-12 (mesuré le 23/11/2026, actuary) ;
+# selon la même mesure, un défaut éventuel n'omettrait qu'une masse
+# < 1e-316, sans effet sur aucune p ni aucun verdict.
 # Identité avec which(dbinom(0:n, n, p) > 0) mesurée sur 240 cas, n <= 5e6
 # (spécification, § 2). Un mode de densité nulle en double est
 # une erreur de programmation (inatteignable : P(X = m) >= 1 / (n + 1)).
@@ -2619,10 +2631,13 @@ calculer_homogeneite <- function(exposition, segmentation, par_annee, convention
   E_a <- somme_par(E[i_s], a, n_a)
   # Garde défensive (#353 ; spécification d'actuary-approfondi, § 5.1) :
   # sous construire_table(), le total des expositions est gardé à l'étape
-  # exposition (refus exposition_hors_plage, M579) ; un appel direct avec
-  # une exposition non finie, ou dont la somme dépasse LIMITE_SOMMES_DOUBLE
-  # (strate, segment ou groupe de tirage infini), s'arrête ici, avant tout
-  # score.
+  # exposition (refus exposition_hors_plage, M579). En appel direct, elle
+  # porte sur E_a, formée des seules cellules saines : une exposition non
+  # finie d'une cellule saine, ou une somme de E_a au-delà de
+  # LIMITE_SOMMES_DOUBLE (strate, segment ou groupe de tirage infini),
+  # s'arrête ici, avant tout score. Une exposition Inf d'une cellule fautive
+  # n'entre pas dans E_a et passe : elle donne des états
+  # evenement_sans_exposition, sans aucune valeur non finie produite.
   if (!all(is.finite(E_a)) || !(sum(E_a) <= LIMITE_SOMMES_DOUBLE))
     stop(paste("calculer_homogeneite() : exposition agrégée non finie ou hors de la plage de calcul",
                "(erreur de programmation)."), call. = FALSE)
