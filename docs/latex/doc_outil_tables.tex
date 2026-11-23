@@ -6828,7 +6828,9 @@ suivants~:\par}
 Les types sont contrôlés sans conversion (E4.4)~: une colonne de dates doit
 être de classe \code{Date}, exactement, à valeurs entières et finies~; une
 colonne \code{POSIXct}, une chaîne ou un nombre sont refusés
-(\code{type\_incompatible}), la conversion revenant à la couche de lecture.
+(\code{type\_incompatible}), la conversion revenant à la couche de lecture~;
+un facteur n'est admis que bien formé (section~\ref{sec:controles-donnees},
+«~Facteur mal formé en colonne de rôle~»~; issue~\#342).
 Au contrôle de type, une valeur manquante, stockée \code{NA} ou \code{NaN},
 est admise (les motifs de lignes en décident ensuite), et les deux restent
 distinctes dans l'empreinte (section~\ref{sec:empreinte}). Une
@@ -6955,7 +6957,8 @@ n'était refusée qu'au calcul des empreintes, module \code{rapport},
 de nom \code{bytes} y est jugée sur son type, nom et classe cités sous le
 repère, sans erreur R~; un tel nom est refusé plus loin par le module
 \code{rapport}, \code{chaine\_codage\_bytes}~; section~\ref{sec:refus}~;
-issue~\#128)~; \code{date\_hors\_domaine} (une ou plusieurs
+issue~\#128~; un facteur n'est admis, pour un rôle dont les types admis
+comprennent \code{factor}, que bien formé, ci-dessous~; issue~\#342)~; \code{date\_hors\_domaine} (une ou plusieurs
 colonnes de date portent une date hors de [0001-01-01, 9999-12-31]~; le refus
 nomme tous les rôles et colonnes en cause et, dans \code{details\$lignes},
 les lignes de chacun, comme \code{ligne\_invalide})~;
@@ -6976,6 +6979,59 @@ rôles de \code{agregats} (par exemple \code{date\_naissance})~; son
 message nomme la ou les recettes qui emploient le rôle, au pluriel s'il y
 en a deux (\code{lignes\_dates\_completes} et \code{stocks\_successifs}
 pour \code{date\_naissance}).
+
+\medskip
+\noindent
+\textbf{Facteur mal formé en colonne de rôle} (issue~\#342~; décision
+M573). Le message du refus \code{type\_incompatible} cite, pour chaque
+rôle en défaut, les types admis puis la classe reçue~: «~Type
+incompatible~: rôle «~[rôle]~», colonne «~[colonne]~»~: [types admis]
+attendu, [classe] reçu.~», les éléments de la classe séparés par «~/~»,
+les rôles en défaut joints par «~;~»~; les \code{details} portent
+\code{role}, \code{colonne} et \code{type\_attendu} (libellé de
+\code{TYPES\_ADMIS}, colonne «~Types R admis~» du
+tableau~\ref{tab:catalogue-roles}). Pour un rôle dont les types admis
+comprennent \code{factor} (\code{sexe}, \code{cause\_sortie},
+\code{type\_ligne}, \code{segment}, \code{etat\_depart},
+\code{etat\_arrivee}), \code{type\_conforme()} n'admet un facteur
+(classe comprenant \code{factor}, sous-classes comprises) que
+\textbf{bien formé}, jugé par \code{facteur\_bien\_forme()}, seul
+prédicat de cette règle~: niveaux (attribut \code{levels}) de type
+\code{character}, codes de type \code{integer}, chaque code \code{NA} ou
+compris entre~1 et le nombre de niveaux. Le prédicat lit sans dispatch
+(niveaux par \code{attr(x, "levels", exact = TRUE)}, codes par
+\code{unclass()}, nombre de niveaux par \code{longueur\_lue()})~: aucune
+méthode \code{levels()}, \code{length()} ni \code{[} de la classe n'est
+appelée. Un facteur mal formé (niveaux absents, niveaux entiers, réels ou
+eux-mêmes facteur, code~0, négatif ou supérieur au nombre de niveaux,
+codes stockés en \code{double}) est refusé sous \code{type\_incompatible},
+module \code{donnees}, la partie «~reçu~» devenant «~[classe] mal formé
+(niveaux absents ou non character, ou code qui n'est ni NA ni un integer
+de 1 au nombre de niveaux) reçu~» (par exemple «~monf/factor mal formé
+(\ldots) reçu~» pour une sous-classe), le reste du message et les
+\code{details} étant inchangés. Avant l'issue~\#342, un tel facteur
+passait le contrôle et arrêtait la construction sur l'erreur R
+«~malformed factor~», levée par la conversion en chaînes
+(\code{as.character.factor()}), avec ou sans exclusion
+(\emph{constat} de mesure sur le code qui précède l'issue, R~4.3.3~:
+\code{sexe} sans niveaux, à niveaux réels, à code~3 pour deux niveaux
+ou sous la sous-classe \code{monf}, \code{sexe} et \code{cause\_sortie}
+mal formés ensemble, \code{segment} à code~3 pour deux niveaux).
+Les codes stockés en \code{double} sont refusés (M573)~: un tel facteur ne se construit pas par les fonctions de R base
+(\code{structure()} convertit les codes en \code{integer}~;
+l'affectation de la classe \code{factor} à un vecteur \code{double} est
+refusée, «~adding class "factor" to an invalid object~»), mais s'obtient
+en relisant par \code{unserialize()} une sérialisation modifiée, et levait
+alors la même erreur R (\emph{constat} de mesure, R~4.3.3). Des niveaux
+\code{NA}, répétés, nommés ou inutilisés ne sont pas une malformation~:
+\code{as.character()} les lit sans erreur, et ces facteurs restent admis.
+Un facteur passé pour un rôle dont les types admis ne comprennent pas
+\code{factor} (\code{id\_tete}, par exemple) est refusé comme avant,
+partie «~factor reçu~», qu'il soit bien formé ou non. Dans tous les cas
+mesurés, seules des entrées qui finissaient en erreur R sont désormais
+refusées, aucune construction qui aboutissait ne l'est (tests du module
+\code{donnees}~; M573). Le constructeur des tables de référence emploie le même contrôle
+pour sa colonne \code{sexe} (section~\ref{sec:table-reference}).
 
 \medskip
 \noindent
@@ -7620,7 +7676,9 @@ refus~:
     lue par \code{lire\_champ()} des deux côtés, reprend les valeurs des
     lignes demandées, jugées sans dispatch (issue~\#322~; décision
     M558). Si la colonne de l'entrée est un facteur (classe comprenant
-    \code{factor}, sous-classes comprises), la colonne extraite doit être
+    \code{factor}, sous-classes comprises), bien formé dans la construction
+    puisque le contrôle des types à l'entrée refuse les autres (ci-dessus,
+    «~Facteur mal formé en colonne de rôle~»~; issue~\#342), la colonne extraite doit être
     un facteur, et ses libellés doivent être ceux des lignes demandées
     dans la colonne de l'entrée, les uns et les autres lus par
     \code{libelles\_facteur()}~: codes par \code{.subset()}, niveaux par
@@ -8279,7 +8337,17 @@ colonne dont la classe porte, à toute position, un élément d'encodage
 une colonne \code{sexe} de classe facteur, ce refus remplace l'erreur R
 «~translating strings with "bytes" encoding is not allowed~» que levait
 \code{anyNA()} (issue~\#150~; une colonne \code{age} ou \code{annee} de
-cette classe était déjà refusée sous ce motif).\par}
+cette classe était déjà refusée sous ce motif). Une colonne \code{sexe} de
+classe facteur n'est admise que bien formée, par le même prédicat
+(\code{facteur\_bien\_forme()}, appelé par \code{type\_conforme()}~;
+section~\ref{sec:controles-donnees}, «~Facteur mal formé en colonne de
+rôle~»)~: un facteur sans niveaux, à code hors des niveaux ou à codes
+stockés en \code{double} est refusé sous \code{table\_colonne\_mal\_typee},
+\code{details\$colonne} valant \code{"sexe"}, au lieu de l'erreur R
+«~malformed factor~» que levait auparavant la construction (issue~\#342~;
+\emph{constat} de mesure, R~4.3.3). Le message de ce refus n'a pas
+changé~: il décrit toujours le type attendu de \code{sexe} comme
+«~chaîne~», alors qu'un facteur bien formé est admis.\par}
 
 \medskip
 \noindent
@@ -10112,7 +10180,8 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{composantes\_date()} & interne & jours depuis 1970-01-01 & année, mois, jour~; champs du \code{POSIXlt} lus par \code{.subset2()}, sans dispatch (issue~\#313) \\
 \catalogue{fonctions-donnees}{age\_revolu()} & interne & naissance, date & âge au dernier anniversaire (section~\ref{sec:conventions-temps}) \\
 \catalogue{fonctions-donnees}{entiers\_finis()} & interne & vecteur & valeurs non manquantes entières et finies \\
-\catalogue{fonctions-donnees}{type\_conforme()} & interne & colonne, code de type & conformité au type du catalogue, sans conversion~; dimension lue par \code{attr()} et facteur par \code{a\_classe()}, une colonne dont la classe porte un élément d'encodage \code{bytes}, à toute position, \code{factor} compris, étant non conforme sans erreur R (issues~\#128 et~\#150)~; partagée avec \code{table\_reference()} \\
+\catalogue{fonctions-donnees}{type\_conforme()} & interne & colonne, code de type & conformité au type du catalogue, sans conversion~; dimension lue par \code{attr()} et facteur par \code{a\_classe()}, une colonne dont la classe porte un élément d'encodage \code{bytes}, à toute position, \code{factor} compris, étant non conforme sans erreur R (issues~\#128 et~\#150)~; facteur admis pour \code{categorie} et \code{categorie\_ou\_entier} s'il est bien formé (fonction suivante~; issue~\#342)~; partagée avec \code{table\_reference()} \\
+\catalogue{fonctions-donnees}{facteur\_bien\_forme()} & interne & facteur & bonne forme d'un facteur, seul prédicat de cette règle~: niveaux de type \code{character}, codes de type \code{integer}, chaque code \code{NA} ou de~1 au nombre de niveaux~; lus sans dispatch (\code{attr(exact = TRUE)}, \code{unclass()}, \code{longueur\_lue()})~; appelée par \code{type\_conforme()} et \code{controler\_roles()} (section~\ref{sec:controles-donnees}~; issue~\#342~; M573) \\
 \catalogue{fonctions-donnees}{citer()} & interne & vecteur (converti par \code{as.character()} s'il n'est pas de type \code{character}) & chaînes de l'utilisateur citées dans un message, par \code{neutraliser\_citation()}, règle unique des refus (section~\ref{sec:refus})~: vecteur de même longueur, sans noms ni \code{paste}, \code{NA} conservé, chaîne \code{bytes} remplacée par le repère «~<chaîne d'encodage bytes>~» (\code{sprintf()} lèverait sur elle au lieu du refus), caractères de contrôle et séparateurs de ligne écrits \code{<U+XXXX>}, octets hors UTF-8 valide \code{<xx>}, latin-1 converti, marque UTF-8 (issues~\#111 et~\#94) \\
 \catalogue{fonctions-donnees}{liste\_guillemets()} & interne & chaînes & liste entre guillemets, jointe par «~,~», pour les messages, chaque chaîne passée d'abord par \code{citer()}~; guillemets marqués par \code{texte\_moteur()} avant le collage, si bien que le résultat est un texte formé, admis tel quel par \code{formuler()} sans nouvelle citation (section~\ref{sec:refus}, «~Règle de rédaction des messages~»~; issues~\#111 et~\#127) \\
 \catalogue{fonctions-donnees}{message\_aucune\_recette()} & interne & recettes, rôles requis absents, groupes non couverts & message du refus \code{aucune\_recette}, recette par recette \\
@@ -10130,7 +10199,7 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{premiere\_ecart\_colonnes()} & interne & noms des colonnes extraites et de l'entrée, décomptes des colonnes extraites, nombre de lignes attendu, indicateur des éléments \code{NULL} & première position écartée du contrôle~(1~bis) de l'extraction~: plus petite des positions où le nom diffère, où le décompte de la colonne extraite n'est pas celui attendu ou est illisible, et où une colonne manque ou excède~; indique si une autre position écartée la suit, l'élément extrait à la première étant \code{NULL} (extraction décalée) ou non~; \code{NULL} sans écart (issue~\#319) \\
 \catalogue{fonctions-donnees}{colonnes\_ecart\_citees()} & interne & noms des colonnes extraites et de l'entrée, première position écartée (\code{NULL} par défaut) & morceaux du constat du contrôle~(1~bis)~: nombre de colonnes s'il diffère, colonnes absentes et en trop (au plus \code{NB\_LIGNES\_CITEES} de chaque sorte, puis leur nombre restant), colonnes sans nom comptées, à défaut d'écart de noms «~mêmes noms de colonnes, dans un autre ordre ou répétés~»~; puis la colonne de l'entrée à la première position écartée, avec sa position et sa classe, et la mention du décalage ou des autres écarts~; appelée sur une extraction dont la liste des colonnes a la longueur de ses noms seulement, une liste incohérente recevant le constat de \code{constat\_colonnes\_lues()} (section~\ref{sec:controles-donnees}~; issues~\#319 et~\#345) \\
 \catalogue{fonctions-donnees}{controler\_lignes\_donnees()} & interne & données (liste de classe \code{data.frame}) & en premier, avant \code{nrow()}, liste des colonnes de la longueur de ses noms (\code{colonnes\_lues()}), sinon refus \code{donnees\_mal\_formees}, \code{details} à trois clés (issue~\#344)~; puis contrôle des décomptes de lignes~: \code{nrow()} (avec dispatch), noms de lignes (\code{.row\_names\_info()}) et nombre de lignes de chaque colonne égaux et lisibles (un \code{nrow()} lisible lu sur \code{unclass()} avant toute comparaison, issue~\#322), sinon refus \code{donnees\_mal\_formees}, \code{details} à six clés, au plus \code{NB\_LIGNES\_CITEES} colonnes citées~; colonnes parcourues par position, sans copie, décomptes lus par les assistants qui précèdent, partagés avec le contrôle d'une extraction de lignes (issues~\#319 et~\#322)~; rend \code{TRUE} (section~\ref{sec:controles-donnees}, «~Décomptes de lignes discordants~»~; issue~\#312) \\
-\catalogue{fonctions-donnees}{controler\_roles()} & interne & données, rôles, segmentation & refus au niveau des rôles, dont \code{donnees\_mal\_formees} (message propre et \code{details\$classe} pour des données de classe \code{bytes}, lue par \code{classe\_bytes()} avant \code{is.data.frame()}~; issue~\#150~; objet classé \code{data.frame} qui n'est pas une liste, et décomptes de lignes discordants (fonction précédente), avant \code{roles\_mal\_formes}~; issue~\#312~; liste des colonnes et noms de colonnes de longueurs différentes, jugés en premier par la fonction précédente~; issue~\#344), \code{roles\_mal\_formes} (forme exacte~: seul attribut admis, les noms~; issue~\#62), \code{colonne\_ambigue} (colonnes des rôles seules~: nom de colonne \code{NA}, vide ou en double hors des rôles admis~; issue~\#321), \code{type\_incompatible} (colonnes lues par \code{lire\_champ()}~: atteint, au lieu d'une erreur R, pour une colonne de classe d'encodage \code{bytes} (à toute position, \code{factor} compris~; issue~\#150), ou de nom \code{bytes} et de type non conforme~; issue~\#128) et \code{date\_hors\_domaine}, puis sélection de la recette (\code{deduire\_recette()}) et refus des rôles qu'elle n'emploie pas~; rend la recette retenue \\
+\catalogue{fonctions-donnees}{controler\_roles()} & interne & données, rôles, segmentation & refus au niveau des rôles, dont \code{donnees\_mal\_formees} (message propre et \code{details\$classe} pour des données de classe \code{bytes}, lue par \code{classe\_bytes()} avant \code{is.data.frame()}~; issue~\#150~; objet classé \code{data.frame} qui n'est pas une liste, et décomptes de lignes discordants (fonction précédente), avant \code{roles\_mal\_formes}~; issue~\#312~; liste des colonnes et noms de colonnes de longueurs différentes, jugés en premier par la fonction précédente~; issue~\#344), \code{roles\_mal\_formes} (forme exacte~: seul attribut admis, les noms~; issue~\#62), \code{colonne\_ambigue} (colonnes des rôles seules~: nom de colonne \code{NA}, vide ou en double hors des rôles admis~; issue~\#321), \code{type\_incompatible} (colonnes lues par \code{lire\_champ()}~: atteint, au lieu d'une erreur R, pour une colonne de classe d'encodage \code{bytes} (à toute position, \code{factor} compris~; issue~\#150), ou de nom \code{bytes} et de type non conforme~; issue~\#128~; facteur mal formé pour un rôle dont les types admis comprennent \code{factor}, partie «~reçu~» précisée~; issue~\#342) et \code{date\_hors\_domaine}, puis sélection de la recette (\code{deduire\_recette()}) et refus des rôles qu'elle n'emploie pas~; rend la recette retenue \\
 \catalogue{fonctions-donnees}{controler\_matrice\_recette()} & interne & recette validée, rôles, plan canonique, convention validée (\code{NULL} sans étape \code{exposition}), valeurs validées \code{p} & étapes et estimateurs du plan admis sous la recette retenue (\code{MATRICE\_RECETTES}), refus sous le motif de la ligne sinon, puis règles qui ne tiennent pas dans une ligne (fonction de la ligne suivante), puis refus \code{exclusion\_hors\_recette} d'une exclusion hors des motifs de la recette~; rend \code{NULL}~; appelée par \code{controler\_plan\_roles()} après \code{resoudre\_convention()} \\
 \catalogue{fonctions-donnees}{regles\_conditionnelles\_recette()} & interne & recette, rôles, étapes du plan, convention, valeurs validées \code{p} & règles de la matrice qui ne tiennent pas dans une ligne~; sous \code{agregats}, dans cet ordre, refus \code{par\_annee\_sans\_annee} (\code{par\_annee} vrai sans le rôle \code{annee}) et \code{binomial\_annee\_}\allowbreak\code{dernier\_anniversaire} (binomial avec le rôle \code{annee} sous la convention retenue \code{dernier\_anniversaire})~; sous \code{stocks\_successifs}, refus \code{identifiants\_concurrents} puis \code{identifiant\_inadapte}~; aucune sous \code{lignes\_dates\_completes}~; rend \code{NULL} \\
 \catalogue{fonctions-donnees}{controler\_segmentation()} & interne & segmentation & seul endroit où s'écrivent la forme et le catalogue de la segmentation~: vecteur \code{character} sans attribut, sans \code{NA} ni doublon, dont chaque clé est prise dans \code{ROLES\_SEGMENTATION}, vide explicite admis~; sinon refus \code{segmentation\_invalide}, module \code{donnees}~; rend \code{NULL}~; appelée par le seul contrôle des paramètres de l'étape \code{donnees} (issues~\#22, \#59 et~\#82~; variantes des modules \code{brut}, \code{validation} et \code{importance\_exclusions} retirées par l'issue~\#82) \\
