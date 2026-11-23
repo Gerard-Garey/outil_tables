@@ -456,96 +456,6 @@ CHEMINS_199 <- list(
 # bloc R11 et R12 de #218 (C4, recalcul indépendant, états, aucun signal) reste,
 # lu sur les références régénérées.
 TRANSITIONS_EN_COURS <- list()
-# Transition #330, conséquence de la mention d'indépendance adaptée à la
-# nature de la grandeur (B35, étape (1), F330 ; spécification
-# d'actuary-approfondi, #330, commentaire 7102990712, § 3 et § 6) : texte des
-# statuts de etapes/validation/resultat/statistiques (R8, R9 : relation
-# independante ; R10 : relation positionnee) et, sous R10 seulement, de
-# etapes/validation/parametres/statuts_sous_groupes (bornes_exactes), en
-# « valeur de chaîne » aux positions lues par les colonnes sœurs de la
-# référence ; texte après tiré du texte avant de la référence par la règle de
-# la spécification (une substitution unique de M + « les tests sont
-# anti-conservateurs » par M + la conséquence de la nature), écrite ici en
-# échappements \u (UTF-8 en toute locale, POSIX comprise), sans lire le
-# package. Aucune valeur numérique ni autre chaîne ne change ; l'empreinte du
-# résultat n'est comparée que par jeton. À clore par la régénération (R) de
-# B35, avec transition_330(), apres_330() et les constantes *_330.
-M_330 <- paste("unit\u00e9s d'observation ind\u00e9pendantes ; sous l'unit\u00e9 contrat, les d\u00e9c\u00e8s sont",
-               "sur-dispers\u00e9s et ")
-CONSEQUENCES_330 <- c(
-  intervalle = "l'intervalle est trop \u00e9troit",
-  variance_x2 = "Var(X2) est sous-estim\u00e9e",
-  valeur_h0 = "la valeur sous H0 (i) diff\u00e8re de celle de la loi r\u00e9elle, dans un sens non \u00e9tabli en g\u00e9n\u00e9ral",
-  niveau = "le niveau n'est plus garanti")
-# Nature des lignes changées de resultat/statistiques (statistique/grandeur),
-# relation independante (R8, R9) ; sous positionnee (R10),
-# khi2_pearson/variance_h0 est valeur_h0.
-NATURES_STATISTIQUES_330 <- c(
-  "residus/esperance_au_dela_2" = "valeur_h0", "residus/esperance_au_dela_3" = "valeur_h0",
-  "khi2_pearson/variance_h0" = "variance_x2", "signes/esperance_positifs_h0" = "valeur_h0",
-  "signes/p_monte_carlo" = "niveau", "runs/p_monte_carlo" = "niveau", "wilcoxon/p_monte_carlo" = "niveau",
-  "fluctuation/esperance_hors_intervalle_exact" = "valeur_h0",
-  "fluctuation/esperance_hors_intervalle_asymptotique" = "valeur_h0")
-# Substitution unique de M + « les tests sont anti-conservateurs » par M + la
-# conséquence `nature` ; garde de la référence déjà régénérée : le texte
-# nouveau ne doit pas y figurer.
-apres_330 <- function(avant, nature) {
-  ancien <- paste0(M_330, "les tests sont anti-conservateurs"); nouveau <- paste0(M_330, CONSEQUENCES_330[[nature]])
-  if (grepl(nouveau, avant, fixed = TRUE))
-    stop("apres_330() : texte nouveau d\u00e9j\u00e0 pr\u00e9sent ; r\u00e9f\u00e9rence d\u00e9j\u00e0 r\u00e9g\u00e9n\u00e9r\u00e9e ? retirer transition_330() et les constantes *_330")
-  if (lengths(regmatches(avant, gregexpr(ancien, avant, fixed = TRUE))) != 1L)
-    stop("apres_330() : mention des tests absente ou r\u00e9p\u00e9t\u00e9e (erreur de programmation)")
-  sub(ancien, nouveau, avant, fixed = TRUE)
-}
-transition_330 <- function(plan, positionnee) {
-  ref <- lire_reference(file.path(DOSSIER_REFERENCES, paste0(plan, ".tsv")))$valeurs
-  st <- "etapes/validation/resultat/statistiques/"
-  natures <- NATURES_STATISTIQUES_330
-  if (positionnee) natures[["khi2_pearson/variance_h0"]] <- "valeur_h0"
-  k <- match(names(natures), paste(ref[[paste0(st, "statistique")]], ref[[paste0(st, "grandeur")]], sep = "/"))
-  if (anyNA(k)) stop("transition_330() : lignes de statistiques absentes de la r\u00e9f\u00e9rence (erreur de programmation)")
-  apres <- mapply(apres_330, ref[[paste0(st, "statut")]][k], natures, USE.NAMES = FALSE)
-  Encoding(apres) <- "UTF-8"
-  changements <- list(list(chemin = paste0(st, "statut"), nature = "valeur de chaîne", valeurs = apres, positions = k))
-  if (positionnee) {
-    sg <- "etapes/validation/parametres/statuts_sous_groupes/"
-    j <- match("bornes_exactes", ref[[paste0(sg, "grandeur")]])
-    if (is.na(j)) stop("transition_330() : statut de sous_groupes/bornes_exactes absent de la r\u00e9f\u00e9rence (erreur de programmation)")
-    b <- apres_330(ref[[paste0(sg, "statut")]][j], "intervalle")
-    Encoding(b) <- "UTF-8"
-    changements <- c(changements, list(list(chemin = paste0(sg, "statut"), nature = "valeur de chaîne", valeurs = b,
-                                            positions = j)))
-  }
-  list(issue = "#330", plans = plan, changements = changements)
-}
-TRANSITIONS_EN_COURS <- c(TRANSITIONS_EN_COURS, list(transition_330("R8", FALSE), transition_330("R9", FALSE),
-                                                     transition_330("R10", TRUE)))
-# Transition #329, mention d'indépendance en fin de statut des deux bornes de
-# crédibilité de wh_poisson (B35, étape (2) ; spécification
-# d'actuary-approfondi, #329, commentaire 7102999392, § 2 et § 5) : texte de
-# etapes/lissage/parametres/statuts/statut (R16, R17) aux positions des
-# grandeurs table_lissee/borne_inf_credibilite et borne_sup_credibilite, lues
-# par la colonne sœur grandeur de la référence (3 et 4), en « valeur de
-# chaîne » ; texte après = texte avant + " ; " + M_330 + « l'intervalle est
-# trop étroit » (CONSEQUENCES_330), sans lire le package. R15 (wh_quadratique)
-# et les autres plans ne changent pas. À clore par la régénération (R) de B35,
-# avec transition_329() et la constante GRANDEURS_329.
-GRANDEURS_329 <- c("table_lissee/borne_inf_credibilite", "table_lissee/borne_sup_credibilite")
-transition_329 <- function(plan) {
-  ref <- lire_reference(file.path(DOSSIER_REFERENCES, paste0(plan, ".tsv")))$valeurs
-  st <- "etapes/lissage/parametres/statuts/"
-  k <- match(GRANDEURS_329, ref[[paste0(st, "grandeur")]])
-  if (anyNA(k)) stop("transition_329() : bornes de crédibilité absentes de la référence (erreur de programmation)")
-  m <- paste0(M_330, CONSEQUENCES_330[["intervalle"]])
-  avant <- ref[[paste0(st, "statut")]][k]
-  if (any(grepl(m, avant, fixed = TRUE)))
-    stop("transition_329() : mention déjà présente ; référence déjà régénérée ? retirer transition_329() et GRANDEURS_329")
-  apres <- paste(avant, ";", m)
-  Encoding(apres) <- "UTF-8"
-  list(issue = "#329", plans = plan,
-       changements = list(list(chemin = paste0(st, "statut"), nature = "valeur de chaîne", valeurs = apres, positions = k)))
-}
-TRANSITIONS_EN_COURS <- c(TRANSITIONS_EN_COURS, list(transition_329("R16"), transition_329("R17")))
 # Transition #218 de la correction de theta_80 (B30, constat C1 de la revue
 # finale, c35eb9d) close par la seconde régénération (R′) de R1 à R17
 # (exécution 44698750703, sur c35eb9d) : transition_218c(), apres_218c() et
@@ -562,6 +472,14 @@ TRANSITIONS_EN_COURS <- c(TRANSITIONS_EN_COURS, list(transition_329("R16"), tran
 # B33 (exécution 45021813451, sur 5aa23d7) : transition_334(),
 # transition_333(), apres_334() et les constantes SUBST_334, SUBST_333 et
 # CHEMIN_STATUTS_334 retirées.
+# Transitions #330 (conséquence de la mention d'indépendance adaptée à la
+# nature de la grandeur : statuts de validation/resultat/statistiques de R8,
+# R9 et R10, et de statuts_sous_groupes/bornes_exactes de R10) et #329
+# (mention d'indépendance en fin de statut des deux bornes de crédibilité de
+# wh_poisson, R16 et R17) de B35, closes par la régénération (R) de B35
+# (exécution 45258747737, sur cac4b84) : transition_330(), apres_330(),
+# transition_329() et les constantes M_330, CONSEQUENCES_330,
+# NATURES_STATISTIQUES_330 et GRANDEURS_329 retirées.
 
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
 CHAMPS_CHANGEMENT <- list(type = c("de", "vers"), valeur = c("valeurs", "positions"),
