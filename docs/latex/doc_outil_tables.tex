@@ -1095,10 +1095,12 @@ normale, rejet pour \code{sample()} \\
 d'un code de refus ou d'avertissement~: \verb|^[a-z][a-z0-9_]*$| \\
 \catalogue{fonctions-outils}{LIMITE\_SOMMES\_DOUBLE} & constante & --- &
 moitié de \code{.Machine\$double.xmax} (8.9884656743115785e+307)~: borne
-d'une somme de termes positifs~; si une somme calculée de $k < 2^{51}$
-termes est au plus cette borne, toute somme partielle, dans n'importe quel
-ordre, en double ou en double étendu, reste finie (résultat exact~;
-constat de simulation concordant)~; lue par les modules \code{exposition}
+d'une somme de termes positifs~; si une somme calculée $\hat T$ de $k <
+2^{51}$ termes est au plus cette borne, toute somme partielle calculée
+$\hat P$, dans n'importe quel ordre, en double ou en \code{long double},
+vérifie $\hat P < 1{,}72\,\hat T$, au plus 0,86~fois
+\code{.Machine\$double.xmax}, et reste finie (résultat exact~; constat
+de simulation concordant)~; lue par les modules \code{exposition}
 (refus \code{exposition\_hors\_plage}) et \code{validation} (garde de
 l'étape \code{homogeneite}), sans contenu métier
 (section~\ref{sec:exposition-cellules}~; issue~\#353, décision M579~;
@@ -10930,18 +10932,28 @@ comme \code{evenements\_hors\_plage} désigne à la fois un refus de
 l'étape \code{exposition} et un diagnostic de ces étapes. \textbf{Pourquoi
 une marge}~: en arithmétique exacte, le total d'une somme de termes
 positifs majore toute somme partielle, mais en double, près du plus grand
-réel, ce n'est plus vrai~: \code{sum()} accumule en double étendu, alors
-que \code{rowsum()} (sommes par strate, segment ou groupe de tirage) et
-l'accumulation séquentielle se font en double~; sur 39\,533 tirages
+réel, ce n'est plus vrai~: \code{sum()} accumule en \code{long double}
+(sur la plateforme de référence x86-64, format étendu à 64~bits de
+mantisse et 15~bits d'exposant~; mesuré~: \code{sum(c(xmax, xmax,
+-xmax))} rend \code{xmax}, quand \code{rowsum()} rend \code{Inf}),
+alors que \code{rowsum()} (sommes par strate, segment ou groupe de
+tirage) et l'accumulation séquentielle se font en double~; sur 39\,533 tirages
 adverses à total fini, 398 donnent une somme par groupe infinie
 (\emph{constat de simulation} d'\code{actuary}, spécification de
 l'issue~\#353, §~3), si bien qu'une garde sur le seul total non fini ne
 protège pas les sommes en aval. Avec la marge, le résultat est
-\emph{exact}~: par l'analyse d'erreur de la sommation récursive de
-termes positifs, si la somme calculée de $k < 2^{51}$ termes est au plus
-cette borne, toute somme partielle de ces termes,
-calculée dans n'importe quel ordre, en double ou en double étendu, reste
-finie~; constat de simulation concordant (32\,889~cas à total au plus la
+\emph{exact}, par l'analyse d'erreur de la sommation récursive de
+termes positifs~: pour $k$ termes positifs de total exact $T$ et de total
+calculé $\hat T$, et pour toute somme partielle $P$ de ces termes,
+calculée dans n'importe quel ordre avec une unité d'arrondi $u \le
+2^{-53}$, $\hat P \le (1+u)^{k-1} P \le (1+u)^{k-1} T$ et $T \le \hat
+T/(1-u)^k$~; pour $k < 2^{51}$, $(k-1)u < 1/4$ et $(1-u)^k > 3/4$, d'où
+$\hat P \le \bigl(e^{1/4}/(3/4)\bigr)\,\hat T < 1{,}72\,\hat T$, au plus
+0,86~fois \code{.Machine\$double.xmax} dès que $\hat T$ est au plus la
+borne~: toute somme partielle reste finie, en double comme en
+\code{long double}, et la borne reste exacte si \code{long double} se
+réduit au double (même inégalité, $u = 2^{-53}$). La condition $k <
+2^{51}$ est toujours tenue~: $2^{51}$ doubles occupent 16~Pio~; constat de simulation concordant (32\,889~cas à total au plus la
 borne, aucune somme partielle non finie, même spécification). La garde
 couvre ainsi toutes les sommes d'expositions des étapes qui travaillent
 sur les cellules de la construction (pour \code{homogeneite}~:
@@ -10953,7 +10965,10 @@ positionnement), $(E^c)^2$ du rapport de variance de
 cette étape (limite assumée, issue~\#360, ouverte). \textbf{Changement
 de comportement} (accepté par M579)~: une construction dont une seule
 cellule porte une exposition de $10^{308}$, finie et produite jusque-là
-(\emph{rapporté}~: $z = \mp 3{,}496$ à l'étape \code{homogeneite}), est
+($z = \mp 3{,}496029$ à l'étape \code{homogeneite}, état
+\code{produite}~; mesuré sur le code d'avant l'issue (\code{d84e86a}, R~4.3.3~;
+spécification de l'issue~\#353, §~1~; remesuré par \code{actuary} à
+l'étape~(6) de B35)), est
 désormais refusée, $10^{308}$ dépassant la borne. Les recettes en lignes
 ne sont pas concernées~: les dates sont bornées (refus
 \code{date\_hors\_domaine}) et un vecteur de R compte au plus $2^{52}$
@@ -15909,9 +15924,10 @@ $z$, aucun attendu ni aucune exposition de segment non finis ne sont
 plus rendus à l'état \code{produite} (avant l'issue, un appel direct à
 exposition infinie rendait $z$ \code{NaN} \code{produite}, et une
 construction à expositions de $10^{308} + 10^{308}$ dans un segment, $z =
-\mp 7{,}98 \cdot 10^{152}$ \code{produite}, ou une erreur de R de
-\code{rmultinom()} dans une cellule~; \emph{rapporté}, spécification de
-l'issue~\#353, §~1).
+\mp 7{,}980239 \cdot 10^{152}$ \code{produite}, ou une erreur de R de
+\code{rmultinom()} dans une cellule~; mesuré sur le code d'avant l'issue (\code{d84e86a}, R~4.3.3~;
+spécification de l'issue~\#353, §~1~; remesuré par \code{actuary} à
+l'étape~(6) de B35)).
 
 \medskip
 {\sloppy \textbf{Écart minimal détectable par segment} (indicateur de
