@@ -2966,7 +2966,39 @@ Les empreintes du résultat de ces trois plans et celle du code changent
 en conséquence~; aucune grandeur numérique, aucune structure ne change~;
 R1 à R14 restent identiques, en comparaison réussie, sur la plateforme de
 référence (processeur Intel Xeon Platinum 8370C, consigné sans
-contrôle).
+contrôle). Les régénérations suivantes ne sont pas détaillées ici~: R1 à
+R17 le 19/11/2026 (exécution 44586537589, calcul sur \code{b29caa5},
+commit \code{58ba7a1}~; issues~\#159 et~\#218) et le 20/11/2026
+(exécution 44698750703, calcul sur \code{c35eb9d}, commit
+\code{e6bbcad}~; issue~\#218), R11 et R12 le 21/11/2026 (exécution
+44894726135, commit \code{3cc2b71}~; issues~\#340 et~\#331) et le
+22/11/2026 (exécution 45021813451, commit \code{e04002c}~; issues~\#334
+et~\#333)~; celles du 20/11 et du 22/11/2026 sont décrites ci-dessus,
+«~Plans R11 et R12~». Les références R8, R9, R10, R16 et R17 ont été
+régénérées le 23/11/2026, en mode \code{regeneration} sur ces cinq plans
+seulement (exécution 45258747737 du workflow, calcul sur \code{cac4b84},
+commit \code{df5a5cd}, visa d'\code{actuary} du 23/11/2026~; issues~\#330
+et~\#329), régénération unique de la branche
+\code{claude/statuts-independance}, pour les seuls changements de texte
+annoncés en transition par ces issues~: la conséquence de la mention
+d'indépendance des unités, propre à la nature de la grandeur
+(section~\ref{sec:validation-statistiques}), dans 9~éléments sur~62 de
+\code{etapes/validation/resultat/statistiques/statut} de R8, de R9 et
+de R10 (positions 2, 4, 7, 34, 35, 44, 54, 60 et~62~: espérances et
+variance sous $H_0$~(i), p-valeurs de Monte-Carlo des signes, des suites
+et de Wilcoxon), plus, dans R10, l'élément~2 sur~4 de
+\code{etapes/validation/parametres/statuts\_sous\_groupes/statut}
+(\code{bornes\_exactes}, désormais «~l'intervalle est trop étroit~»)
+(\#330)~; la mention ajoutée en fin de statut des deux bornes de
+crédibilité, éléments 3 et~4 de
+\code{etapes/lissage/parametres/statuts/statut} (12~éléments dans R16,
+11~dans R17, où \code{parametre\_lissage} est absente, $\lambda$ étant
+déclaré~; \#329). Les empreintes du résultat de ces cinq plans changent
+en conséquence, celle du code aussi~; aucune grandeur numérique, aucune
+structure ne change~; R1 à R7 et R11 à R15 restent identiques, en
+comparaison réussie, sur la plateforme de référence (processeur Intel
+Xeon 6975P-C, consigné sans contrôle), sans table finale, verdict ni
+valeur de table homologuée changés.
 
 \begin{encadre}
 \small
@@ -12137,8 +12169,8 @@ trois estimateurs, des statuts de l'étape et de la fiche \code{identical()}
 à \code{STATUTS\_BRUT}.
 
 \medskip
-\code{tests/unitaires/test\_independance\_unites.R} (issues~\#159 et~\#330, critère
-C3~; quatorze tests) vérifie la mention d'indépendance des unités, comptée par
+\code{tests/unitaires/test\_independance\_unites.R} (issues~\#159, \#330
+et~\#329, critère C3~; seize tests) vérifie la mention d'indépendance des unités, comptée par
 ligne sur les octets, donc sans dépendre de la locale~: exactement une fois
 sur les lignes~2, 3, 5, 6, 8, 9, 11 et~12 de \code{STATUTS\_BRUT} et sur
 aucune autre, à la fin du statut (sauf la ligne~12, inchangée), jamais dans
@@ -12155,14 +12187,20 @@ une \code{variance}, 5~\code{valeur\_h0} et 3~\code{niveau} dans
 \code{variance} dans \code{STATUTS\_IMPORTANCE})~; les textes rendus par
 \code{mention\_independance()} pour chacune des cinq natures, et ses refus
 (nature inconnue, \code{variance} sans objet ou d'objet numérique, objet
-donné à une autre nature, chaîne vide, \code{NA} ou nombre)~; au plus
-une fois par ligne dans les sept tables de statuts (positionnement et
-homogénéité compris)~; les mêmes décomptes dans un sous-processus sous
-\code{LC\_ALL=C}~; quatre témoins d'altération, sur des copies des tables,
+donné à une autre nature, chaîne vide, \code{NA} ou nombre)~; sur les
+deux bornes de crédibilité de \code{STATUTS\_LISSAGE\_POISSON}, et sur
+aucune de ses dix autres lignes (clé \code{grandeur} seule), en fin de
+statut, texte égal à celui de \code{mention\_independance("intervalle")}~;
+au plus une fois par ligne dans les huit tables de statuts (positionnement,
+homogénéité et lissage de Poisson compris)~; les mêmes décomptes dans un
+sous-processus sous \code{LC\_ALL=C}~; cinq témoins d'altération, sur des copies des tables,
 où le contrôle signale l'écart, dont celui d'une
 ligne \code{sous\_groupes}/\allowbreak\code{bornes\_exactes} de
 \code{STATUTS\_VALIDATION\_POSITIONNEE} qui reprendrait la conséquence des
-tests au lieu de celle d'un intervalle, défaut corrigé par l'issue~\#330
+tests au lieu de celle d'un intervalle, défaut corrigé par l'issue~\#330,
+et celui de \code{STATUTS\_LISSAGE\_POISSON}, dont une copie perd la
+mention sur la borne inférieure de crédibilité, puis une autre la reçoit
+sur \code{segments/}\allowbreak\code{parametre\_lissage} (issue~\#329)
 (littéraux de la spécification, identité
 exacte et valeurs calculées à la main).
 
@@ -13145,7 +13183,25 @@ ne redonnent pas le total des événements est une erreur de programmation.\par}
     numérique, aucune propriété fréquentiste revendiquée~; leviers et
     \code{segments/ddl\_effectifs}, trace de $(W + P)^{-1} W$ à la
     convergence, définition du cas normal transposée, approximation
-    numérique~; bornes de crédibilité~: ci-dessus~; \code{regle\_force},
+    numérique~; bornes de crédibilité~: ci-dessus, statut terminé, après
+    «~(aucun constat de simulation versé)~», par la mention d'indépendance
+    des unités de nature \code{intervalle} (section~\ref{sec:validation-statistiques})~:
+    «~unités d'observation indépendantes~; sous l'unité contrat, les décès
+    sont sur-dispersés et l'intervalle est trop étroit~» (issue~\#329). Le
+    sens est un \emph{résultat exact} d'algèbre matricielle, conditionnel
+    à $\lambda$ et à $W$ tenue pour fixe~: sous une sur-dispersion
+    $\varphi \ge 1$, la quasi-vraisemblance remplace $W$ par $W/\varphi$,
+    et $W/\varphi + P \preceq W + P$ au sens de Loewner donne $(W/\varphi +
+    P)^{-1} \succeq (W + P)^{-1}$, donc des éléments diagonaux, et des
+    demi-largeurs, plus grands~; il ne dit rien de la couverture
+    fréquentiste, déjà non établie. Le module \code{lissage} précédant
+    \code{validation} dans l'ordre des modules, le fragment est écrit dans
+    \code{R/lissage.R}, égal à l'octet au texte de
+    \code{mention\_independance("intervalle")} (contrôle~C3).
+    \code{segments/parametre\_lissage} et \code{segments/laml} ne portent
+    pas la mention~: l'un est un maximiseur, l'autre la valeur d'un
+    critère, et aucune n'affirme de loi~; l'effet de la sur-dispersion sur
+    $\hat\lambda$ n'est pas établi par une source lue~; \code{regle\_force},
     transformation exacte, hypothèse même de l'estimateur d'entrée~;
     \code{segments/parametre\_lissage} (sous \code{laml} seulement)~:
     maximiseur local d'un critère approché, unimodalité non établie,
@@ -13434,7 +13490,7 @@ ici (E3.4).
 \catalogue{fonctions-lissage}{HYPOTHESE\_LISSAGE\_POISSON} & constante & --- & texte de l'hypothèse de \code{wh\_poisson}, règles non tirées de la source comprises (section~\ref{sec:lissage-poisson}) \\
 \catalogue{fonctions-lissage}{REFERENCE\_METHODE\_LISSAGE\_POISSON} & constante & --- & identité de la source de \code{wh\_poisson}~: Biessy, arXiv:2306.06932 v5, SHA-256, sections lues \\
 \catalogue{fonctions-lissage}{STATUTS\_LISSAGE} & constante & --- & statut de chaque grandeur sous \code{wh\_quadratique} (\code{grandeur}, \code{statut}~; section~\ref{sec:lissage-quadratique}) \\
-\catalogue{fonctions-lissage}{STATUTS\_LISSAGE\_POISSON} & constante & --- & statut de chaque grandeur sous \code{wh\_poisson} (section~\ref{sec:lissage-poisson}) \\
+\catalogue{fonctions-lissage}{STATUTS\_LISSAGE\_POISSON} & constante & --- & statut de chaque grandeur sous \code{wh\_poisson} (section~\ref{sec:lissage-poisson}), mention d'indépendance comprise sur les deux bornes de crédibilité (issue~\#329) \\
 \catalogue{fonctions-lissage}{CONSTANTES\_LISSAGE} & constante & --- & \code{data.frame} (\code{constante}, \code{valeur}, \code{origine}) à zéro ligne~: aucune constante numérique sous \code{wh\_quadratique} \\
 \catalogue{fonctions-lissage}{EPSILON\_DEPART\_LISSAGE} & constante & --- & $10^{-8}$~: plancher des décès au départ de l'algorithme de \code{wh\_poisson} \\
 \catalogue{fonctions-lissage}{EPSILON\_DEVIANCE\_LISSAGE} & constante & --- & $10^{-8}$~: seuil relatif d'arrêt sur la déviance pénalisée (\code{wh\_poisson}) \\
@@ -14678,7 +14734,16 @@ source unique, la fonction interne \code{mention\_independance()}
 (tableau~\ref{tab:fonctions-validation}), qu'appellent
 \code{STATUTS\_VALIDATION}, \code{STATUTS\_VALIDATION\_POSITIONNEE} et
 \code{STATUTS\_IMPORTANCE} (section~\ref{sec:importance-exclusions}).
-Sous \code{lissee}, aucune ligne ne porte la mention (issue~\#329). Les
+Sous \code{lissee}, aucune ligne ne porte la mention (issue~\#329)~: les
+seules lignes de loi produites, \code{khi2\_pearson}/\allowbreak\code{p\_asymptotique}
+et \code{deviance}/\allowbreak\code{p\_asymptotique}, disent déjà
+«~approximation non établie~» et que «~le niveau réel du test fondé sur
+cette p n'est pas établi~»~; «~les tests sont anti-conservateurs~»
+supposerait un niveau de base connu, et «~le niveau n'est plus garanti~»
+serait faux, ce niveau n'ayant jamais été garanti. Hors de la validation,
+les deux bornes de crédibilité de \code{wh\_poisson}
+(\code{STATUTS\_LISSAGE\_POISSON}) portent la mention de nature
+\code{intervalle} (section~\ref{sec:lissage-poisson}). Les
 statistiques portent sur les seules cellules de $C^{+}$~; la
 table~\ref{tab:statistiques-validation} en donne la liste et les statuts,
 que la constante \code{STATUTS\_VALIDATION} écrit, grandeur par grandeur,
@@ -20608,7 +20673,8 @@ sur l'intervalle déclaré (grille, puis Brent, ou la borne à l'état
 bayésiens asymptotiques, conditionnels au paramètre de lissage retenu,
 qui ne sont pas des intervalles de confiance (couverture fréquentiste non
 établie)~» (la mention du rapport~; le statut des bornes ajoute
-«~aucun constat de simulation versé~»), l'interpolation des cellules sans exposition et le renvoi aux
+«~aucun constat de simulation versé~», puis la mention d'indépendance des
+unités, issue~\#329), l'interpolation des cellules sans exposition et le renvoi aux
 constantes et à l'hypothèse~; la mention
 \code{lissage\_conservation\_poisson}~: «~Somme des E\^{}c mu\^{} = somme
 des D (SMR = 1) par l'équation du score, et somme des x E\^{}c mu\^{} =
