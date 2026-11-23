@@ -15057,7 +15057,9 @@ soit $\theta$, asymptotiques sous le modèle de survie. Par grandeur~:
     niveau)~; pour un sous-groupe de plusieurs segments, p-valeurs exactes
     sous la loi d'une somme de binomiales indépendantes
     $\mathcal{B}(O_s, \pi_{b,s})$, calculée par convolution
-    (\code{loi\_somme\_binomiales()}), bornes non produites (état
+    (\code{loi\_somme\_binomiales()}, sur le support de chaque
+    binomiale, sans vecteur de longueur $O_s + 1$~: section~\ref{sec:homogeneite},
+    p-valeur exacte~; issue~\#350), bornes non produites (état
     \code{bornes\_non\_definies})~; la convolution n'est faite que si son
     nombre de produits, calculé avant elle
     (\code{cout\_convolution\_binomiales()}), est au plus
@@ -15613,7 +15615,34 @@ n'étant appariée (différence voulue avec l'étape \code{validation}).\par}
     convolution (\code{loi\_somme\_binomiales()}, brique partagée avec la
     relation \code{positionnee}), faite si son nombre de produits est au
     plus \code{N\_MAX\_PRODUITS\_CONVOLUTION}. Sinon état
-    \code{convolution\_au\_dela\_n\_max}~; plus de deux groupes, état
+    \code{convolution\_au\_dela\_n\_max}. Depuis l'issue~\#350,
+    chaque binomiale est évaluée sur son seul support, $\{k :{}$
+    \code{dbinom(k, n, p)} ${}> 0\}$ en double, dont les bornes sont trouvées
+    par bisection autour du mode (\code{support\_binomiale()}), et la
+    loi est rendue sur son support~: aucun vecteur de longueur
+    proportionnelle à $n$ n'est formé, ni par le calcul du coût ni par la
+    convolution. Une strate seule, sans produit de convolution, est donc
+    toujours calculée~: son support compte au plus 1\,775\,728~valeurs
+    ($n = 2^{31} - 1$, $p = 0{,}5$, le total des événements étant gardé
+    sous l'entier maximal, issue~\#348)~; avant l'issue, une strate de
+    $10^9 + 10^9$~décès arrêtait le calcul sur une erreur d'allocation de
+    R. Les termes non nuls et leur ordre de sommation étant inchangés,
+    coûts, lois et p-valeurs des cas calculés auparavant sont identiques
+    au bit près, et aucun état ni texte de statut ne change.
+    \textbf{Statut de la contiguïté du support}~: en arithmétique réelle,
+    le support est un intervalle (la loi binomiale est log-concave), ce que
+    la bisection suppose~; en double, la contiguïté est \emph{mesurée},
+    non démontrée~: aux frontières, la log-densité vaut environ $-745$
+    (bord des nombres dénormalisés) et la pente du logarithme de la
+    densité entre voisins est au moins $1{,}65 \cdot 10^{-3}$, très
+    au-dessus du bruit de calcul, au plus $1{,}3 \cdot 10^{-12}$ (mesure
+    d'\code{actuary} du 23/11/2026 sur 44~frontières, $n$ de $10^6$ à
+    $2^{31} - 1$, $p$ de $10^{-6}$ à $1 - 10^{-6}$~; même pente minimale
+    remesurée sur 54~frontières)~; selon la même mesure, un défaut
+    éventuel n'omettrait qu'une masse inférieure à $10^{-316}$, sans effet
+    sur aucune p-valeur ni aucun verdict. L'identité du support avec
+    celui de \code{dbinom(0:n, n, p)} est vérifiée par les tests de la
+    relation \code{positionnee} (section~\ref{sec:validation-verifications})~; plus de deux groupes, état
     \code{plus\_de\_deux\_groupes}~; somme des tranches, état
     \code{non\_produite\_par\_cette\_version} (la loi exacte d'une somme de
     statistiques de tranche n'est pas mise en œuvre).
@@ -16709,7 +16738,15 @@ l'ordre des gardes (un total hors plage seul, refusé sur
 \code{evenements\_hors\_plage}~; les deux premières gardes dépassées, la
 première citée)~; l'erreur de programmation de
 \code{replications\_multinomiales()} pour un effectif au-delà de
-l'entier maximal, avant tout tirage~; l'état \code{precision\_insuffisante} par appel
+l'entier maximal, avant tout tirage~; la p-valeur exacte d'une strate
+de $10^9 + 10^9$~décès, calculée sur son support (issue~\#350~: une
+strate, deux segments d'exposition $5 \cdot 10^{10}$~; décès $(10^9,
+10^9)$~: statistiques nulles, p exacte~1, \code{produite}~; décès
+$(10^9, 10^9 + 50\,000)$~: statistique égale à sa valeur calculée à la
+main, p exacte \code{produite}, égale à son recoupement par
+\code{pbinom()} et à la valeur mesurée~; somme des tranches
+\code{non\_produite\_par\_cette\_version}~; aucune erreur de R,
+mémoire et durée bornées)~; l'état \code{precision\_insuffisante} par appel
 direct (strate unique, deux segments égaux~: $10^{20}$ décès, quatre
 branches \code{precision\_insuffisante}, sans erreur~; $10^{15}$ décès,
 branches produites, postcondition recalculée)~; la règle d'une branche
@@ -17908,6 +17945,19 @@ chaque test nommant la nature de son attendu (ADR 0007, point~11.4)~:
     \code{NA} sous les trois relations hors de l'état
     \code{convolution\_au\_dela\_n\_max}, aucune ligne portant une
     p-valeur exacte et une p-valeur asymptotique, textes des statuts)~;
+    support de chaque binomiale (issue~\#350)~: bornes de
+    \code{support\_binomiale()} et valeurs de \code{binomiale\_elaguee()}
+    identiques à l'élagage de \code{dbinom(0:n, n, p)} sur 240~cas
+    ($n \le 5 \cdot 10^6$), support contigu, cas dégénérés, coût nul de
+    $\mathcal{B}(10^9~; 0{,}5)$ et support de 1\,775\,728~valeurs à $n =
+    2^{31} - 1$ sans allocation proportionnelle à $n$, loi de
+    $\mathcal{B}(10^9~; 1) + \mathcal{B}(10~; 0{,}3)$ (coût~11, longueur~11,
+    début $10^9$), coût, loi et p-valeur exacte de l'homogénéité
+    identiques à l'algorithme d'avant sur 100~cas tirés, p-valeurs des
+    sous-groupes identiques aux valeurs mesurées avant l'issue, et
+    sous-groupe d'un segment complet de $10^9$~décès calculé, deux
+    segments partiels de $10^9$ restant à l'état
+    \code{convolution\_au\_dela\_n\_max}~;
     les trois refus inter-étapes et \code{relation\_table\_invalide}~;
     comparateur~2 non produit~; rejeu \code{identical()} hors
     \code{execution}~; mention de la table de référence prise telle quelle
@@ -18062,9 +18112,10 @@ reproduites ici, E3.4).
 \catalogue{fonctions-validation}{statistiques\_test()} & interne & matrice de décès (une colonne par jeu), attendus, début des séquences & $X^2$, $G^2$, signes, $R$, $z$ de Wilcoxon par colonne~; observé et répliques \\
 \catalogue{fonctions-validation}{replications\_poisson()} & interne & $A$, $B$, graine, fonction de réduction & statistiques des $B$ réplications, tirées par blocs sous \code{sous\_graine()} \\
 \catalogue{fonctions-validation}{replications\_multinomiales()} & interne & poids, groupe de chaque cellule, effectifs des groupes, $B$, graine, fonction de réduction & statistiques des $B$ réplications multinomiales par groupe, tirées réplique par réplique puis groupe par groupe sous \code{sous\_graine()}, par blocs~; erreur de programmation, avant tout tirage, pour un poids non positif, un groupe hors de~1 à~$G$, un effectif manquant, négatif ou au-delà de \code{.Machine\$integer.max} (issue~\#348~; les appelants rangent le total des événements en \code{integer} avant tout tirage), ou un groupe d'effectif positif sans cellule \\
-\catalogue{fonctions-validation}{binomiale\_elaguee()} & interne & $n$, $p$ & \code{dbinom(0:n, n, p)} réduite à l'intervalle de ses valeurs non nulles, et sa première valeur \\
-\catalogue{fonctions-validation}{cout\_convolution\_binomiales()} & interne & effectifs, probabilités & nombre de produits de la convolution, calculé avant elle \\
-\catalogue{fonctions-validation}{loi\_somme\_binomiales()} & interne & effectifs, probabilités & loi d'une somme de binomiales indépendantes, par convolution directe~; attribut \code{produits}~; brique partagée avec l'étape \code{homogeneite} \\
+\catalogue{fonctions-validation}{support\_binomiale()} & interne & $n$, $p$ & bornes entières $[a, b]$ du support $\{k :{}$ \code{dbinom(k, n, p)} ${}> 0\}$ en double, sans former \code{dbinom(0:n)}~: $[0, 0]$ si $n = 0$ ou $p = 0$, $[n, n]$ si $p = 1$, sinon bisection de chaque côté du mode $\lfloor (n+1)p \rfloor$, en $O(\log n)$ évaluations~; mode de densité nulle~: erreur de programmation (issue~\#350~; contiguïté~: section~\ref{sec:homogeneite}, p-valeur exacte) \\
+\catalogue{fonctions-validation}{binomiale\_elaguee()} & interne & $n$, $p$ & \code{dbinom()} sur le support rendu par la fonction de la ligne précédente, et sa première valeur (\code{debut})~; égale à \code{dbinom(0:n, n, p)} réduite à ses valeurs non nulles, sans former ce vecteur (issue~\#350) \\
+\catalogue{fonctions-validation}{cout\_convolution\_binomiales()} & interne & effectifs, probabilités & nombre de produits de la convolution, calculé avant elle, à partir des seules longueurs des supports, sans aucun vecteur \code{dbinom} (issue~\#350) \\
+\catalogue{fonctions-validation}{loi\_somme\_binomiales()} & interne & effectifs, probabilités & loi d'une somme de binomiales indépendantes, par convolution directe, rendue sur son support (zéros exacts hors de lui)~; attributs \code{debut} et \code{produits}, l'appelant indexant par $k = \code{debut} + i - 1$ (issue~\#350)~; brique partagée avec l'étape \code{homogeneite} \\
 \catalogue{fonctions-validation}{p\_somme\_binomiales\_normale()} & interne & effectifs, probabilités, valeur observée $o$ & p-valeurs inférieure, supérieure et centrale de l'approximation normale d'une somme de binomiales indépendantes, avec correction de continuité (\code{pnorm()})~; erreur de programmation si la variance est nulle (issue~\#178) \\
 \catalogue{fonctions-validation}{pvaleur\_monte\_carlo()} & interne & observé, répliques, sens & $p_{MC}$ et erreur de Monte-Carlo \\
 \catalogue{fonctions-validation}{statistiques\_validation()} & interne & cellules ($D$, $E^c$, $\tilde q$, $\tilde\mu$, $A$, état, séquence, âge), niveau, relation, $B$, graine, segment (sous \code{positionnee} seulement), somme des leviers retenus (sous \code{lissee} seulement) & S1 à S4 et S6 à S12 au format long, colonnes par cellule, suites par séquence, nombre de tirages~; cœur partagé (ADR 0015, point~7.5) \\
