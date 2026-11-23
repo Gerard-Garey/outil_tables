@@ -1,4 +1,3 @@
 type,nom,issue,motif
-entree,fonctions-validation:mention_independance,#330,"fonction interne nouvelle (F330, #330) ; entrée du catalogue écrite par docwriter au commit docs: de #330 (règle 9)"
 entree,fonctions-validation:support_binomiale,#350,"fonction interne nouvelle (règle (A), M580, #350) ; entrée du catalogue écrite par docwriter au commit docs: de #350 (règle 9)"
 entree,fonctions-outils:LIMITE_SOMMES_DOUBLE,#353,"constante de plateforme nouvelle (M579, #353 ; ADR 0009, annotation du 23/11/2026) ; entrée du catalogue écrite par docwriter au commit docs: de #353 (règle 9)"
