@@ -1157,3 +1157,78 @@ verifier("#320 etats_evenements_exclus(), cause_sortie facteur (NA, niveau inuti
   f0 <- factor(rep(NA_character_, 8L))
   identical(et(f), et(as.character(f))) && identical(et(f0), et(rep(NA_character_, 8L)))
 })
+
+# Lecture du nombre de lignes reçues sans dispatch (#343, suite de #322, C2) :
+# calculer_importance_exclusions() lisait nrow(donnees), qui dispatche sur la
+# classe de l'entrée ; une dim() à état qui ne ment qu'à cette lecture levait le
+# stop() « lignes reçues différentes de conservées + exclues (erreur de
+# programmation) ». La classe k343 ment (nombre de lignes + 1) seulement quand
+# nrow() est appelée par la fonction désignée par REF343$corps (pile :
+# calculer_importance_exclusions, nrow, dim, dim.k343, d'où sys.function(k - 3L)),
+# honnête ailleurs (evaluer_motifs(), controler_lignes_donnees()). Contrôle de
+# la profondeur de pile : sur une copie de la fonction qui relit nrow(donnees),
+# le mensonge est atteint et le stop() levé ; sans lui, le test ne prouverait
+# rien. k343h : dim() honnête, témoin.
+local({
+  REF343 <- new.env(); REF343$corps <- NULL; REF343$mensonges <- 0L
+  m343 <- list(
+    dim.k343 = function(x) {
+      d <- c(.row_names_info(x, 2L), length(unclass(x)))
+      k <- sys.nframe()
+      if (k >= 4L && !is.null(REF343$corps) && identical(body(sys.function(k - 3L)), REF343$corps)) {
+        REF343$mensonges <- REF343$mensonges + 1L
+        d[1L] <- d[1L] + 1L
+      }
+      d },
+    dim.k343h = function(x) c(.row_names_info(x, 2L), length(unclass(x))))
+  for (n in names(m343)) assign(n, m343[[n]], envir = globalenv())
+  on.exit(rm(list = names(m343), envir = globalenv()))
+  reel <- tablexp:::calculer_importance_exclusions
+  # Copie qui relit nrow(donnees) à la place de .row_names_info(donnees, 2L)
+  # (état d'avant #343), dans l'espace de noms du package.
+  src <- deparse(reel)
+  i_n <- grep(".row_names_info(donnees, 2L)", src, fixed = TRUE)
+  ancien <- reel
+  if (length(i_n) == 1L) {
+    src[i_n] <- sub(".row_names_info(donnees, 2L)", "nrow(donnees)", src[i_n], fixed = TRUE)
+    ancien <- eval(parse(text = src), envir = asNamespace("tablexp"))
+    environment(ancien) <- environment(reel)
+  }
+  corps_reel <- body(reel); corps_ancien <- body(ancien)
+  attrape <- function(expr) tryCatch(expr, refus_tablexp = function(r) r, error = function(e) e)
+  D1 <- structure(T1, class = c("k343", "data.frame"))
+  e <- X1$etapes
+  appel <- function(f, d) f(d, ROLES_SIM, e$donnees, e$exposition, NULL, NULL, P_X1, REC_X1, CONV_X1, character(0), 0.95)
+  verifier("#343 la copie d'avant (nrow(donnees)) se distingue de la fonction du package : une seule ligne remplacée, corps différents",
+           length(i_n) == 1L && !identical(corps_reel, corps_ancien))
+  REF343$corps <- corps_ancien
+  verifier("#343 contrôle de la profondeur de pile (constat d'exécution) : copie d'avant (nrow(donnees)) appelée sur la classe k343 : dim() ment, stop() « lignes reçues différentes de conservées + exclues (erreur de programmation) »", {
+    REF343$mensonges <- 0L
+    x <- attrape(appel(ancien, D1))
+    inherits(x, "error") && !inherits(x, "refus_tablexp") && REF343$mensonges >= 1L &&
+      grepl("+ exclues (erreur de programmation)", conditionMessage(x), fixed = TRUE)
+  })
+  REF343$corps <- corps_reel
+  verifier("#343 appel direct, classe k343 dont dim() ment à nrow() depuis calculer_importance_exclusions() (identité exacte) : aucune erreur, résultat identical() à celui du data.frame nu", {
+    x <- attrape(appel(reel, D1))
+    if (inherits(x, "condition")) conditionMessage(x)
+    else identical(x[c("parametres", "resultat", "diagnostics")], e$importance_exclusions)
+  })
+  for (u in c("tete", "contrat")) {
+    ro <- if (u == "tete") ROLES_SIM else ROLES_SANS_TETE
+    ref <- if (u == "tete") X1 else X2
+    for (k in c("k343", "k343h")) {
+      verifier(sprintf("#343 construire_table(), classe %s (mensonge de dim() à nrow() depuis calculer_importance_exclusions() pour k343), unité %s (identité exacte) : aucune erreur, étape importance_exclusions identical() à celle du data.frame nu", k, u), {
+        x <- attrape(construire_table(structure(T1, class = c(k, "data.frame")), ro, plan_ie()))
+        if (inherits(x, "condition")) conditionMessage(x)
+        else identical(x$etapes$importance_exclusions, ref$etapes$importance_exclusions) &&
+          identical(x$etapes$importance_exclusions$resultat, ref$etapes$importance_exclusions$resultat)
+      })
+    }
+  }
+  verifier("#343 témoin : le data.frame nu donne les mêmes étapes importance_exclusions qu'au premier appel (identité exacte)", {
+    identical(construire_table(T1, ROLES_SIM, plan_ie())$etapes$importance_exclusions, X1$etapes$importance_exclusions)
+  })
+})
+verifier("#343 les méthodes dim de session sont retirées de globalenv()",
+         !any(c("dim.k343", "dim.k343h") %in% ls(globalenv(), all.names = TRUE)))

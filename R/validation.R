@@ -3666,7 +3666,7 @@ calculer_importance_exclusions <- function(donnees, roles, etape_donnees, etape_
   pe <- etape_exposition$parametres
   unite <- rd$unite_observation
   le <- rd$lignes_exclues
-  n <- nrow(donnees)
+  n <- .row_names_info(donnees, 2L)
   if (!identical(as.numeric(n), as.numeric(length(rd$numeros_conserves) + rd$nombre_lignes_exclues)))
     stop("calculer_importance_exclusions() : lignes reçues différentes de conservées + exclues (erreur de programmation).",
          call. = FALSE)
