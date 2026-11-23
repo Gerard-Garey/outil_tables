@@ -4460,12 +4460,12 @@ de l'étape \code{coherence\_regularite} (section~\ref{sec:coherence-regularite}
 \code{importance\_exclusions}, sur ses ensembles de lignes exclues
 (issue~\#174), le refus \code{donnees\_mal\_formees} de la même étape,
 sur une extraction de lignes fausse de son contrefactuel (issue~\#320),
-et ceux de l'étape \code{exposition}
+ceux de l'étape \code{exposition}
 sur la table qu'elle forme (\code{trop\_de\_cellules},
 \code{evenements\_hors\_plage}, \code{denombrement\_hors\_plage} et
 \code{periode\_sans\_exposition},
 section~\ref{sec:troncature-censure}), et ceux de l'étape \code{donnees}
-sur les lignes reçues (\code{base\_vide}, refus par défaut
+sur ses lignes (\code{base\_vide}, refus par défaut
 \code{ligne\_invalide}, \code{aucune\_ligne\_conservee}, refus
 \code{donnees\_mal\_formees} du contrôle de l'extraction des lignes
 conservées, distinct du refus de même motif du contrôle des lignes reçues,
@@ -7002,7 +7002,7 @@ les rôles en défaut joints par «~;~»~; les \code{details} portent
 tableau~\ref{tab:catalogue-roles}). Pour un rôle dont les types admis
 comprennent \code{factor} (\code{sexe}, \code{cause\_sortie},
 \code{type\_ligne}, \code{segment}, \code{etat\_depart},
-\code{etat\_arrivee}), \code{type\_conforme()} n'admet un facteur
+\code{etat\_arrivee}~; ces deux derniers, qu'aucune recette n'emploie, sont refusés avant le contrôle des types, sous \code{role\_non\_pris\_en\_charge}, quel que soit leur type~: \emph{constat} de mesure), \code{type\_conforme()} n'admet un facteur
 (classe comprenant \code{factor}, sous-classes comprises) que
 \textbf{bien formé}, jugé par \code{facteur\_bien\_forme()}, seul
 prédicat de cette règle~: niveaux (attribut \code{levels}) de type
@@ -7037,9 +7037,8 @@ alors la même erreur R (\emph{constat} de mesure, R~4.3.3). Des niveaux
 Un facteur passé pour un rôle dont les types admis ne comprennent pas
 \code{factor} (\code{id\_tete}, par exemple) est refusé comme avant,
 partie «~factor reçu~», qu'il soit bien formé ou non. Dans tous les cas
-mesurés, seules des entrées qui finissaient en erreur R sont désormais
-refusées, aucune construction qui aboutissait ne l'est (tests du module
-\code{donnees}~; M573). Le constructeur des tables de référence emploie le même contrôle
+mesurés (\code{sexe}, \code{cause\_sortie} et \code{segment}, tests du module \code{donnees}~; \code{type\_ligne} sous la recette \code{stocks\_successifs}, avec et sans exclusion, \emph{constat} de mesure, R~4.3.3~; M573), seules des entrées qui finissaient en erreur R sont désormais
+refusées, aucune construction qui aboutissait ne l'est. Le constructeur des tables de référence emploie le même contrôle
 pour sa colonne \code{sexe} (section~\ref{sec:table-reference}).
 
 \medskip
@@ -17984,7 +17983,7 @@ reproduites ici, E3.4).
 \catalogue{fonctions-validation}{smr\_comparateur\_2()} & interne & cellules retirées, clés, découpage, table, plage, clé, relation, niveau & $O$, $A$, SMR, bornes et décomptes sous la table de l'étape \code{validation}~; tout ou rien \\
 \catalogue{fonctions-validation}{etats\_evenements\_exclus()} & interne & données, rôles, lignes, fenêtre, état d'arrivée & état des déclarations de chaque ligne~; \code{cause\_sortie} et \code{date\_sortie} lues sans dispatch par \code{lire\_champ()} (issues~\#255 et~\#320) \\
 \catalogue{fonctions-validation}{ligne\_resultat()} & interne & ensemble, niveau, valeurs & \code{data.frame} d'une ligne d'une table du résultat \\
-\catalogue{fonctions-validation}{calculer\_importance\_exclusions()} & interne & données, rôles, étapes préalables et \code{validation}, table, valeurs validées \code{p} (dont la période et le délai, issue~\#182), recette et convention validées, segmentation, niveau & fonction d'étape \code{importance\_exclusions}~: paramètres, résultat, diagnostics, avertissements (aucun)~; table \code{NULL} si et seulement si \code{validation} est absente ou sous \code{lissee} (erreur de programmation sinon)~; ne contrôle rien (issue~\#82), hormis une erreur de programmation si la ligne de matrice de la recette n'admet pas l'étape sans condition ou si la forme rendue au noyau n'est pas \code{fenetres} (le refus utilisateur, \code{importance\_exclusions\_}\allowbreak\code{agregats}, est levé en amont, au contrôle des entrées, section~\ref{sec:recettes})~; refus de capacité \code{evenements\_retires\_}\allowbreak\code{hors\_plage}, levé par la fonction de la ligne suivante (issue~\#174), et refus \code{donnees\_mal\_formees} d'une extraction de lignes fausse, levé par l'outil de contrôle des extractions du module \code{donnees} (issue~\#320)~; \code{id\_tete} lu par \code{lire\_champ()} (issue~\#255) \\
+\catalogue{fonctions-validation}{calculer\_importance\_exclusions()} & interne & données, rôles, étapes préalables et \code{validation}, table, valeurs validées \code{p} (dont la période et le délai, issue~\#182), recette et convention validées, segmentation, niveau & fonction d'étape \code{importance\_exclusions}~: paramètres, résultat, diagnostics, avertissements (aucun)~; table \code{NULL} si et seulement si \code{validation} est absente ou sous \code{lissee} (erreur de programmation sinon)~; ne contrôle rien (issue~\#82), hormis une erreur de programmation si la ligne de matrice de la recette n'admet pas l'étape sans condition ou si la forme rendue au noyau n'est pas \code{fenetres}, ou si les lignes reçues, lues sans dispatch par \code{.row\_names\_info(, 2L)} (issue~\#343), ne sont pas les conservées plus les exclues (section~\ref{sec:importance-exclusions}, «~Volumes et événements déclarés~») (le refus utilisateur, \code{importance\_exclusions\_}\allowbreak\code{agregats}, est levé en amont, au contrôle des entrées, section~\ref{sec:recettes})~; refus de capacité \code{evenements\_retires\_}\allowbreak\code{hors\_plage}, levé par la fonction de la ligne suivante (issue~\#174), et refus \code{donnees\_mal\_formees} d'une extraction de lignes fausse, levé par l'outil de contrôle des extractions du module \code{donnees} (issue~\#320)~; \code{id\_tete} lu par \code{lire\_champ()} (issue~\#255) \\
 \catalogue{fonctions-validation}{total\_evenements\_retires()} & interne & événements retirés des cellules, ensemble, niveau & total en \code{integer}, formé en \code{double}~; refus \code{evenements\_retires\_}\allowbreak\code{hors\_plage} (module \code{importance\_exclusions}) au-delà de \code{.Machine\$integer.max}, le message citant le total, l'ensemble et le niveau (issue~\#174) \\
 \catalogue{fonctions-validation}{retrait\_vide()} & interne & contexte, clés & cellules retirées vides (gabarit des colonnes) \\
 \end{longtable}
