@@ -2592,9 +2592,9 @@ verifier("I #353 construire_table(), agrégats, une seule cellule à 1e308 (tota
   if (!isTRUE(ok)) ok else if (grepl("(1e+308 ; au plus 8.9884656743115785e+307,", conditionMessage(x$r), fixed = TRUE)) TRUE
   else conditionMessage(x$r)
 })
-verifier("I #353 témoin (1000, 1000, 900, 1100) : inchangé, z = -/+0,7090792 et T = 0,5027933 (1e-6), état produite ; total à la borne (.Machine$double.xmax / 2 - 3000 sur une cellule) : construit, état produite", {
+verifier("I #353 témoin (1000, 1000, 900, 1100) : inchangé, z = -/+0,7090792 et T = 0,5027933 (1e-6), état produite ; total égal à la borne (.Machine$double.xmax / 2 sur une cellule ; + 3000 sans effet en double) : admis, construit, état produite", {
   x <- construire_353(c(1000, 1000, 900, 1100))
-  y <- construire_353(c(.Machine$double.xmax / 2 - 3000, 1000, 900, 1100))
+  y <- construire_353(c(.Machine$double.xmax / 2, 1000, 900, 1100))
   if (inherits(x$r, "condition")) return(paste("témoin :", conditionMessage(x$r)))
   if (inherits(y$r, "condition")) return(paste("borne :", conditionMessage(y$r)))
   s <- x$r$etapes$homogeneite$resultat$segments; t <- x$r$etapes$homogeneite$resultat$tests
