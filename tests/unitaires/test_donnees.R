@@ -336,6 +336,204 @@ local({
                                "table_colonne_mal_typee", "colonne(s) mal typée(s)"), TRUE))
   }
 })
+# Facteur mal formé en colonne de rôle (#342, F342 ; spécification
+# d'actuary-approfondi, commentaire de #342, amendée par M573) : un seul
+# prédicat, facteur_bien_forme() (niveaux character, codes integer, chaque
+# code NA ou de 1 au nombre de niveaux), appelé par type_conforme() pour
+# categorie et categorie_ou_entier. Refus type_incompatible du module donnees,
+# partie « reçu » précisée, message et details exacts, par construire_table()
+# (avec et sans exclusion sexe_manquant) et par type_conforme() (avant #342 :
+# erreur R « malformed factor », appel as.character.factor(x), mesurée sur
+# 7c800c0 pour chaque cas). Témoins : construction identique à la colonne
+# character. Facteur à codes doubles : unserialize() d'une sérialisation ASCII
+# dont l'en-tête 781 (INTSXP, objet, attributs) devient 782 (REALSXP).
+# Littéraux non ASCII en \u00XX ; méthodes S3 de session dans globalenv(),
+# retirées par on.exit(). Une erreur R est rendue, non propagée.
+local({
+  plan342 <- function(exclusions) list(
+    transition = VD, periode = PER, delai_declaration = 0, segmentation = "sexe",
+    etapes = list(donnees = list(exclusions = exclusions),
+                  exposition = list(convention = "plus_fine", par_annee = FALSE),
+                  brut = list(estimateurs = "poisson", niveau = 0.95)))
+  attrape <- function(expr) tryCatch({ force(expr); NULL }, refus_tablexp = function(r) r, error = function(e) e)
+  # Valeur de expr, ou la condition levée.
+  valeur <- function(expr) tryCatch(expr, refus_tablexp = function(r) r, error = function(e) e)
+  avec <- function(...) {
+    l <- unclass(BASE); v <- list(...)
+    for (n in names(v)) l[[n]] <- v[[n]]
+    structure(l, class = "data.frame", row.names = seq_len(nrow(BASE)))
+  }
+  fac <- function(codes, niveaux, classe = "factor") {
+    x <- codes; attr(x, "levels") <- niveaux; oldClass(x) <- classe; x
+  }
+  sans_niveaux <- function(classe = "factor") {
+    x <- fac(c(2L, 1L, 2L, 2L), c("F", "H"), classe); attr(x, "levels") <- NULL; x
+  }
+  s <- rawToChar(serialize(fac(c(2L, 1L, 2L, 2L), c("F", "H")), NULL, ascii = TRUE))
+  codes_doubles <- unserialize(charToRaw(sub("\n781\n", "\n782\n", s, fixed = TRUE)))
+  verifier("#342 construction du facteur \u00e0 codes doubles : classe factor, codes de type double, niveaux F, H",
+           identical(oldClass(codes_doubles), "factor") && identical(typeof(unclass(codes_doubles)), "double") &&
+             identical(attr(codes_doubles, "levels", exact = TRUE), c("F", "H")))
+  MF <- paste(" mal form\u00e9 (niveaux absents ou non character, ou code qui n'est ni NA ni un integer de 1 au",
+              "nombre de niveaux)")
+  partie <- function(role, colonne, attendu, recu)
+    sprintf("r\u00f4le \u00ab %s \u00bb, colonne \u00ab %s \u00bb : %s attendu, %s re\u00e7u", role, colonne, attendu, recu)
+  message_attendu <- function(...) paste0("Type incompatible : ", paste(c(...), collapse = " ; "), ".")
+  CAT <- "character, factor"
+  # Refus exact : module, motif, message, details.
+  exact <- function(x, msg, details) {
+    if (is.null(x)) "aucun refus lev\u00e9"
+    else if (!inherits(x, "refus_tablexp")) sprintf("condition %s : %s", class(x)[1L], conditionMessage(x))
+    else if (!identical(x$module, "donnees")) sprintf("module \u00ab %s \u00bb", x$module)
+    else if (!identical(x$motif, "type_incompatible")) sprintf("motif \u00ab %s \u00bb", x$motif)
+    else if (!identical(conditionMessage(x), msg)) paste("message :", conditionMessage(x))
+    else if (!identical(x$details, details)) paste("details :", paste(deparse(x$details), collapse = ""))
+    else TRUE
+  }
+  d_sexe <- list(role = "sexe", colonne = "sexe", type_attendu = CAT)
+  m_sexe <- message_attendu(partie("sexe", "sexe", CAT, paste0("factor", MF)))
+  m_cause <- message_attendu(partie("cause_sortie", "cause", CAT, paste0("factor", MF)))
+  REFUSES <- list(
+    list(nom = "sexe sans levels", d = list(sexe = sans_niveaux()), m = m_sexe, det = d_sexe),
+    list(nom = "sexe de classe monf/factor sans levels", d = list(sexe = sans_niveaux(c("monf", "factor"))),
+         m = message_attendu(partie("sexe", "sexe", CAT, paste0("monf/factor", MF))), det = d_sexe),
+    list(nom = "sexe aux levels entiers (1:2)", d = list(sexe = fac(c(2L, 1L, 2L, 2L), 1:2)), m = m_sexe, det = d_sexe),
+    list(nom = "sexe aux levels doubles", d = list(sexe = fac(c(2L, 1L, 2L, 2L), c(1, 2))), m = m_sexe, det = d_sexe),
+    list(nom = "sexe aux levels eux-m\u00eames facteur", d = list(sexe = fac(c(2L, 1L, 2L, 2L), factor(c("F", "H")))),
+         m = m_sexe, det = d_sexe),
+    list(nom = "sexe, code 3 pour deux niveaux", d = list(sexe = fac(c(2L, 1L, 3L, 2L), c("F", "H"))), m = m_sexe, det = d_sexe),
+    list(nom = "sexe, code 0", d = list(sexe = fac(c(2L, 1L, 0L, 2L), c("F", "H"))), m = m_sexe, det = d_sexe),
+    list(nom = "sexe, code -1", d = list(sexe = fac(c(2L, 1L, -1L, 2L), c("F", "H"))), m = m_sexe, det = d_sexe),
+    list(nom = "cause_sortie, code 4 pour trois niveaux",
+         d = list(cause = fac(c(3L, 2L, 1L, 4L), c("deces", "en_cours", "rachat"))), m = m_cause,
+         det = list(role = "cause_sortie", colonne = "cause", type_attendu = CAT)),
+    list(nom = "sexe aux codes doubles (unserialize)", d = list(sexe = codes_doubles), m = m_sexe, det = d_sexe),
+    list(nom = "sexe et cause_sortie mal form\u00e9s",
+         d = list(sexe = sans_niveaux(), cause = fac(c(3L, 2L, 1L, 4L), c("deces", "en_cours", "rachat"))),
+         m = message_attendu(partie("sexe", "sexe", CAT, paste0("factor", MF)),
+                             partie("cause_sortie", "cause", CAT, paste0("factor", MF))),
+         det = list(role = c("sexe", "cause_sortie"), colonne = c("sexe", "cause"), type_attendu = c(CAT, CAT))))
+  for (cas in REFUSES) {
+    d <- do.call(avec, cas$d)
+    for (ex in list(character(0), "sexe_manquant"))
+      verifier(sprintf("#342 %s : construire_table()%s -> refus type_incompatible, message et details exacts", cas$nom,
+                       if (length(ex)) " avec exclusion sexe_manquant" else ""),
+               exact(attrape(construire_table(d, ROLES, plan342(ex))), cas$m, cas$det))
+    verifier(sprintf("#342 %s : type_conforme() -> FALSE pour categorie et categorie_ou_entier", cas$nom),
+             all(vapply(cas$d, function(v) !tablexp:::type_conforme(v, "categorie") &&
+                          !tablexp:::type_conforme(v, "categorie_ou_entier"), logical(1L))))
+  }
+  # Rôle segment (categorie_ou_entier) : refus par controler_roles(), partie
+  # « reçu » précisée, type attendu de categorie_ou_entier.
+  RS <- c(ROLES, segment = "seg")
+  x <- attrape(tablexp:::controler_roles(avec(seg = fac(c(1L, 2L, 3L, 1L), c("a", "b"))), RS, "sexe"))
+  verifier("#342 segment (categorie_ou_entier), code 3 pour deux niveaux : controler_roles() -> refus type_incompatible exact",
+           exact(x, message_attendu(partie("segment", "seg", "character, factor, integer", paste0("factor", MF))),
+                 list(role = "segment", colonne = "seg", type_attendu = "character, factor, integer")))
+  verifier("#342 segment : facteur bien form\u00e9 et integer admis par controler_roles()",
+           is.null(attrape(tablexp:::controler_roles(avec(seg = fac(c(1L, 2L, 2L, 1L), c("a", "b"))), RS, "sexe"))) &&
+             is.null(attrape(tablexp:::controler_roles(avec(seg = c(1L, 2L, 2L, 1L)), RS, "sexe"))))
+  # Rôle segment mal formé de bout en bout, par construire_table() : segment
+  # dans la segmentation du plan et segment déclaré mais hors de la
+  # segmentation (réserve 2 du visa d'actuary, étape (3)). Avant #342 (mesuré
+  # sur 7c800c0 et dd541a6, les quatre combinaisons) : erreur R « malformed
+  # factor », appel as.character.factor(x).
+  SEG <- list(dans = c("sexe", "segment"), hors = "sexe")
+  seg_mal <- list("code 3 pour deux niveaux" = fac(c(1L, 2L, 3L, 1L), c("a", "b")),
+                  "codes doubles (unserialize)" = unserialize(charToRaw(sub("\n781\n", "\n782\n",
+                    rawToChar(serialize(fac(c(1L, 2L, 1L, 1L), c("a", "b")), NULL, ascii = TRUE)), fixed = TRUE))))
+  verifier("#342 segment aux codes doubles : classe factor, codes de type double 1, 2, 1, 1, niveaux a, b",
+           identical(oldClass(seg_mal[[2L]]), "factor") && identical(typeof(unclass(seg_mal[[2L]])), "double") &&
+             identical(attr(seg_mal[[2L]], "levels", exact = TRUE), c("a", "b")) &&
+             identical(as.vector(unclass(seg_mal[[2L]])), c(1, 2, 1, 1)))
+  for (k in names(seg_mal))
+    for (z in names(SEG))
+      verifier(sprintf("#342 segment %s, %s la segmentation du plan : construire_table() -> refus type_incompatible exact, pas une erreur R",
+                       k, if (z == "dans") "dans" else "hors de"),
+               exact(attrape(construire_table(avec(seg = seg_mal[[k]]), RS, modifyList(plan342(character(0)), list(segmentation = SEG[[z]])))),
+                     message_attendu(partie("segment", "seg", "character, factor, integer", paste0("factor", MF))),
+                     list(role = "segment", colonne = "seg", type_attendu = "character, factor, integer")))
+  for (z in names(SEG))
+    verifier(sprintf("#342 segment en facteur bien form\u00e9, %s la segmentation du plan : construit", if (z == "dans") "dans" else "hors de"),
+             is.null(attrape(construire_table(avec(seg = fac(c(1L, 2L, 1L, 1L), c("a", "b"))), RS,
+                                              modifyList(plan342(character(0)), list(segmentation = SEG[[z]]))))))
+  # Partie « reçu » réservée aux facteurs mal formés des types categorie et
+  # categorie_ou_entier : facteur (bien ou mal formé) pour id_tete, et integer
+  # pour sexe, gardent leur seule classe.
+  m_tete <- message_attendu(partie("id_tete", "tete", "character, integer, double entier fini", "factor"))
+  d_tete <- list(role = "id_tete", colonne = "tete", type_attendu = "character, integer, double entier fini")
+  for (k in list(list("bien form\u00e9", factor(BASE$tete)), list("sans levels", sans_niveaux())))
+    verifier(sprintf("#342 id_tete en facteur %s : refus type_incompatible inchang\u00e9, \u00ab factor re\u00e7u \u00bb", k[[1L]]),
+             exact(attrape(construire_table(avec(tete = k[[2L]]), ROLES, plan342(character(0)))), m_tete, d_tete))
+  verifier("#342 sexe integer : refus type_incompatible inchang\u00e9, \u00ab integer re\u00e7u \u00bb",
+           exact(attrape(construire_table(avec(sexe = c(1L, 2L, 1L, 1L)), ROLES, plan342(character(0)))),
+                 message_attendu(partie("sexe", "sexe", CAT, "integer")), d_sexe))
+  # Témoins : construits, brut identical() à la colonne character.
+  brut_ref <- function(d, ex) construire_table(d, ROLES, plan342(ex))$etapes$brut$resultat
+  ref <- brut_ref(BASE, character(0))
+  TEMOINS <- list(
+    "facteur nu" = factor(BASE$sexe),
+    "structure() aux codes doubles (convertis en integer)" = structure(c(2, 1, 2, 2), class = "factor", levels = c("F", "H")),
+    "facteur ordonn\u00e9" = factor(BASE$sexe, ordered = TRUE),
+    "sous-classe monf/factor bien form\u00e9e" = fac(c(2L, 1L, 2L, 2L), c("F", "H"), c("monf", "factor")),
+    "levels nomm\u00e9s" = fac(c(2L, 1L, 2L, 2L), c(a = "F", b = "H")),
+    "niveau inutilis\u00e9" = factor(BASE$sexe, levels = c("F", "H", "X")))
+  for (k in names(TEMOINS))
+    for (ex in list(character(0), "sexe_manquant"))
+      verifier(sprintf("#342 t\u00e9moin %s%s : construit, brut identical() \u00e0 la colonne character", k,
+                       if (length(ex)) " (exclusion sexe_manquant)" else ""), {
+        r <- valeur(brut_ref(avec(sexe = TEMOINS[[k]]), ex))
+        if (inherits(r, "condition")) conditionMessage(r) else identical(r, ref)
+      })
+  verifier("#342 t\u00e9moin structure() : codes de type integer (le facteur \u00e0 codes doubles ne se construit pas ainsi)",
+           is.integer(unclass(TEMOINS[[2L]])))
+  b_na <- BASE; b_na$sexe[2L] <- NA
+  ref_na <- brut_ref(b_na, "sexe_manquant")
+  for (k in list(list("code NA", fac(c(2L, NA, 2L, 2L), c("F", "H"))),
+                 list("niveau NA", factor(c("H", NA, "H", "H"), levels = c("F", "H", NA), exclude = NULL)))) {
+    verifier(sprintf("#342 t\u00e9moin %s sans exclusion : refus ligne_invalide (sexe_manquant), inchang\u00e9", k[[1L]]), {
+      x <- attrape(construire_table(avec(sexe = k[[2L]]), ROLES, plan342(character(0))))
+      inherits(x, "refus_tablexp") && identical(x$motif, "ligne_invalide") &&
+        identical(x$details$lignes, list(sexe_manquant = 2L))
+    })
+    verifier(sprintf("#342 t\u00e9moin %s avec exclusion sexe_manquant : construit, brut identical() \u00e0 la colonne character", k[[1L]]), {
+      r <- valeur(brut_ref(avec(sexe = k[[2L]]), "sexe_manquant"))
+      if (inherits(r, "condition")) conditionMessage(r) else identical(r, ref_na)
+    })
+  }
+  verifier("#342 t\u00e9moin niveaux r\u00e9p\u00e9t\u00e9s (H, H) : construit (hors p\u00e9rim\u00e8tre)",
+           is.null(attrape(construire_table(avec(sexe = fac(c(2L, 1L, 2L, 2L), c("H", "H"))), ROLES, plan342(character(0))))))
+  # Prédicat lu sans dispatch : méthodes de session qui lèvent une erreur.
+  m342 <- list(levels.k342 = function(x) stop("dispatch levels"), length.k342 = function(x) stop("dispatch length"),
+               `[.k342` = function(x, ...) stop("dispatch ["), Ops.k342 = function(e1, e2) stop("dispatch Ops"),
+               is.na.k342 = function(x) stop("dispatch is.na"))
+  for (n in names(m342)) assign(n, m342[[n]], envir = globalenv())
+  on.exit(rm(list = names(m342), envir = globalenv()))
+  bon <- fac(c(2L, 1L, 2L, 2L), c("F", "H"), c("k342", "factor"))
+  mauvais <- fac(c(2L, 1L, 3L, 2L), c("F", "H"), c("k342", "factor"))
+  verifier("#342 classe k342/factor aux m\u00e9thodes levels, length, [, Ops, is.na qui l\u00e8vent : facteur_bien_forme() rend TRUE / FALSE sans erreur",
+           identical(tryCatch(c(tablexp:::facteur_bien_forme(bon), tablexp:::facteur_bien_forme(mauvais)),
+                              error = function(e) conditionMessage(e)), c(TRUE, FALSE)))
+  verifier("#342 classe k342/factor mal form\u00e9e : controler_roles() -> refus type_incompatible exact, sans erreur R",
+           exact(attrape(tablexp:::controler_roles(avec(sexe = mauvais), ROLES, "sexe")),
+                 message_attendu(partie("sexe", "sexe", CAT, paste0("k342/factor", MF))), d_sexe))
+  # Même prédicat pour la colonne sexe d'une table de référence (type_conforme()
+  # categorie) : refus table_colonne_mal_typee (avant #342 : erreur R
+  # « malformed factor »).
+  tr <- function(sx) structure(list(age = 0:1, sexe = sx, qx = c(0.1, 0.2)), class = "data.frame", row.names = 1:2)
+  for (k in list(list("code 2 pour un niveau", fac(c(1L, 2L), "H")),
+                 list("codes doubles", unserialize(charToRaw(sub("\n781\n", "\n782\n",
+                   rawToChar(serialize(fac(c(1L, 1L), "H"), NULL, ascii = TRUE)), fixed = TRUE))))))
+    verifier(sprintf("#342 table_reference(), sexe en facteur mal form\u00e9 (%s) : refus table_colonne_mal_typee, details colonne sexe", k[[1L]]), {
+      x <- attrape(table_reference(tr(k[[2L]]), "t", "importee", "source de test"))
+      inherits(x, "refus_tablexp") && identical(x$motif, "table_colonne_mal_typee") &&
+        identical(x$details, list(colonne = "sexe"))
+    })
+  verifier("#342 table_reference(), sexe en facteur bien form\u00e9 : admis",
+           is.null(attrape(table_reference(tr(fac(c(1L, 1L), "H")), "t", "importee", "source de test"))))
+})
+verifier("#342 les m\u00e9thodes de session sont retir\u00e9es de globalenv()",
+         !any(c("levels.k342", "length.k342", "[.k342", "Ops.k342", "is.na.k342") %in% ls(globalenv(), all.names = TRUE)))
 # Décomptes de lignes des données (#312) : nrow() (avec dispatch), noms de
 # lignes (.row_names_info(, 2L)) et nombre de lignes de chaque colonne, toutes
 # les colonnes, doivent concorder ; sinon refus donnees_mal_formees de
@@ -1117,9 +1315,12 @@ verifier("#322 les m\u00e9thodes de session sont retir\u00e9es de globalenv()",
 # l'extraction sont ceux de l'entrée, et decomptes_colonnes() levait l'erreur R
 # « 'names' attribute [8] must be the same length as the vector [1] » (mesuré
 # sur dab4345 ; à faa0709, refus donnees_mal_formees par le nombre de colonnes).
-# Même refus, même message et mêmes details qu'à faa0709, sous le module de
-# l'étape appelante : appel direct de l'outil (donnees, importance_exclusions),
-# preparer_donnees() et construire_table(). Témoin : un environnement classé
+# Même refus et mêmes details qu'à faa0709, sous le module de l'étape
+# appelante : appel direct de l'outil (donnees, importance_exclusions),
+# preparer_donnees() et construire_table() ; constat amendé par #345 (« liste
+# de 1 colonne(s) pour 8 nom(s) de colonne », constat commun de F344, au lieu
+# de « mêmes noms de colonnes, dans un autre ordre ou répétés », texte de
+# faa0709 à e14d33e), message exact sur les trois chemins. Témoin : un environnement classé
 # « data.frame » rendu par `[` est le refus (0), non l'erreur R « cannot
 # unclass an environment » (mesuré avant la correction : le refus lisait les
 # noms avant le contrôle de forme).
@@ -1139,10 +1340,14 @@ local({
   verifier("#322 revue finale : length(unclass()) de l'extraction du témoin k322klen (1) diffère de celui des noms (8), égal à celui de l'entrée",
            identical(vapply(list(dk[-2L, , drop = FALSE]), function(e) c(length(unclass(e)), length(attr(e, "names", exact = TRUE))),
                             integer(2L))[, 1L], c(1L, 8L)) && length(unclass(dk)) == 8L)
-  PREF_E <- "Les lignes conservées, extraites des données par la méthode « [ » de la classe "
-  SUFF_E <- " : le moteur ne corrige pas une extraction fausse ; passer un data.frame dont la méthode « [ » rend exactement les lignes demandées (ou qui n'a pas de méthode « [ » propre)."
+  PREF_E <- "Les lignes conserv\u00e9es, extraites des donn\u00e9es par la m\u00e9thode \u00ab [ \u00bb de la classe "
+  SUFF_E <- " : le moteur ne corrige pas une extraction fausse ; passer un data.frame dont la m\u00e9thode \u00ab [ \u00bb rend exactement les lignes demand\u00e9es (ou qui n'a pas de m\u00e9thode \u00ab [ \u00bb propre)."
   msg <- paste0(PREF_E, "k322klen/data.frame, comptent 3 ligne(s) comme demand\u00e9 mais n'ont pas les colonnes des donn\u00e9es ",
-                "(m\u00eames noms de colonnes, dans un autre ordre ou r\u00e9p\u00e9t\u00e9s)", SUFF_E)
+                "(liste de 1 colonne(s) pour 8 nom(s) de colonne)", SUFF_E)
+  SUJET_IE <- paste0("Les lignes relues par l'\u00e9tape \u00ab importance_exclusions \u00bb (lignes exclues et, sous ",
+                     "l'unit\u00e9 t\u00eate, lignes conserv\u00e9es des m\u00eames t\u00eates)")
+  details_k <- list(classe = class(dk), classe_rendue = class(dk), lignes = 3L, attendu = 3L, colonnes = character(0),
+                    colonne = character(0), position = integer(0), lignes_colonne = numeric(0))
   chemins <- list(
     outil = function(x) tablexp:::controler_lignes_extraites(x, x[-2L, , drop = FALSE], c(1L, 3L, 4L), ROLES),
     preparer_donnees = function(x) prep(x, exclusions = "entree_manquante"),
@@ -1153,18 +1358,17 @@ local({
              if (is.null(r)) "aucun refus"
              else if (!inherits(r, "refus_tablexp")) sprintf("condition %s : %s", class(r)[1L], conditionMessage(r))
              else if (!identical(r$module, "donnees") || !identical(r$motif, "donnees_mal_formees")) sprintf("%s / %s", r$module, r$motif)
-             else if (!grepl("n'ont pas les colonnes des données (", conditionMessage(r), fixed = TRUE)) paste("message :", conditionMessage(r))
-             else if (!identical(Encoding(conditionMessage(r)), "UTF-8")) "message non marqué UTF-8"
-             else if (!identical(r$details$classe, class(dk)) || !identical(r$details$classe_rendue, class(dk)) ||
-                      !identical(r$details$lignes, 3L) || !identical(r$details$attendu, 3L) ||
-                      !identical(r$details$colonne, character(0)) || !identical(r$details$colonnes, character(0)))
-               paste("details :", paste(deparse(r$details), collapse = " "))
+             else if (!identical(conditionMessage(r), msg)) paste("message :", conditionMessage(r))
+             else if (!identical(Encoding(conditionMessage(r)), "UTF-8")) "message non marqu\u00e9 UTF-8"
+             else if (!identical(r$details, details_k)) paste("details :", paste(deparse(r$details), collapse = " "))
              else TRUE)
   }
   r <- attrape(tablexp:::controler_lignes_extraites(dk, dk[-2L, , drop = FALSE], c(1L, 3L, 4L), ROLES, etape = "importance_exclusions"))
-  verifier("#322 revue finale, outil, etape importance_exclusions : même refus sous le module importance_exclusions",
+  verifier("#322 revue finale, outil, etape importance_exclusions : m\u00eame refus sous le module importance_exclusions (constat de #345)",
            inherits(r, "refus_tablexp") && identical(r$module, "importance_exclusions") && identical(r$motif, "donnees_mal_formees") &&
-             grepl("n'ont pas les colonnes des données (", conditionMessage(r), fixed = TRUE))
+             identical(conditionMessage(r),
+                       sub("Les lignes conserv\u00e9es", SUJET_IE, msg, fixed = TRUE)) &&
+             identical(r$details, details_k))
   # Témoin : entrée de classe exactement « data.frame », extraction faite sous un length.data.frame qui ment
   # (posé dans globalenv() le temps de l'extraction seul, puis retiré) : même cause, variante sans classe de colonne
   # attribuée (le nombre de colonnes de la liste, 1, n'est pas celui des noms, 8), sans erreur R.
@@ -1204,6 +1408,221 @@ local({
 })
 verifier("#322 revue finale : les méthodes de session sont retirées de globalenv()",
          !any(vapply(c("length.k322klen", "[.k322env"), exists, logical(1L), envir = globalenv(), inherits = FALSE)))
+# Constat du refus (1 bis) d'une extraction dont la liste n'a pas autant
+# d'éléments que ses noms (#345 ; spécification d'actuary-approfondi,
+# commentaire de #345) : le constat commun de F344 (constat_colonnes_lues(),
+# « liste de N colonne(s) pour M nom(s) de colonne ») remplace toute la
+# parenthèse, même si les noms diffèrent aussi de ceux de l'entrée ; motif,
+# module et details inchangés. Entrée exactement data.frame, extraction tirée
+# d'une classe dont length() ment. Avant (mesuré à e14d33e) : « mêmes noms de
+# colonnes, dans un autre ordre ou répétés » (corps de l'issue), « absente(s) :
+# « b » ; en trop : « z » » (noms différents), « 3 colonne(s) au lieu de 2 ;
+# en trop : « c » » (liste de 2 éléments, égale au nombre de colonnes de
+# l'entrée, pour 3 noms : tue le mutant qui jugerait la cohérence sur le nombre
+# de colonnes de l'entrée). Témoins : extraction juste admise ; liste cohérente
+# aux noms différents, constat des noms inchangé.
+local({
+  m <- list(`length.k345a` = function(x) 1L, `length.k345z` = function(x) 1L, `length.k345d` = function(x) 2L)
+  for (n in names(m)) assign(n, m[[n]], envir = globalenv())
+  on.exit(rm(list = names(m), envir = globalenv()))
+  attrape <- function(expr) tryCatch({ force(expr); NULL }, refus_tablexp = function(r) r, error = function(e) e)
+  d <- data.frame(a = 1:3, b = 4:6)
+  extraire <- function(x, cl) { x <- structure(x, class = c(cl, "data.frame")); x[1:3, , drop = FALSE] }
+  ea <- extraire(d, "k345a")
+  ez <- extraire(data.frame(a = 1:3, z = 4:6), "k345z")
+  ed <- extraire(data.frame(a = 1:3, b = 4:6, c = 7:9), "k345d")
+  verifier("#345 formes des extractions : listes de 1, 1 et 2 \u00e9l\u00e9ments pour 2, 2 et 3 noms",
+           identical(lapply(list(ea, ez, ed), function(e) list(length(unclass(e)), attr(e, "names", exact = TRUE))),
+                     list(list(1L, c("a", "b")), list(1L, c("a", "z")), list(2L, c("a", "b", "c")))))
+  PREF <- "Les lignes conserv\u00e9es, extraites des donn\u00e9es par la m\u00e9thode \u00ab [ \u00bb de la classe data.frame, "
+  SUJET_IE <- paste0("Les lignes relues par l'\u00e9tape \u00ab importance_exclusions \u00bb (lignes exclues et, sous ",
+                     "l'unit\u00e9 t\u00eate, lignes conserv\u00e9es des m\u00eames t\u00eates), extraites des donn\u00e9es par la ",
+                     "m\u00e9thode \u00ab [ \u00bb de la classe data.frame, ")
+  MILIEU <- "comptent 3 ligne(s) comme demand\u00e9 mais n'ont pas les colonnes des donn\u00e9es ("
+  SUFF <- paste0(") : le moteur ne corrige pas une extraction fausse ; passer un data.frame dont la m\u00e9thode \u00ab [ \u00bb ",
+                 "rend exactement les lignes demand\u00e9es (ou qui n'a pas de m\u00e9thode \u00ab [ \u00bb propre).")
+  details <- function(cl, colonne) list(classe = "data.frame", classe_rendue = c(cl, "data.frame"), lignes = 3L, attendu = 3L,
+                                        colonnes = character(0), colonne = colonne, position = integer(0),
+                                        lignes_colonne = numeric(0))
+  cas <- list(
+    list(nom = "corps de l'issue (1 colonne pour 2 noms)", ex = ea, etape = "donnees",
+         msg = paste0(PREF, MILIEU, "liste de 1 colonne(s) pour 2 nom(s) de colonne", SUFF), details = details("k345a", character(0))),
+    list(nom = "liste incoh\u00e9rente et noms diff\u00e9rents (a, z)", ex = ez, etape = "donnees",
+         msg = paste0(PREF, MILIEU, "liste de 1 colonne(s) pour 2 nom(s) de colonne", SUFF), details = details("k345z", "b")),
+    list(nom = "liste de 2 \u00e9l\u00e9ments (nombre de colonnes de l'entr\u00e9e) pour 3 noms", ex = ed, etape = "donnees",
+         msg = paste0(PREF, MILIEU, "liste de 2 colonne(s) pour 3 nom(s) de colonne", SUFF), details = details("k345d", character(0))),
+    list(nom = "etape importance_exclusions, noms diff\u00e9rents", ex = ez, etape = "importance_exclusions",
+         msg = paste0(SUJET_IE, MILIEU, "liste de 1 colonne(s) pour 2 nom(s) de colonne", SUFF), details = details("k345z", "b")))
+  for (cc in cas) {
+    r <- attrape(tablexp:::controler_lignes_extraites(d, cc$ex, 1:3, c(age = "a"), etape = cc$etape))
+    verifier(sprintf("#345 %s -> refus donnees_mal_formees, constat commun de F344, message et details exacts", cc$nom),
+             if (is.null(r)) "aucun refus"
+             else if (!inherits(r, "refus_tablexp")) sprintf("condition %s : %s", class(r)[1L], conditionMessage(r))
+             else if (!identical(r$module, cc$etape) || !identical(r$motif, "donnees_mal_formees")) sprintf("%s / %s", r$module, r$motif)
+             else if (!identical(conditionMessage(r), cc$msg)) paste("message :", conditionMessage(r))
+             else if (!identical(Encoding(conditionMessage(r)), "UTF-8")) "message non marqu\u00e9 UTF-8"
+             else if (!identical(r$details, cc$details)) paste("details :", paste(deparse(r$details), collapse = " "))
+             else TRUE)
+  }
+  # Témoin d'ordre : liste incohérente et décompte de lignes faux (2 pour 3) : refus (1), avant le (1 bis) ; le
+  # constat commun ne remonte pas avant le décompte des lignes.
+  e2 <- structure(d, class = c("k345a", "data.frame"))[1:2, , drop = FALSE]
+  r <- attrape(tablexp:::controler_lignes_extraites(d, e2, 1:3, c(age = "a")))
+  verifier("#345 t\u00e9moin d'ordre : liste incoh\u00e9rente (1 pour 2) et 2 lignes pour 3 -> refus (1) du d\u00e9compte, non le constat commun",
+           if (!identical(c(length(unclass(e2)), length(attr(e2, "names", exact = TRUE))), c(1L, 2L))) "extraction de forme inattendue"
+           else if (!inherits(r, "refus_tablexp")) "aucun refus"
+           else if (!identical(conditionMessage(r),
+                               paste0(PREF, "comptent 2 ligne(s) au lieu de 3", sub(")", "", SUFF, fixed = TRUE))))
+             paste("message :", conditionMessage(r))
+           else identical(r$details, list(classe = "data.frame", classe_rendue = c("k345a", "data.frame"), lignes = 2L,
+                                          attendu = 3L, colonnes = character(0), colonne = character(0),
+                                          position = integer(0), lignes_colonne = numeric(0))))
+  # Témoins : extraction juste (admise) ; liste cohérente aux noms différents (constat des noms, inchangé).
+  r <- attrape(tablexp:::controler_lignes_extraites(d, d[1:3, , drop = FALSE], 1:3, c(age = "a")))
+  verifier("#345 t\u00e9moin : extraction juste -> admise", if (is.null(r)) TRUE else paste("condition :", conditionMessage(r)))
+  r <- attrape(tablexp:::controler_lignes_extraites(d, data.frame(a = 1:3, z = 4:6), 1:3, c(age = "a")))
+  verifier("#345 t\u00e9moin : liste coh\u00e9rente aux noms diff\u00e9rents -> constat des noms inchang\u00e9",
+           inherits(r, "refus_tablexp") &&
+             identical(conditionMessage(r),
+                       paste0(sub("data.frame, ", "data.frame, qui applique \u00e0 chaque colonne la m\u00e9thode \u00ab [ \u00bb de sa classe, ",
+                                  PREF, fixed = TRUE),
+                              MILIEU, "absente(s) : \u00ab b \u00bb ; en trop : \u00ab z \u00bb ; colonne \u00ab b \u00bb (position 2, classe ",
+                              "integer), premi\u00e8re position o\u00f9 l'extraction s'\u00e9carte des donn\u00e9es) : le moteur ne corrige ",
+                              "pas une extraction fausse ; passer un data.frame dont les colonnes cit\u00e9es (classe integer) ont une ",
+                              "m\u00e9thode \u00ab [ \u00bb qui rend exactement les lignes demand\u00e9es (ou n'ont pas de m\u00e9thode ",
+                              "\u00ab [ \u00bb propre).")) &&
+             identical(r$details, list(classe = "data.frame", classe_rendue = "data.frame", lignes = 3L, attendu = 3L,
+                                       colonnes = character(0), colonne = "b", position = integer(0),
+                                       lignes_colonne = numeric(0))))
+})
+verifier("#345 les m\u00e9thodes de session sont retir\u00e9es de globalenv()",
+         !any(vapply(c("length.k345a", "length.k345z", "length.k345d"), exists, logical(1L), envir = globalenv(), inherits = FALSE)))
+# Cohérence de la liste des colonnes et de ses noms à l'entrée (#344, F344 ;
+# spécification d'actuary-approfondi, commentaire de #344) : sous une classe
+# dont length() ment, `[.data.frame` rend une liste de 1 (ou 3) élément(s)
+# munie de huit noms. Passée en entrée, elle levait l'erreur R « 'names'
+# attribute [8] must be the same length as the vector [1] » (mesuré à
+# e76b75b, appel direct, controler_roles() et construire_table()) ; elle
+# reçoit le refus donnees_mal_formees de l'étape donnees, premier contrôle de
+# controler_lignes_donnees(), avant nrow() et les noms de lignes. Messages
+# attendus écrits à la main (texte de la spécification) ; littéraux non ASCII
+# en \u00XX. Témoins : data.frame nu et sous-classes à méthode « [ » correcte,
+# admis, mêmes grandeurs que le data.frame nu. Précondition de
+# decomptes_colonnes() : erreur de programmation sur une liste incohérente.
+local({
+  m <- list(length.k344n1 = function(x) 1L, length.k344n3 = function(x) 3L,
+            dim.k344nr = function(x) c(99L, 8L),
+            `[.k344ok` = function(x, i, j, ..., drop = TRUE) NextMethod(),
+            `[.k344reset` = function(x, i, j, ..., drop = TRUE) {
+              r <- NextMethod(); attr(r, "row.names") <- seq_len(.row_names_info(r, 2L)); attr(r, "histo") <- "extrait"; r },
+            `[.k344attr` = function(x, i, j, ..., drop = TRUE) { r <- NextMethod(); attr(r, "histo") <- "extrait"; r })
+  for (n in names(m)) assign(n, m[[n]], envir = globalenv())
+  on.exit(rm(list = names(m), envir = globalenv()))
+  attrape <- function(expr) tryCatch({ force(expr); NULL }, refus_tablexp = function(r) r, error = function(e) e)
+  avertissements <- function(expr) {
+    n <- 0L
+    withCallingHandlers(attrape(expr), warning = function(w) { n <<- n + 1L; invokeRestart("muffleWarning") })
+    n
+  }
+  PLAN <- list(
+    transition = VD, periode = PER, delai_declaration = 0, segmentation = "sexe",
+    etapes = list(donnees = list(exclusions = character(0)),
+                  exposition = list(convention = "plus_fine", par_annee = FALSE),
+                  brut = list(estimateurs = "poisson", niveau = 0.95)))
+  chemins <- list(controler_lignes_donnees = function(d) tablexp:::controler_lignes_donnees(d),
+                  controler_roles = function(d) tablexp:::controler_roles(d, ROLES, "sexe"),
+                  construire_table = function(d) construire_table(d, ROLES, PLAN))
+  PREF <- paste0("Les donn\u00e9es sont un data.frame mal form\u00e9 : la liste de ses colonnes et ses noms de colonnes ",
+                 "n'ont pas la m\u00eame longueur (")
+  SUFF <- paste0("). Le moteur ne choisit pas entre ces d\u00e9comptes, et ne les corrige pas : passer un data.frame ",
+                 "dont la liste des colonnes et les noms de colonnes ont la m\u00eame longueur.")
+  x1 <- structure(BASE, class = c("k344n1", "data.frame"))[-2L, , drop = FALSE]
+  x3 <- structure(BASE, class = c("k344n3", "data.frame"))[-2L, , drop = FALSE]
+  # Liste incohérente, noms de lignes (7) et nrow() (99) discordants avec les colonnes : la cohérence est jugée la première.
+  xnr <- x1; attr(xnr, "row.names") <- 1:7; class(xnr) <- c("k344nr", "k344n1", "data.frame")
+  verifier("#344 : entr\u00e9es de forme attendue (1 et 3 colonnes de liste pour 8 noms ; noms de lignes 7 et nrow() 99 pour la troisi\u00e8me)",
+           identical(c(length(unclass(x1)), length(attr(x1, "names", exact = TRUE))), c(1L, 8L)) &&
+             identical(c(length(unclass(x3)), length(attr(x3, "names", exact = TRUE))), c(3L, 8L)) &&
+             identical(.row_names_info(xnr, 2L), 7L) && identical(nrow(xnr), 99L))
+  cas <- list(
+    list("1 colonne(s) pour 8 nom(s)", x1, "liste de 1 colonne(s) pour 8 nom(s) de colonne ; classe k344n1/data.frame",
+         list(classe = c("k344n1", "data.frame"), nombre_colonnes = 1L, nombre_noms = 8L)),
+    list("3 colonne(s) pour 8 nom(s)", x3, "liste de 3 colonne(s) pour 8 nom(s) de colonne ; classe k344n3/data.frame",
+         list(classe = c("k344n3", "data.frame"), nombre_colonnes = 3L, nombre_noms = 8L)),
+    list("1 colonne(s) pour 8 nom(s), noms de lignes et nrow() discordants", xnr,
+         "liste de 1 colonne(s) pour 8 nom(s) de colonne ; classe k344nr/k344n1/data.frame",
+         list(classe = c("k344nr", "k344n1", "data.frame"), nombre_colonnes = 1L, nombre_noms = 8L)))
+  for (c1 in cas) for (k in names(chemins)) {
+    x <- attrape(chemins[[k]](c1[[2L]]))
+    verifier(sprintf("#344 %s : %s -> refus donnees_mal_formees du module donnees, message et details exacts, une ligne marqu\u00e9e UTF-8, 0 avertissement R (avant : erreur R de names)", c1[[1L]], k), {
+      if (is.null(x)) "aucun refus"
+      else if (!inherits(x, "refus_tablexp")) sprintf("condition %s : %s", class(x)[1L], conditionMessage(x))
+      else if (!identical(x$module, "donnees") || !identical(x$motif, "donnees_mal_formees")) sprintf("%s / %s", x$module, x$motif)
+      else if (!identical(conditionMessage(x), paste0(PREF, c1[[3L]], SUFF))) paste("message :", conditionMessage(x))
+      else if (grepl("[\n\v\f]", conditionMessage(x)) || !validUTF8(conditionMessage(x)) ||
+               !identical(Encoding(conditionMessage(x)), "UTF-8")) "message sur plusieurs lignes ou non marqu\u00e9 UTF-8"
+      else if (!identical(x$details, c1[[4L]])) paste("details :", paste(deparse(x$details), collapse = " "))
+      else if (avertissements(chemins[[k]](c1[[2L]])) != 0L) "avertissement R"
+      else TRUE
+    })
+  }
+  # Ordre (reprise de l'audit léger, mutant M2) : la cohérence est jugée avant nrow(), donc avant dim(). Sous une
+  # classe dont dim() compte ses appels puis lève une erreur, la liste incohérente reçoit le refus de cohérence et
+  # dim() n'est jamais appelée, par les trois chemins.
+  appels_dim <- 0L
+  assign("dim.k344dim", function(x) { appels_dim <<- appels_dim + 1L; stop("dim.k344dim appel\u00e9e") }, envir = globalenv())
+  xdim <- x1; class(xdim) <- c("k344dim", "k344n1", "data.frame")
+  for (k in names(chemins)) {
+    appels_dim <- 0L
+    x <- attrape(chemins[[k]](xdim))
+    verifier(sprintf("#344 ordre : liste incoh\u00e9rente sous une classe dont dim() l\u00e8ve une erreur, %s -> refus de coh\u00e9rence, 0 appel \u00e0 dim()", k), {
+      if (is.null(x)) "aucun refus"
+      else if (!inherits(x, "refus_tablexp")) sprintf("condition %s : %s", class(x)[1L], conditionMessage(x))
+      else if (!identical(x$motif, "donnees_mal_formees") ||
+               !identical(conditionMessage(x), paste0(PREF, "liste de 1 colonne(s) pour 8 nom(s) de colonne ; classe k344dim/k344n1/data.frame", SUFF)))
+        paste("refus :", x$motif, conditionMessage(x))
+      else if (appels_dim != 0L) sprintf("dim() appel\u00e9e %d fois", appels_dim)
+      else TRUE
+    })
+  }
+  rm(list = "dim.k344dim", envir = globalenv())
+  verifier("#344 : decomptes_colonnes() sur une liste incoh\u00e9rente -> erreur de programmation (stop()), non l'erreur R de names", {
+    e <- tryCatch({ tablexp:::decomptes_colonnes(x1); NULL }, error = function(e) e)
+    if (is.null(e)) "aucune erreur"
+    else if (inherits(e, "refus_tablexp")) "refus au lieu d'une erreur de programmation"
+    else grepl("erreur de programmation", conditionMessage(e), fixed = TRUE) &&
+      !grepl("'names' attribute", conditionMessage(e), fixed = TRUE)
+  })
+  verifier("#344 : colonnes_lues() d'une liste sans attribut names : autant de noms (vides) que de colonnes, coh\u00e9rente",
+           identical(tablexp:::colonnes_lues(structure(list(1:2, 3:4), class = "data.frame", row.names = 1:2)),
+                     list(nombre_colonnes = 2L, nombre_noms = 2L, coherente = TRUE)))
+  # Témoins : data.frame nu et sous-classes à méthode « [ » correcte, admis ; objet construit identical() à celui du
+  # data.frame nu hors `execution` (horodatage, durée, session) et empreinte du code, la seule différence admise étant
+  # la classe de lignes_conservees (celle de l'entrée, sans autre attribut).
+  X0 <- construire_table(BASE, ROLES, PLAN)
+  net <- function(x) { x$execution <- NULL; x$fiche$empreintes$code <- NULL; x }
+  verifier("#344 t\u00e9moin : controler_lignes_donnees(BASE) rend TRUE", isTRUE(tablexp:::controler_lignes_donnees(BASE)))
+  for (k in c("k344ok", "k344reset", "k344attr")) {
+    d <- structure(BASE, class = c(k, "data.frame"))
+    verifier(sprintf("#344 t\u00e9moin : classe %s, admise par controler_lignes_donnees() et construire_table() ; objet construit identical() \u00e0 celui du data.frame nu hors execution et empreinte du code (lignes_conservees de classe %s/data.frame), 0 avertissement R", k, k), {
+      r <- attrape(tablexp:::controler_lignes_donnees(d))
+      x <- tryCatch(construire_table(d, ROLES, PLAN), error = function(e) e)
+      if (!is.null(r)) sprintf("controler_lignes_donnees : %s", conditionMessage(r))
+      else if (inherits(x, "error")) sprintf("construire_table : %s", conditionMessage(x))
+      else if (!identical(class(x$etapes$donnees$resultat$lignes_conservees), c(k, "data.frame")))
+        paste("classe de lignes_conservees :", paste(class(x$etapes$donnees$resultat$lignes_conservees), collapse = "/"))
+      else {
+        y <- net(x); class(y$etapes$donnees$resultat$lignes_conservees) <- "data.frame"
+        if (!identical(y, net(X0))) paste("objet diff\u00e9rent du t\u00e9moin :", paste(all.equal(y, net(X0)), collapse = " | "))
+        else if (avertissements(construire_table(d, ROLES, PLAN)) != 0L) "avertissement R"
+        else TRUE
+      }
+    })
+  }
+})
+verifier("#344 : les m\u00e9thodes de session sont retir\u00e9es de globalenv()",
+         !any(vapply(c("length.k344n1", "length.k344n3", "dim.k344nr", "dim.k344dim", "[.k344ok", "[.k344reset", "[.k344attr"),
+                     exists, logical(1L), envir = globalenv(), inherits = FALSE)))
 # Colonne de rôle de type conforme sous un nom d'encodage bytes, à
 # preparer_donnees() (#140, suite de #128) : lue par lire_champ(), sans erreur
 # R ; observations et lignes conservées égales à celles du même jeu sous le
