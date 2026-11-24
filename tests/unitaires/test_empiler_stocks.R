@@ -175,6 +175,91 @@ verifier("refus (valeur écrite à la main) : ordre table, colonne_type, noms, c
     identical(rf(empiler_stocks(transform(INV, id = as.numeric(id)), EVT, "sx"))$motif, "empilement_colonne_type_presente")
 })
 
+# --- liste des colonnes et noms de longueurs différentes (#355, F355) -------------
+#
+# Spécification d'actuary (commentaire 7124469548 de #355) : sous une classe
+# dont length() rend 1, `[.data.frame` rend une liste d'un élément munie de
+# tous les noms, puis reclassée « data.frame ». Avant #355 : erreur R
+# « subscript out of bounds » (.subset2(tab, j)) ; un environnement classé
+# « data.frame » : erreur R « a character vector argument expected »
+# (Encoding(n)) (mesuré à d3b11ac). Après : refus empilement_table_invalide,
+# première table en défaut (inventaires, puis evenements), avant le contrôle
+# de colonne_type ; l'environnement reçoit le texte existant (garde
+# is.list()). Un sous-processus Rscript par cas (consigne de #355 : la même
+# entrée arrête R dans table_reference()) ; résultat rendu par saveRDS().
+# Valeurs écrites à la main (texte de la spécification).
+local({
+  # Avertissements R comptés au second appel (comme au test de #344) : sous
+  # LC_ALL=C, le premier usage des chaînes UTF-8 du package avertit « strings
+  # not representable in native encoding will be translated to UTF-8 », appel
+  # nominal compris (mesuré en sous-processus).
+  script <- tempfile("e355_", fileext = ".R")
+  on.exit(unlink(script))
+  writeLines(c(
+    "a <- commandArgs(TRUE)",
+    sprintf("suppressPackageStartupMessages(library(tablexp, lib.loc = %s))", deparse(.harnais$bibliotheque)),
+    "length.k355 <- function(x) 1L",
+    "incoherente <- function(d) { x <- structure(d, class = c('k355', 'data.frame'))[-2L, , drop = FALSE]; class(x) <- 'data.frame'; x }",
+    "env_df <- function() { e <- new.env(); class(e) <- 'data.frame'; e }",
+    "I2 <- data.frame(id = 1:3, sx = c('H', 'F', 'H'), stringsAsFactors = FALSE)",
+    "E3 <- data.frame(id = 2:4, sx = c('F', 'H', 'H'), c = c('deces', 'rachat', 'deces'), stringsAsFactors = FALSE)",
+    "args <- switch(a[2L],",
+    "  inventaires = list(incoherente(I2), E3, 't'), evenements = list(I2, incoherente(E3), 't'),",
+    "  deux = list(incoherente(I2), incoherente(E3), 't'), colonne_type = list(incoherente(I2), E3, 1),",
+    "  env_inventaires = list(env_df(), E3, 't'), env_evenements = list(I2, env_df(), 't'),",
+    "  env_et_incoherente = list(env_df(), incoherente(E3), 't'))",
+    "appel <- function() tryCatch({ do.call(empiler_stocks, args); NULL }, refus_tablexp = function(e) e, error = function(e) e)",
+    "r <- suppressWarnings(appel())",
+    "n_avert <- 0L",
+    "withCallingHandlers(appel(), warning = function(w) { n_avert <<- n_avert + 1L; invokeRestart('muffleWarning') })",
+    "saveRDS(list(classe = class(r), module = r$module, motif = r$motif,",
+    "             message = if (!is.null(r)) conditionMessage(r), details = r$details, avertissements = n_avert), a[1L])"),
+    script)
+  executer <- function(k) {
+    sortie <- tempfile("e355_", fileext = ".rds")
+    on.exit(unlink(sortie))
+    p <- executer_rscript(script, c(shQuote(sortie), k))
+    if (!file.exists(sortie)) return(sprintf("aucun résultat : code de sortie %d (%s)", p$statut,
+                                             paste(utils::tail(p$sortie, 3L), collapse = " | ")))
+    readRDS(sortie)
+  }
+  incoherente <- function(t, noms) list(
+    paste0("Empilement des stocks successifs : la table « ", t, " » est un data.frame mal formé, dont la ",
+           "liste des colonnes et les noms de colonnes n'ont pas la même longueur (liste de 1 colonne(s) pour ", noms,
+           " nom(s) de colonne ; classe data.frame). Le moteur ne choisit pas entre ces décomptes, et ne les corrige ",
+           "pas : passer un data.frame dont la liste des colonnes et les noms de colonnes ont la même longueur."),
+    list(table = t, classe = setNames(list("data.frame"), t), nombre_colonnes = 1L, nombre_noms = noms))
+  environnement <- function(t) list(
+    paste0("Empilement des stocks successifs : un data.frame est attendu pour « ", t,
+           " » (classe(s) reçue(s) : data.frame) ; le moteur ne lit pas de fichier."),
+    list(table = t, classe = setNames(list("data.frame"), t)))
+  cas <- list(
+    list("inventaires de 1 colonne pour 2 noms", "inventaires", incoherente("inventaires", 2L)),
+    list("evenements de 1 colonne pour 3 noms", "evenements", incoherente("evenements", 3L)),
+    list("les deux tables incohérentes (première table en défaut)", "deux", incoherente("inventaires", 2L)),
+    list("inventaires incohérente et colonne_type invalide (cohérence jugée avant colonne_type)", "colonne_type",
+         incoherente("inventaires", 2L)),
+    list("inventaires environnement classé data.frame (avant : erreur R)", "env_inventaires", environnement("inventaires")),
+    list("evenements environnement classé data.frame (avant : erreur R)", "env_evenements", environnement("evenements")),
+    list("inventaires environnement, evenements incohérente (table hors data.frame jugée d'abord)", "env_et_incoherente",
+         environnement("inventaires")))
+  for (c1 in cas)
+    verifier(sprintf("#355 refus (valeur écrite à la main) : %s -> donnees/empilement_table_invalide, message et details exacts, une ligne marquée UTF-8, 0 avertissement R, sous-processus", c1[[1L]]), {
+      x <- executer(c1[[2L]])
+      if (is.character(x)) x
+      else if (!"refus_tablexp" %in% x$classe) sprintf("condition %s : %s", paste(x$classe, collapse = "/"),
+                                                       paste(x$message, collapse = ""))
+      else if (!identical(x$module, "donnees") || !identical(x$motif, "empilement_table_invalide"))
+        sprintf("%s / %s", x$module, x$motif)
+      else if (!identical(x$message, c1[[3L]][[1L]])) paste("message :", x$message)
+      else if (grepl("[\n\v\f]", x$message) || !validUTF8(x$message) || !identical(Encoding(x$message), "UTF-8"))
+        "message sur plusieurs lignes ou non marqué UTF-8"
+      else if (!identical(x$details, c1[[3L]][[2L]])) paste("details :", paste(deparse(x$details), collapse = " "))
+      else if (x$avertissements != 0L) sprintf("%d avertissement(s) R", x$avertissements)
+      else TRUE
+    })
+})
+
 # --- forme consommée par la recette `stocks_successifs` (identité exacte) ------------
 
 PER_E <- list(debut = D("2015-01-01"), fin = D("2017-12-31"))

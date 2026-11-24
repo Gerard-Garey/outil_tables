@@ -666,8 +666,9 @@ colonnes_lues <- function(x) {
 }
 
 # Constat d'une liste incohérente (rendu de colonnes_lues()), formé une fois et
-# cité tel quel par les refus de controler_lignes_donnees() (#344) et de
-# controler_lignes_extraites() (#345) : « liste de N colonne(s) pour M nom(s) de
+# cité tel quel par les refus de controler_lignes_donnees() (#344), de
+# controler_lignes_extraites() (#345), de table_reference() et
+# d'empiler_stocks() (#355) : « liste de N colonne(s) pour M nom(s) de
 # colonne ».
 constat_colonnes_lues <- function(lues)
   formuler("liste de %d colonne(s) pour %d nom(s) de colonne", lues$nombre_colonnes, lues$nombre_noms)
@@ -1865,7 +1866,10 @@ observations_stocks <- function(lignes, numeros, roles, segmentation, p, donnees
 # donnees), dans l'ordre :
 #   empilement_table_invalide        : `inventaires` ou `evenements` n'est pas
 #                                      un data.frame (le moteur ne lit pas de
-#                                      fichier) ;
+#                                      fichier), ou est un data.frame dont la
+#                                      liste des colonnes et les noms n'ont
+#                                      pas la même longueur (#355 ; première
+#                                      table en défaut) ;
 #   empilement_colonne_type_invalide : `colonne_type` hors de la forme
 #                                      ci-dessus ;
 #   empilement_noms_invalides        : nom de colonne NA, vide, en double ou
@@ -1883,7 +1887,9 @@ observations_stocks <- function(lignes, numeros, roles, segmentation, p, donnees
 #                                      différents, toutes citées.
 empiler_stocks <- function(inventaires, evenements, colonne_type) {
   tables <- list(inventaires = inventaires, evenements = evenements)
-  non_df <- names(tables)[!vapply(tables, is.data.frame, logical(1L))]
+  # is.list() : un environnement classé « data.frame » n'a pas de colonnes à
+  # lire (colonnes_lues() : précondition ; précédent de controler_roles()).
+  non_df <- names(tables)[!vapply(tables, function(x) is.data.frame(x) && is.list(x), logical(1L))]
   if (length(non_df))
     refuser("donnees", "empilement_table_invalide",
             formuler(paste("Empilement des stocks successifs : un data.frame est attendu pour %s (classe(s) reçue(s) : %s) ;",
@@ -1892,6 +1898,21 @@ empiler_stocks <- function(inventaires, evenements, colonne_type) {
                      paste(vapply(tables[non_df], function(x) paste(citer(class(x)), collapse = "/"), character(1L)),
                            collapse = " ; ")),
             list(table = non_df, classe = lapply(tables[non_df], class)))
+  # Cohérence de la liste des colonnes et de ses noms (#355, F344), première
+  # table en défaut, avant toute lecture de colonne : sous une liste plus
+  # courte que ses noms, .subset2() levait « subscript out of bounds ».
+  for (nom_table in names(tables)) {
+    lues <- colonnes_lues(tables[[nom_table]])
+    if (!lues$coherente)
+      refuser("donnees", "empilement_table_invalide",
+              formuler(paste("Empilement des stocks successifs : la table « %s » est un data.frame mal formé, dont la",
+                             "liste des colonnes et les noms de colonnes n'ont pas la même longueur (%s ; classe %s).",
+                             "Le moteur ne choisit pas entre ces décomptes, et ne les corrige pas : passer un",
+                             "data.frame dont la liste des colonnes et les noms de colonnes ont la même longueur."),
+                       citer(nom_table), constat_colonnes_lues(lues), paste(citer(class(tables[[nom_table]])), collapse = "/")),
+              list(table = nom_table, classe = lapply(tables[nom_table], class),
+                   nombre_colonnes = lues$nombre_colonnes, nombre_noms = lues$nombre_noms))
+  }
   if (!chaine_unique(colonne_type) || Encoding(colonne_type) == "bytes")
     refuser("donnees", "empilement_colonne_type_invalide",
             formuler(paste("Empilement des stocks successifs : colonne_type, nom de la colonne du type de ligne",
@@ -2711,8 +2732,22 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
                            "d'encodage bytes."),
                      nom_cite, paste(citer(class(x)), collapse = "/")),
             list(classe = class(x)))
-  if (!is.data.frame(x))
+  # !is.list() : un environnement classé « data.frame » n'a pas de colonnes à
+  # lire (colonnes_lues() : précondition ; précédent de controler_roles()).
+  if (!is.data.frame(x) || !is.list(x))
     refuser("donnees", "table_mal_formee", formuler("Table « %s » : un data.frame est attendu.", nom_cite))
+  # Cohérence de la liste des colonnes et de ses noms (#355, F344), avant toute
+  # lecture de colonne : sous une liste plus courte que ses noms, x$sexe
+  # arrêtait R (segmentation fault, type_conforme(x$sexe, "categorie")).
+  lues <- colonnes_lues(x)
+  if (!lues$coherente)
+    refuser("donnees", "table_mal_formee",
+            formuler(paste("Table « %s » : la table est un data.frame mal formé, dont la liste des colonnes et les noms",
+                           "de colonnes n'ont pas la même longueur (%s ; classe %s). Le moteur ne choisit pas entre ces",
+                           "décomptes, et ne les corrige pas : passer un data.frame dont la liste des colonnes et les",
+                           "noms de colonnes ont la même longueur."),
+                     nom_cite, constat_colonnes_lues(lues), paste(citer(class(x)), collapse = "/")),
+            list(classe = class(x), nombre_colonnes = lues$nombre_colonnes, nombre_noms = lues$nombre_noms))
   # Colonnes (spécification de #146, § 1.2 ; ADR 0019, point 1.2) : age, sexe,
   # au plus un axe temporel (annee ou generation), et exactement une des
   # colonnes qx ou lx ; lx ne se reçoit que sous la forme
