@@ -71,7 +71,9 @@ mesurer <- function(nom, expr_fn) {
   g0 <- gc(reset = TRUE)
   v <- expr_fn()
   g1 <- gc()
-  pic <- sum(g1[, 6L]) - sum(g0[, 2L])
+  # Colonne « max used » lue par nom : la colonne Mb qui la suit (R_MAX_VSIZE
+  # ajoute « limit (Mb) » et décale les positions ; #371, comme #362).
+  pic <- sum(g1[, match("max used", colnames(g1)) + 1L]) - sum(g0[, 2L])
   profil <- if (capabilities("profmem")) {
     f <- tempfile()
     rm(v); invisible(gc())
