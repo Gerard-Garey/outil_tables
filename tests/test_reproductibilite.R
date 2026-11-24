@@ -456,130 +456,6 @@ CHEMINS_199 <- list(
 # bloc R11 et R12 de #218 (C4, recalcul indépendant, états, aucun signal) reste,
 # lu sur les références régénérées.
 TRANSITIONS_EN_COURS <- list()
-# Transition #359, mention d'indépendance qualifiée (résultat asymptotique)
-# et source unique mention_independance() dans R/brut.R (B37, étape (1),
-# F359, Q-A (a) ; spécification d'actuary-approfondi, #359, commentaire
-# 7137095929) : textes de statut seuls, R1 à R17, en « valeur de chaîne » sur
-# les chemins de CHEMINS_359 ; texte après tiré du texte avant de la
-# référence par six substitutions exactes (SUBST_359 : ligne d'intervalle de
-# Kaplan-Meier et segments/z de l'homogénéité, avis d'actuary sur #359, Q1 et
-# Q2 ; brut_intervalle, intervalle, tests, et l'ancienne
-# INDEPENDANCE_HOMOGENEITE remplacée par la nature tests), écrites en
-# échappements \u (UTF-8 en toute locale, C comprise : un littéral non
-# marqué y rend l'expression invalide ; audit léger de #359, C1), sans lire
-# le package ; positions = lignes que les substitutions changent, leur
-# nombre par chemin et par plan figé dans CHEMINS_359 (278 chaînes en
-# tout). Aucune valeur numérique ni autre chaîne ne change. À clore par la
-# régénération (R) de B37, avec transition_359(), apres_359() et les
-# constantes *_359.
-P_359 <- "unit\u00e9s d'observation ind\u00e9pendantes ; sous l'unit\u00e9 contrat, "
-B_359 <- paste0("les contrats d'une m\u00eame t\u00eate sont suppos\u00e9s ind\u00e9pendants (une d\u00e9pendance ",
-                "positive rend ")
-R_359 <- " ; relev\u00e9 tetes_multi_contrats de l'\u00e9tape donnees)"
-D_359 <- "les d\u00e9c\u00e8s sont sur-dispers\u00e9s et "
-TESTS_359 <- paste("les tests sont anti-conservateurs \u00e0 attendus grands (r\u00e9sultat asymptotique), l'erreur de",
-                   "niveau \u00e9tant de sens non \u00e9tabli en g\u00e9n\u00e9ral \u00e0 petits attendus")
-# Paires (avant, après), appliquées dans l'ordre ; kaplan_meier et z
-# (avis d'actuary sur #359, Q1 et Q2) précèdent brut_intervalle et
-# homogeneite, qui achèvent la ligne de Kaplan-Meier et prendraient z.
-SUBST_359 <- list(
-  kaplan_meier = c(paste0("asymptotique (ensemble \u00e0 risque -> infini sur toute la cellule), sous ind\u00e9pendance ",
-                          "des unit\u00e9s d'observation ; non d\u00e9fini \u00e0 q = 0 et q = 1 ; sous l'unit\u00e9 contrat, "),
-                   paste0("asymptotique (ensemble \u00e0 risque -> infini sur toute la cellule) ; non d\u00e9fini \u00e0 ",
-                          "q = 0 et q = 1 ; ", P_359)),
-  z = c(paste0("aucune correction de multiplicit\u00e9 ; ", P_359, D_359,
-               "le test est anti-conservateur (p-valeurs trop petites)"),
-        paste0("aucune correction de multiplicit\u00e9 ; ", P_359, D_359, "V_ss est sous-estim\u00e9e")),
-  brut_intervalle = c(paste0(P_359, B_359, "l'intervalle trop \u00e9troit", R_359),
-                      paste0(P_359, B_359, "l'intervalle trop \u00e9troit \u00e0 grand nombre attendu d'\u00e9v\u00e9nements ",
-                             "(r\u00e9sultat asymptotique), l'\u00e9cart de couverture \u00e9tant de sens non \u00e9tabli en ",
-                             "g\u00e9n\u00e9ral \u00e0 petit nombre attendu", R_359)),
-  intervalle = c(paste0(P_359, D_359, "l'intervalle est trop \u00e9troit"),
-                 paste0(P_359, D_359, "l'intervalle est trop \u00e9troit \u00e0 attendus grands (r\u00e9sultat ",
-                        "asymptotique), l'\u00e9cart de couverture \u00e9tant de sens non \u00e9tabli en g\u00e9n\u00e9ral ",
-                        "\u00e0 petits attendus")),
-  tests = c(paste0(P_359, D_359, "les tests sont anti-conservateurs"), paste0(P_359, D_359, TESTS_359)),
-  homogeneite = c(paste0(P_359, D_359, "le test est anti-conservateur (p-valeurs trop petites)"),
-                  paste0(P_359, D_359, TESTS_359)))
-# Nombre de chaînes changées par chemin et par plan (tableau avant / après
-# de #359, mesuré sur les relevés avant et après d'un même poste).
-CHEMINS_359 <- local({
-  base <- c("etapes/brut/parametres/statuts/statut" = 6L, "fiche/hypotheses_brut/statuts/statut" = 6L)
-  val <- c("etapes/validation/resultat/statistiques/statut" = 11L,
-           "etapes/validation/parametres/statuts_sous_groupes/statut" = 2L,
-           "etapes/importance_exclusions/parametres/statuts/statut" = 3L)
-  hom <- c("etapes/homogeneite/parametres/hypothese_nulle" = 1L, "etapes/homogeneite/parametres/statuts/statut" = 4L)
-  pos <- c("etapes/positionnement/parametres/statuts/statut" = 8L)
-  lis <- c("etapes/lissage/parametres/statuts/statut" = 2L)
-  l <- stats::setNames(rep(list(base), 17L), paste0("R", 1:17))
-  l$R4 <- base - 2L
-  # Ligne d'intervalle de Kaplan-Meier (avis d'actuary sur #359, Q1).
-  l$R6 <- l$R7 <- l$R14 <- base + 1L
-  l$R8 <- l$R9 <- c(base, val)
-  l$R10 <- c(base, pos, "etapes/validation/resultat/statistiques/statut" = 4L,
-             "etapes/validation/parametres/statuts_sous_groupes/statut" = 3L,
-             "etapes/importance_exclusions/parametres/statuts/statut" = 3L)
-  l$R11 <- l$R12 <- c(base, hom)
-  l$R13 <- c(base, pos)
-  l$R16 <- l$R17 <- c(base, lis)
-  l
-})
-# Texte après d'un vecteur de chaînes de la référence ; garde de la référence
-# déjà régénérée : aucun texte nouveau ne doit y figurer.
-apres_359 <- function(avant) {
-  for (p in SUBST_359)
-    if (any(grepl(p[2L], avant, fixed = TRUE)))
-      stop("apres_359() : texte nouveau d\u00e9j\u00e0 pr\u00e9sent ; r\u00e9f\u00e9rence d\u00e9j\u00e0 r\u00e9g\u00e9n\u00e9r\u00e9e ? retirer transition_359() et les constantes *_359")
-  for (p in SUBST_359) avant <- gsub(p[1L], p[2L], avant, fixed = TRUE)
-  Encoding(avant) <- "UTF-8"
-  avant
-}
-transition_359 <- function(plan) {
-  ref <- lire_reference(file.path(DOSSIER_REFERENCES, paste0(plan, ".tsv")))$valeurs
-  n <- CHEMINS_359[[plan]]
-  changements <- lapply(names(n), function(c_) {
-    v <- ref[[c_]]
-    if (is.null(v)) stop(sprintf("transition_359() : %s absent de %s (erreur de programmation)", c_, plan))
-    a <- apres_359(v); k <- which(a != v)
-    if (length(k) != n[[c_]])
-      stop(sprintf("transition_359() : %s de %s : %d cha\u00eene(s) chang\u00e9e(s) au lieu de %d", c_, plan, length(k), n[[c_]]))
-    list(chemin = c_, nature = "valeur de chaîne", valeurs = a[k], positions = k)
-  })
-  list(issue = "#359", plans = plan, changements = changements)
-}
-TRANSITIONS_EN_COURS <- c(TRANSITIONS_EN_COURS, lapply(paste0("R", 1:17), transition_359))
-# Transition #361, mention d'unité de l'hypothèse nulle de la validation
-# (B37, étape (2), Q-A (a) ; spécification d'actuary-approfondi, #361,
-# commentaire 7137100694) : une chaîne, etapes/validation/parametres/
-# hypothese_nulle, dans R8, R9 (HYPOTHESE_VALIDATION) et R10
-# (HYPOTHESE_VALIDATION_POSITIONNEE), en « valeur de chaîne » ; texte après
-# tiré du texte avant de la référence par une substitution exacte (SUBST_361,
-# échappements \u comme pour #359), sans lire le package. Chemin disjoint de
-# ceux de CHEMINS_359 : l'union des deux transitions sur R8 à R10 ne déclare
-# aucun chemin deux fois. Aucune valeur numérique ni autre chaîne ne change.
-# À clore par la régénération (R) de B37, avec transition_361(), apres_361()
-# et SUBST_361.
-SUBST_361 <- c("(l'unit\u00e9 contrat rend les tests anti-conservateurs)",
-               paste("(sous l'unit\u00e9 contrat, les d\u00e9c\u00e8s sont sur-dispers\u00e9s : sens de l'erreur",
-                     "propre \u00e0 chaque grandeur, colonne statut de etapes/validation/resultat/statistiques)"))
-CHEMIN_361 <- "etapes/validation/parametres/hypothese_nulle"
-apres_361 <- function(avant) {
-  if (any(grepl(SUBST_361[2L], avant, fixed = TRUE)))
-    stop("apres_361() : texte nouveau d\u00e9j\u00e0 pr\u00e9sent ; r\u00e9f\u00e9rence d\u00e9j\u00e0 r\u00e9g\u00e9n\u00e9r\u00e9e ? retirer transition_361() et SUBST_361")
-  avant <- gsub(SUBST_361[1L], SUBST_361[2L], avant, fixed = TRUE)
-  Encoding(avant) <- "UTF-8"
-  avant
-}
-transition_361 <- function(plan) {
-  v <- lire_reference(file.path(DOSSIER_REFERENCES, paste0(plan, ".tsv")))$valeurs[[CHEMIN_361]]
-  if (is.null(v)) stop(sprintf("transition_361() : %s absent de %s (erreur de programmation)", CHEMIN_361, plan))
-  a <- apres_361(v); k <- which(a != v)
-  if (length(k) != 1L)
-    stop(sprintf("transition_361() : %s de %s : %d cha\u00eene(s) chang\u00e9e(s) au lieu de 1", CHEMIN_361, plan, length(k)))
-  list(issue = "#361", plans = plan,
-       changements = list(list(chemin = CHEMIN_361, nature = "valeur de chaîne", valeurs = a[k], positions = k)))
-}
-TRANSITIONS_EN_COURS <- c(TRANSITIONS_EN_COURS, lapply(c("R8", "R9", "R10"), transition_361))
 # Transition #218 de la correction de theta_80 (B30, constat C1 de la revue
 # finale, c35eb9d) close par la seconde régénération (R′) de R1 à R17
 # (exécution 44698750703, sur c35eb9d) : transition_218c(), apres_218c() et
@@ -604,6 +480,13 @@ TRANSITIONS_EN_COURS <- c(TRANSITIONS_EN_COURS, lapply(c("R8", "R9", "R10"), tra
 # (exécution 45258747737, sur cac4b84) : transition_330(), apres_330(),
 # transition_329() et les constantes M_330, CONSEQUENCES_330,
 # NATURES_STATISTIQUES_330 et GRANDEURS_329 retirées.
+# Transitions #359 (mention d'indépendance qualifiée, résultat asymptotique, et
+# source unique mention_independance() : textes de statut de R1 à R17, 278
+# chaînes) et #361 (mention d'unité de l'hypothèse nulle de la validation,
+# R8, R9 et R10) closes par la régénération (R) de B37 (exécution
+# 45496372907, sur 8bc0117) : transition_359(), apres_359(), transition_361(),
+# apres_361() et les constantes P_359, B_359, R_359, D_359, TESTS_359,
+# SUBST_359, CHEMINS_359, SUBST_361 et CHEMIN_361 retirées.
 
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
 CHAMPS_CHANGEMENT <- list(type = c("de", "vers"), valeur = c("valeurs", "positions"),
