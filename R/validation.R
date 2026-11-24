@@ -188,8 +188,9 @@ HYPOTHESE_VALIDATION_LISSEE <- texte_moteur(paste(
 # États d'une cellule (M253, point 1) : retenue (A > 0, dans C+) ;
 # sans_exposition (E^c = 0, D = 0) ; taux_table_nul (A = 0 avec E^c > 0, D =
 # 0) ; evenement_sans_exposition (E^c = 0, D > 0) ; evenement_sous_taux_nul
-# (A = 0 avec E^c > 0, D > 0). A = 0 avec E^c > 0 : q~ = 0, ou produit
-# E^c mu~ nul en double.
+# (A = 0 avec E^c > 0, D > 0). A = 0 avec E^c > 0 : q~ = 0 seulement ; un
+# produit E^c mu~ nul (ou infini) en double à q~ > 0 sort de PLAGE_ATTENDUS
+# et est refusé (attendus_hors_plage, attendus_cellules(), #360).
 ETATS_CELLULE_VALIDATION <- c("retenue", "sans_exposition", "taux_table_nul", "evenement_sans_exposition",
                               "evenement_sous_taux_nul")
 # États d'une grandeur (valeur NA hors `produite`).
@@ -945,10 +946,14 @@ replications_poisson <- function(A, B, graine, statistiques, elements_bloc = ELE
 # de programmation (#353) pour les appelants de l'homogénéité, qui tirent
 # sur des expositions dont le total est gardé à l'étape exposition
 # (LIMITE_SOMMES_DOUBLE, M579). L'appelant positionnee de
-# statistiques_validation() est hors de cette garde : il tire sur les
-# attendus Ar = theta^ E^c mu~, produits que LIMITE_SOMMES_DOUBLE ne couvre
-# pas (#360) ; sur ce chemin, l'erreur « poids ou effectifs invalides » peut
-# venir d'une entrée.
+# statistiques_validation() tire sur les attendus Ar = theta^ A, que
+# LIMITE_SOMMES_DOUBLE ne couvre pas : ils sont gardés par le refus
+# attendus_hors_plage (attendus_cellules(), #360). Chaque A retenu est dans
+# PLAGE_ATTENDUS = [1e-100, 1e100], theta^ = O_s / A_s avec O_s > 0
+# (positionnement_sans_deces) et A_s <= n 1e100 (n cellules) : Ar est
+# compris entre O_s 1e-100 / (n 1e100) et O_s, fini et positif. Sur ce chemin
+# aussi, l'erreur « poids ou effectifs invalides » est une erreur de
+# programmation.
 replications_multinomiales <- function(poids, groupe, effectifs, B, graine, statistiques,
                                        elements_bloc = ELEMENTS_BLOC_REPLICATIONS) {
   n <- length(poids)
@@ -3543,6 +3548,13 @@ retrait_contrefactuel <- function(S, cles, ctx) {
   if (any(De < 0L) || any(Je < 0))
     stop("retrait_contrefactuel() : événements ou jours retirés négatifs (erreur de programmation).", call. = FALSE)
   Ee[Je == 0] <- 0
+  # Garde G2 (#360) : sous la recette en lignes, seule admise ici, les dates
+  # sont entières et bornées, le total de l'exposition centrale retirée est
+  # fini et majoré par LIMITE_SOMMES_DOUBLE (isTRUE() : une somme NaN lève
+  # aussi cette erreur, et non « missing value where TRUE/FALSE needed »).
+  if (!isTRUE(sum(Ee) <= LIMITE_SOMMES_DOUBLE))
+    stop("retrait_contrefactuel() : exposition centrale retirée hors de la plage de calcul (erreur de programmation).",
+         call. = FALSE)
   if (any(Je > 0 & !(Ee > 0)))
     stop("retrait_contrefactuel() : exposition centrale retirée non positive avec des jours retirés (erreur de programmation).",
          call. = FALSE)
@@ -3599,6 +3611,13 @@ smr_comparateur_1 <- function(ret, conservees, cles, par_annee, niveau) {
   etat_cel <- rep("sans_exposition_retenue", nrow(ret)); etat_cel[ok] <- "produite"
   ret$etat_cellule <- etat_cel
   O <- sum(as.numeric(ret$evenements_retires[ok])); A <- sum(att[ok])
+  rv <- if (A > 0) sum(ret$exposition_centrale_retiree[ok]^2 * mu[ok] / Er[ok]) / A else NA_real_
+  # Garde G1 (#360) : sous la recette en lignes, seule admise ici (dates
+  # entières et bornées), E <= 2^52 jours, E^c >= 1/366 par cellule exposée et
+  # D <= 2^31 : attendus et rapport de variance finis, le rapport inférieur à
+  # 4e79 (majoration exacte ; spécification d'actuary-approfondi de #360).
+  if (!is.finite(A) || (A > 0 && !is.finite(rv)))
+    stop("smr_comparateur_1() : attendus ou rapport de variance non finis (erreur de programmation).", call. = FALSE)
   tp <- taux_poisson(O, A, niveau)
   # Sommes d'événements rangées en integer (#199) : gardes défensives ; sous la
   # forme fenêtres, seule admise ici, le total est majoré par le nombre de lignes
@@ -3608,8 +3627,7 @@ smr_comparateur_1 <- function(ret, conservees, cles, par_annee, niveau) {
                     attendus = A, smr = tp$taux, borne_inf_exacte = tp$borne_inf_exacte,
                     borne_sup_exacte = tp$borne_sup_exacte, borne_inf_asymptotique = tp$borne_inf_asymptotique,
                     borne_sup_asymptotique = tp$borne_sup_asymptotique,
-                    rapport_variance = if (A > 0) sum(ret$exposition_centrale_retiree[ok]^2 * mu[ok] / Er[ok]) / A
-                                       else NA_real_,
+                    rapport_variance = rv,
                     cellules_sans_exposition_retenue = sum(!ok),
                     evenements_sans_exposition_retenue = denombrement_entier(
                       sum(as.numeric(ret$evenements_retires[!ok])), "importance_exclusions",
@@ -3628,7 +3646,11 @@ smr_comparateur_1 <- function(ret, conservees, cles, par_annee, niveau) {
 # (avis d'actuary, C2) : une cellule retirée sans valeur de table (sexe
 # absent) ou à q~ = 1 avec E^c > 0 rend l'étape non calculable (O, A, SMR
 # et bornes NA, aucun agrégat partiel) ; les cellules à q~ = 1 sont écartées
-# avant attendus_cellules() (aucun refus taux_table_egal_un ici). Ordre des
+# avant attendus_cellules() (aucun refus taux_table_egal_un ici) ; une
+# cellule retirée à q~ > 0 d'attendu hors de PLAGE_ATTENDUS lève le refus
+# attendus_hors_plage, module validation (#360 ; atteint par
+# construire_table() pour une cellule exposée des seules lignes exclues,
+# l'étape validation ayant abouti). Ordre des
 # états : cellule_sans_valeur_table l'emporte sur taux_table_egal_un, qui
 # l'emporte sur les états de taux_poisson(). Les décomptes des deux cas sont
 # toujours restitués.
