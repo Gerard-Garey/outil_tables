@@ -1270,7 +1270,7 @@ deces_par_tete <- function(g, sor, cause) {
 #                 date de sortie hors « en_cours » (motifs non mesurables,
 #                 #69, § 2) est une erreur de programmation.
 evaluer_motifs <- function(donnees, roles, debut, fin, borne, segmentation, lignes_tete = NULL) {
-  n <- nrow(donnees)
+  n <- .row_names_info(donnees, 2L)
   if (!is.null(lignes_tete) && (!is.integer(lignes_tete) || !is.null(attributes(lignes_tete)) ||
                                 anyNA(lignes_tete) || anyDuplicated(lignes_tete) ||
                                 any(lignes_tete < 1L | lignes_tete > n)))
@@ -1393,7 +1393,7 @@ sous_indicer_categorie <- function(x, i) {
 # comparées exactement. Rend list(motifs) : liste nommée code -> numéros de
 # ligne (1-based, croissants), dans l'ordre MOTIFS_LIGNES_AGREGATS.
 evaluer_motifs_agregats <- function(donnees, roles, p) {
-  n <- nrow(donnees)
+  n <- .row_names_info(donnees, 2L)
   col <- function(role) if (role %in% names(roles)) lire_champ(donnees, roles[[role]]) else NULL
   vrai <- function(x) !is.na(x) & x
   non_entier <- function(x) !is.na(x) & (!is.finite(x) | x != trunc(x))
@@ -1623,7 +1623,7 @@ evaluer_motifs_stocks <- function(donnees, roles, p, segmentation) {
   if (is.null(p$inventaires))
     stop("evaluer_motifs_stocks() : grille des inventaires absente de p (erreur de programmation).", call. = FALSE)
   grille <- as.numeric(unclass(p$inventaires)); M <- length(grille)
-  n <- nrow(donnees)
+  n <- .row_names_info(donnees, 2L)
   col <- function(role) if (role %in% names(roles)) lire_champ(donnees, roles[[role]]) else NULL
   jours <- function(role) as.numeric(unclass(col(role)))
   vrai <- function(x) !is.na(x) & x
@@ -2277,7 +2277,7 @@ controler_lignes_extraites <- function(donnees, extraites, numeros, roles, etape
 # numéro de son observation (composante fusionnée ou contrat ; la cellule
 # elle-même sous `agregats`).
 preparer_donnees <- function(donnees, roles, p, segmentation, exclusions, recette) {
-  n <- nrow(donnees)
+  n <- .row_names_info(donnees, 2L)
   if (!n) refuser("donnees", "base_vide", formuler("La base d'observation ne contient aucune ligne."))
   ev <- switch(recette$recette,
     lignes_dates_completes = evaluer_motifs(donnees, roles, p$debut, p$fin, p$borne, segmentation),
