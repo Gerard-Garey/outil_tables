@@ -2113,7 +2113,12 @@ SUJETS_LIGNES_EXTRAITES <- c(
 # chaque colonne de rôle (lue sans dispatch par lire_champ(), des deux côtés)
 # reprend les valeurs des lignes demandées, jugées sans dispatch (#322, point
 # 2, spécification d'actuary, Q1 ; M558) : colonne de l'entrée facteur
-# (a_classe(), sous-classes comprises) : la colonne extraite est un facteur et
+# (a_classe(), sous-classes comprises) : (3 a), sur toutes les colonnes de
+# rôle avant le (3 b), une colonne extraite facteur est bien formée
+# (facteur_bien_forme(), F342 ; #357, spécification d'actuary : un code hors
+# des niveaux, lu NA par libelles_facteur(), passerait le (3 b) et ferait
+# lever « malformed factor » à as.character() plus loin ; toutes les colonnes
+# en défaut citées, constat propre) ; (3 b) la colonne extraite est un facteur et
 # ses libellés (libelles_facteur()) sont ceux des numéros dans la colonne de
 # l'entrée, les niveaux n'étant pas comparés (une méthode `[` qui retire les
 # niveaux inutilisés, droplevels(), reste admise ; une méthode `[` de colonne
@@ -2160,7 +2165,7 @@ controler_lignes_extraites <- function(donnees, extraites, numeros, roles, etape
   coherente <- forme && lues$coherente
   ecart_colonnes <- forme && !ecart_compte &&
     (!coherente || lues$nombre_colonnes != length(unclass(donnees)) || !identical(nom_c, nom_d))
-  dec <- NULL; k <- integer(0); colonnes <- character(0); premiere <- NULL
+  dec <- NULL; k <- integer(0); colonnes <- character(0); premiere <- NULL; mal_formees <- FALSE
   # Entrée exactement « data.frame » et écart de colonnes : décomptes lus pour situer la première position écartée
   # (et les éléments NULL, que `[.data.frame` laisse à la place d'une colonne retirée).
   if (exact && ecart_colonnes && coherente) {
@@ -2171,17 +2176,29 @@ controler_lignes_extraites <- function(donnees, extraites, numeros, roles, etape
   if (forme && !ecart_compte && !ecart_colonnes) {
     dec <- decomptes_colonnes(extraites)
     k <- which(is.na(dec$lc) | dec$lc != attendu)
-    if (!length(k))
-      for (cc in unique(unname(roles))) {
-        a <- lire_champ(extraites, cc); b <- lire_champ(donnees, cc)
-        # Facteur : libellés lus sans dispatch, comparés, non les niveaux ; autre colonne (sans classe ou Date
-        # exacte, type_conforme()) : `[` interne ou de base.
-        identique <- if (a_classe(b, "factor"))
-                       a_classe(a, "factor") && identical(libelles_facteur(a, seq_len(longueur_lue(a))),
-                                                          libelles_facteur(b, numeros))
-                     else identical(a, b[numeros])
-        if (!identique) colonnes <- c(colonnes, cc)
+    if (!length(k)) {
+      cr <- unique(unname(roles))
+      # (3 a) bonne forme du facteur extrait (facteur_bien_forme(), F342 ; #357), sur toutes les colonnes de rôle,
+      # avant (3 b) : un code hors des niveaux n'a pas de libellé interprétable (libelles_facteur() le lit NA).
+      for (cc in cr) {
+        a <- lire_champ(extraites, cc)
+        if (a_classe(lire_champ(donnees, cc), "factor") && a_classe(a, "factor") && !facteur_bien_forme(a))
+          colonnes <- c(colonnes, cc)
       }
+      mal_formees <- length(colonnes) > 0L
+      # (3 b) identité des colonnes de rôle.
+      if (!mal_formees)
+        for (cc in cr) {
+          a <- lire_champ(extraites, cc); b <- lire_champ(donnees, cc)
+          # Facteur : libellés lus sans dispatch, comparés, non les niveaux ; autre colonne (sans classe ou Date
+          # exacte, type_conforme()) : `[` interne ou de base.
+          identique <- if (a_classe(b, "factor"))
+                         a_classe(a, "factor") && identical(libelles_facteur(a, seq_len(longueur_lue(a))),
+                                                            libelles_facteur(b, numeros))
+                       else identical(a, b[numeros])
+          if (!identique) colonnes <- c(colonnes, cc)
+        }
+    }
   }
   if (!forme || ecart_compte || ecart_colonnes || length(k) || length(colonnes)) {
     # Classe d'entrée exactement « data.frame » (sans méthode « [ » propre) et cause « colonne » (écart de
@@ -2222,6 +2239,11 @@ controler_lignes_extraites <- function(donnees, extraites, numeros, roles, etape
     else if (length(k))
       formuler("comptent %d ligne(s) comme demandé mais leurs colonnes ne comptent pas toutes ce nombre de lignes (%s)",
                nc, paste(colonnes_decompte_citees(k, dec, classes), collapse = " ; "))
+    else if (mal_formees)
+      formuler(paste("comptent %d ligne(s) comme demandé mais leur(s) colonne(s) de rôle %s sont des facteurs mal",
+                     "formés (niveaux absents ou non character, ou code qui n'est ni NA ni un integer de 1 au nombre",
+                     "de niveaux)"), nc,
+               if (is.null(classes)) liste_guillemets(colonnes) else colonnes_classe_citees(colonnes, classes))
     else
       formuler(paste("comptent %d ligne(s) comme demandé mais ne reprennent pas les valeurs des lignes demandées",
                      "dans la ou les colonne(s) de rôle %s"), nc,
