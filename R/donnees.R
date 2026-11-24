@@ -751,8 +751,9 @@ colonnes_ecart_citees <- function(nom_c, nom_d, premiere = NULL) {
 # Décomptes de lignes d'un data.frame (#312), contrôle « (1) forme » des
 # données : .row_names_info(donnees, 2L) (attribut row.names, lu sans dispatch ;
 # la valeur que lisent dim.data.frame, `[.data.frame` et le rapport), nrow()
-# (avec dispatch : la grandeur que lit preparer_donnees()) et le nombre de
-# lignes de chaque colonne, toutes les colonnes, doivent être égaux ; sinon
+# (avec dispatch : seule lecture avec dispatch du nombre de lignes de
+# l'entrée qu'admette la garde de #354) et le nombre de lignes de chaque
+# colonne, toutes les colonnes, doivent être égaux ; sinon
 # refus donnees_mal_formees, sans rien corriger. Une méthode dim() de la
 # classe qui lève une erreur la propage (R2 de #312). Colonnes parcourues par
 # position, décompte de chacune lu comme le décrivent les assistants
