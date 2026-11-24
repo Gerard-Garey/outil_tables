@@ -8412,7 +8412,7 @@ absolue le plus grand entier de R ($2^{31} - 1$) est refusée sous le même
 motif, au lieu de devenir une valeur manquante à la conversion en entier~;
 le message de
 \code{table\_colonne\_mal\_typee} rappelle les six types («~age~: entier >= 0~;
-annee~: entier~; generation~: entier~; sexe~: chaîne~; qx~: double~; lx~: nombre~»). Une
+annee~: entier~; generation~: entier~; sexe~: chaîne ou facteur bien formé~; qx~: double~; lx~: nombre~»~; «~sexe~: chaîne~» avant l'issue~\#356). Une
 colonne dont la classe porte, à toute position, un élément d'encodage
 \code{bytes} est refusée sous \code{table\_colonne\_mal\_typee}~; pour
 une colonne \code{sexe} de classe facteur, ce refus remplace l'erreur R
@@ -8426,9 +8426,10 @@ rôle~»)~: un facteur sans niveaux, à code hors des niveaux ou à codes
 stockés en \code{double} est refusé sous \code{table\_colonne\_mal\_typee},
 \code{details\$colonne} valant \code{"sexe"}, au lieu de l'erreur R
 «~malformed factor~» que levait auparavant la construction (issue~\#342~;
-\emph{constat} de mesure, R~4.3.3). Le message de ce refus n'a pas
-changé~: il décrit toujours le type attendu de \code{sexe} comme
-«~chaîne~», alors qu'un facteur bien formé est admis.\par}
+\emph{constat} de mesure, R~4.3.3). Depuis l'issue~\#356, le message
+de ce refus décrit le type attendu de \code{sexe} comme «~chaîne ou
+facteur bien formé~», conforme à ce que le contrôle admet~; motif,
+module et \code{details} sont inchangés.\par}
 
 \medskip
 \noindent
