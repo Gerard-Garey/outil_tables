@@ -2807,7 +2807,7 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
                                                       any(abs(x$generation) > .Machine$integer.max))))
   if (any(mal_typees))
     refuser("donnees", "table_colonne_mal_typee",
-            formuler("Table « %s » : colonne(s) mal typée(s) ou avec valeur manquante %s (age : entier >= 0 ; annee : entier ; generation : entier ; sexe : chaîne ; qx : double ; lx : nombre).",
+            formuler("Table « %s » : colonne(s) mal typée(s) ou avec valeur manquante %s (age : entier >= 0 ; annee : entier ; generation : entier ; sexe : chaîne ou facteur bien formé ; qx : double ; lx : nombre).",
                      nom_cite, liste_guillemets(names(mal_typees)[mal_typees])),
             list(colonne = names(mal_typees)[mal_typees]))
   sexe <- as.character(x$sexe)

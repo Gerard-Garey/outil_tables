@@ -531,6 +531,17 @@ local({
     })
   verifier("#342 table_reference(), sexe en facteur bien form\u00e9 : admis",
            is.null(attrape(table_reference(tr(fac(c(1L, 1L), "H")), "t", "importee", "source de test"))))
+  # Texte du refus (#356, spécification d'actuary, commentaire 7124476603) : le
+  # type attendu de sexe est « chaîne ou facteur bien formé » (avant #356 :
+  # « chaîne », faux pour un facteur bien formé, admis). Message écrit à la main.
+  verifier("#356 table_reference(), sexe en facteur mal form\u00e9 : texte exact du refus table_colonne_mal_typee, module donnees", {
+    x <- attrape(table_reference(tr(fac(c(1L, 2L), "H")), "t", "importee", "source de test"))
+    inherits(x, "refus_tablexp") && identical(x$motif, "table_colonne_mal_typee") && identical(x$module, "donnees") &&
+      identical(conditionMessage(x),
+                paste0("Table \u00ab t \u00bb : colonne(s) mal typ\u00e9e(s) ou avec valeur manquante \u00ab sexe \u00bb ",
+                       "(age : entier >= 0 ; annee : entier ; generation : entier ; ",
+                       "sexe : cha\u00eene ou facteur bien form\u00e9 ; qx : double ; lx : nombre)."))
+  })
 })
 verifier("#342 les m\u00e9thodes de session sont retir\u00e9es de globalenv()",
          !any(c("levels.k342", "length.k342", "[.k342", "Ops.k342", "is.na.k342") %in% ls(globalenv(), all.names = TRUE)))
