@@ -384,6 +384,18 @@ verifier("étape : paramètres (relation positionnee, p = 1 par segment, hypoth�
     identical(p$statuts_sous_groupes$statut, s$statut[s$statistique == "sous_groupes"]) &&
     identical(ST$statut, s$statut[s$statistique != "sous_groupes"])
 })
+verifier("#361 HYPOTHESE_VALIDATION_POSITIONNEE (littéral de la spécification) : même mention d'unité que HYPOTHESE_VALIDATION, sans « anti-conservateurs » ni le préfixe de C1 (#359) ; marquée UTF-8",
+         identical(tablexp:::HYPOTHESE_VALIDATION_POSITIONNEE, paste(
+           "H0 (i) : D_c ~ Poisson(theta_s A~_c) indépendants, A~_c = E^c_c mu~_c, mu~_c = -ln(1 - q~_c), theta_s inconnu,",
+           "un par segment, estimé par theta^_s = O_s / A~_s (étape positionnement) ; attendus de la table positionnée",
+           "A_c = theta^_s A~_c ; conditionnellement à O_s, statistique exhaustive de theta_s, (D_c) suit la loi",
+           "multinomiale (O_s ; pi_c), pi_c = A~_c / A~_s (= A_c / A_s), libre de theta_s ; exacte avec E^c tenue pour fixe,",
+           "asymptotique sous le modèle de survie (E^c aléatoire) ; unités d'observation indépendantes (sous l'unité",
+           "contrat, les décès sont sur-dispersés : sens de l'erreur propre à chaque grandeur, colonne statut de",
+           "etapes/validation/resultat/statistiques) ; cellule [x, x+1) de la convention dernier_anniversaire.")) &&
+           !grepl("anti-conservat", tablexp:::HYPOTHESE_VALIDATION_POSITIONNEE, fixed = TRUE) &&
+           !grepl("indépendantes ; sous l'unité contrat", tablexp:::HYPOTHESE_VALIDATION_POSITIONNEE, fixed = TRUE) &&
+           identical(Encoding(tablexp:::HYPOTHESE_VALIDATION_POSITIONNEE), "UTF-8"))
 local({
   sg <- V$resultat$sous_groupes
   O_s <- tapply(as.numeric(CV$evenements[RV]), CV$sexe[RV], sum)

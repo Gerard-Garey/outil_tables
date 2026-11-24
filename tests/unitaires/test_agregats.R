@@ -188,14 +188,18 @@ verifier("rapport figé sous les agrégats : mention d'unité non déterminée (
   n_nd == 3L && !grepl(esc(m[["validation_unite_contrat"]]), h, fixed = TRUE) &&
     grepl("fiche/hypotheses_recette", h, fixed = TRUE)
 })
-verifier("rapport figé : texte de validation_unite_non_determinee visé par actuary (événements, et non décès, sous toute transition)",
+verifier("rapport figé : texte de validation_unite_non_determinee visé par actuary (événements, et non décès, sous toute transition ; #361 : sens de l'erreur propre à chaque grandeur, anti-conservatisme à attendus grands seulement, résultat asymptotique)",
          identical(unname(tablexp:::MENTIONS_RAPPORT[["validation_unite_non_determinee"]]), paste(
            "Unité d'observation non déterminée (agrégats ; fiche/avertissement_unite) : si les effectifs comptent des",
            "contrats, les événements des contrats d'une même tête ne sont pas indépendants ; la variance des événements",
            "est sur-dispersée d'un facteur au plus phi = somme k^2 E / somme k E >= 1 (k nombre de contrats d'une tête),",
            "atteint quand les événements d'une tête sont simultanés, comme un décès compté sur chacun de ses contrats ;",
-           "les tests sont alors anti-conservateurs (p-valeurs trop petites, intervalles trop étroits) ; phi n'est pas",
-           "mesurable sur des agrégats.")))
+           "dès que la variance est sur-dispersée, les p-valeurs, intervalles et variances calculés sous l'hypothèse",
+           "d'unités d'observation indépendantes sont faussés. Le sens de l'erreur est propre à chaque grandeur (colonne",
+           "statut du résultat de l'étape) : à attendus grands (résultat asymptotique), les tests fondés sur la loi de",
+           "Poisson des événements sont anti-conservateurs (p-valeurs trop petites) et les intervalles trop étroits ; à",
+           "petits attendus, ce sens n'est pas établi en général, ni, à tout attendu, pour les tests des signes, des",
+           "suites et de Wilcoxon. phi n'est pas mesurable sur des agrégats.")))
 verifier("rapport figé : mention_unite() rend la mention contrat sous l'unité contrat, la mention non déterminée sous non_determinee, rien sous l'unité tête ou sans avertissement d'unité", {
   mu <- tablexp:::mention_unite
   m <- tablexp:::MENTIONS_RAPPORT

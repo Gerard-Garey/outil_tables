@@ -538,9 +538,10 @@ verifier("rapport : plan sans positionnement -> « Étape « positionnement » :
   grepl("<p>Étape « positionnement » : non demandée par le plan (chemin etapes/positionnement absent de l'objet).</p>",
         h, fixed = TRUE)
 })
-verifier("rapport : unité contrat (sans id_tete) -> mention d'anti-conservatisme dans la section du positionnement", {
+verifier("rapport : unité contrat (sans id_tete) -> mention validation_unite_contrat (sens de l'erreur propre à chaque grandeur, #361), en entier, dans la section du positionnement", {
   x <- construire_table(JEU, ROLES[names(ROLES) != "id_tete"], plan_p(), tables_reference = list(tv = T_HF))
   h <- rawToChar(ecrire_rapport(x)); Encoding(h) <- "UTF-8"
   sec <- regmatches(h, regexpr("<section id=\"etape_positionnement\">.*?</section>", h))
-  length(sec) == 1L && grepl("Unité d'observation contrat, sans identifiant de tête", sec, fixed = TRUE)
+  m <- tablexp:::echapper_html(tablexp:::MENTIONS_RAPPORT[["validation_unite_contrat"]])
+  length(sec) == 1L && grepl(paste0("<p>", m, "</p>"), sec, fixed = TRUE)
 })

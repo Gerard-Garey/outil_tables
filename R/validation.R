@@ -163,7 +163,8 @@ REFERENCE_METHODE_VALIDATION <- texte_moteur(paste(
 HYPOTHESE_VALIDATION <- texte_moteur(paste(
   "H0 (i) : D_c ~ Poisson(A_c) indépendants, A_c = E^c_c mu~_c, mu~_c = -ln(1 - q~_c) ; exacte avec E^c tenue",
   "pour fixe, asymptotique sous le modèle de survie (E^c aléatoire) ; unités d'observation indépendantes",
-  "(l'unité contrat rend les tests anti-conservateurs) ; cellule [x, x+1) de la convention",
+  "(sous l'unité contrat, les décès sont sur-dispersés : sens de l'erreur propre à chaque grandeur, colonne",
+  "statut de etapes/validation/resultat/statistiques) ; cellule [x, x+1) de la convention",
   "dernier_anniversaire."))
 # Hypothèse nulle sous la relation positionnee (spécification de #167, § 8).
 HYPOTHESE_VALIDATION_POSITIONNEE <- texte_moteur(paste(
@@ -171,8 +172,9 @@ HYPOTHESE_VALIDATION_POSITIONNEE <- texte_moteur(paste(
   "un par segment, estimé par theta^_s = O_s / A~_s (étape positionnement) ; attendus de la table positionnée",
   "A_c = theta^_s A~_c ; conditionnellement à O_s, statistique exhaustive de theta_s, (D_c) suit la loi",
   "multinomiale (O_s ; pi_c), pi_c = A~_c / A~_s (= A_c / A_s), libre de theta_s ; exacte avec E^c tenue pour fixe,",
-  "asymptotique sous le modèle de survie (E^c aléatoire) ; unités d'observation indépendantes (l'unité contrat",
-  "rend les tests anti-conservateurs) ; cellule [x, x+1) de la convention dernier_anniversaire."))
+  "asymptotique sous le modèle de survie (E^c aléatoire) ; unités d'observation indépendantes (sous l'unité contrat,",
+  "les décès sont sur-dispersés : sens de l'erreur propre à chaque grandeur, colonne statut de",
+  "etapes/validation/resultat/statistiques) ; cellule [x, x+1) de la convention dernier_anniversaire."))
 # Hypothèse nulle sous la relation lissee (#224, spécification de forme,
 # § 2) : aucune loi exacte.
 HYPOTHESE_VALIDATION_LISSEE <- texte_moteur(paste(

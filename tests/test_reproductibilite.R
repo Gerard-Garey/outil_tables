@@ -548,6 +548,38 @@ transition_359 <- function(plan) {
   list(issue = "#359", plans = plan, changements = changements)
 }
 TRANSITIONS_EN_COURS <- c(TRANSITIONS_EN_COURS, lapply(paste0("R", 1:17), transition_359))
+# Transition #361, mention d'unité de l'hypothèse nulle de la validation
+# (B37, étape (2), Q-A (a) ; spécification d'actuary-approfondi, #361,
+# commentaire 7137100694) : une chaîne, etapes/validation/parametres/
+# hypothese_nulle, dans R8, R9 (HYPOTHESE_VALIDATION) et R10
+# (HYPOTHESE_VALIDATION_POSITIONNEE), en « valeur de chaîne » ; texte après
+# tiré du texte avant de la référence par une substitution exacte (SUBST_361,
+# échappements \u comme pour #359), sans lire le package. Chemin disjoint de
+# ceux de CHEMINS_359 : l'union des deux transitions sur R8 à R10 ne déclare
+# aucun chemin deux fois. Aucune valeur numérique ni autre chaîne ne change.
+# À clore par la régénération (R) de B37, avec transition_361(), apres_361()
+# et SUBST_361.
+SUBST_361 <- c("(l'unit\u00e9 contrat rend les tests anti-conservateurs)",
+               paste("(sous l'unit\u00e9 contrat, les d\u00e9c\u00e8s sont sur-dispers\u00e9s : sens de l'erreur",
+                     "propre \u00e0 chaque grandeur, colonne statut de etapes/validation/resultat/statistiques)"))
+CHEMIN_361 <- "etapes/validation/parametres/hypothese_nulle"
+apres_361 <- function(avant) {
+  if (any(grepl(SUBST_361[2L], avant, fixed = TRUE)))
+    stop("apres_361() : texte nouveau d\u00e9j\u00e0 pr\u00e9sent ; r\u00e9f\u00e9rence d\u00e9j\u00e0 r\u00e9g\u00e9n\u00e9r\u00e9e ? retirer transition_361() et SUBST_361")
+  avant <- gsub(SUBST_361[1L], SUBST_361[2L], avant, fixed = TRUE)
+  Encoding(avant) <- "UTF-8"
+  avant
+}
+transition_361 <- function(plan) {
+  v <- lire_reference(file.path(DOSSIER_REFERENCES, paste0(plan, ".tsv")))$valeurs[[CHEMIN_361]]
+  if (is.null(v)) stop(sprintf("transition_361() : %s absent de %s (erreur de programmation)", CHEMIN_361, plan))
+  a <- apres_361(v); k <- which(a != v)
+  if (length(k) != 1L)
+    stop(sprintf("transition_361() : %s de %s : %d cha\u00eene(s) chang\u00e9e(s) au lieu de 1", CHEMIN_361, plan, length(k)))
+  list(issue = "#361", plans = plan,
+       changements = list(list(chemin = CHEMIN_361, nature = "valeur de chaîne", valeurs = a[k], positions = k)))
+}
+TRANSITIONS_EN_COURS <- c(TRANSITIONS_EN_COURS, lapply(c("R8", "R9", "R10"), transition_361))
 # Transition #218 de la correction de theta_80 (B30, constat C1 de la revue
 # finale, c35eb9d) close par la seconde régénération (R′) de R1 à R17
 # (exécution 44698750703, sur c35eb9d) : transition_218c(), apres_218c() et

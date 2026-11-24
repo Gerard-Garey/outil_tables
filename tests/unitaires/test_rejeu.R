@@ -51,9 +51,11 @@ EMPREINTE_CODE <- tablexp:::EMPREINTE_CODE
 #  - reporté à #129 (empreinte_donnees) : 870a195ddc27301e2de53ae9bc32d2fe ;
 #  - reporté à #310 (integrite_hors_2) : 7d0667ba477d743b39ebd4e5174f0d8c ;
 #  - reporté à #218 (homogeneite_portee, suffisance_intro, suffisance_homogeneite,
-#    suffisance_homogeneite_absente) : 7190f458a39cc61ae9f105a80ef9cd54.
+#    suffisance_homogeneite_absente) : 7190f458a39cc61ae9f105a80ef9cd54 ;
+#  - reporté à #361 (validation_unite_contrat, validation_unite_non_determinee) :
+#    4377a128d9595c589e34eaa23c4f2aa1.
 # TEXTE_REJEU_FICHE : relevé à 8a81102, inchangé.
-MD5_MENTIONS_RAPPORT <- "7190f458a39cc61ae9f105a80ef9cd54"
+MD5_MENTIONS_RAPPORT <- "4377a128d9595c589e34eaa23c4f2aa1"
 MD5_TEXTE_REJEU_FICHE <- "ddbaf36e1e6fa260b51e57ca46e6604f"
 
 # Ligne 8 « tables_reference » (contrôle 7 bis, ADR 0015, point 4.3 ; #73) :

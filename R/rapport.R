@@ -2338,8 +2338,12 @@ MENTIONS_RAPPORT <- texte_moteur(c(
     "statut de etapes/validation/resultat/statistiques."),
   validation_unite_contrat = paste(
     "Unité d'observation contrat, sans identifiant de tête (fiche/avertissement_unite) : la variance des décès",
-    "est sur-dispersée d'un facteur phi = somme k^2 E / somme k E >= 1 (k nombre de contrats d'une tête), ce qui",
-    "rend les tests anti-conservateurs (p-valeurs trop petites, intervalles trop étroits) ; phi n'est pas",
+    "est sur-dispersée d'un facteur phi = somme k^2 E / somme k E >= 1 (k nombre de contrats d'une tête) ; dès",
+    "que phi > 1, les p-valeurs, intervalles et variances calculés sous l'hypothèse d'unités d'observation",
+    "indépendantes sont faussés. Le sens de l'erreur est propre à chaque grandeur (colonne statut du résultat de",
+    "l'étape) : à attendus grands (résultat asymptotique), les tests fondés sur la loi de Poisson des décès sont",
+    "anti-conservateurs (p-valeurs trop petites) et les intervalles trop étroits ; à petits attendus, ce sens n'est",
+    "pas établi en général, ni, à tout attendu, pour les tests des signes, des suites et de Wilcoxon. phi n'est pas",
     "mesurable sans identifiant de tête."),
   # Mention d'unité non déterminée (agrégats ; avis d'actuary du 08/11/2026
   # sur #169, point 3), reprise sous la même condition que
@@ -2349,8 +2353,12 @@ MENTIONS_RAPPORT <- texte_moteur(c(
     "contrats, les événements des contrats d'une même tête ne sont pas indépendants ; la variance des événements",
     "est sur-dispersée d'un facteur au plus phi = somme k^2 E / somme k E >= 1 (k nombre de contrats d'une tête),",
     "atteint quand les événements d'une tête sont simultanés, comme un décès compté sur chacun de ses contrats ;",
-    "les tests sont alors anti-conservateurs (p-valeurs trop petites, intervalles trop étroits) ; phi n'est pas",
-    "mesurable sur des agrégats."),
+    "dès que la variance est sur-dispersée, les p-valeurs, intervalles et variances calculés sous l'hypothèse",
+    "d'unités d'observation indépendantes sont faussés. Le sens de l'erreur est propre à chaque grandeur (colonne",
+    "statut du résultat de l'étape) : à attendus grands (résultat asymptotique), les tests fondés sur la loi de",
+    "Poisson des événements sont anti-conservateurs (p-valeurs trop petites) et les intervalles trop étroits ; à",
+    "petits attendus, ce sens n'est pas établi en général, ni, à tout attendu, pour les tests des signes, des suites",
+    "et de Wilcoxon. phi n'est pas mesurable sur des agrégats."),
   validation_ensemble = paste(
     "Table de modalité « ensemble » appliquée à chaque sexe de la segmentation",
     "(etapes/validation/parametres/appariement_sexe : ensemble_par_sexe)."),
