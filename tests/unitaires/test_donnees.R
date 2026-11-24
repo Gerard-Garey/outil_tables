@@ -2861,7 +2861,8 @@ for (k in c("nom", "source", "classe"))
 # « data.frame » recevait table_colonne_manquante (faux constat) : il reçoit
 # le refus « un data.frame est attendu » (garde is.list(), précédent de
 # controler_roles()). Messages attendus écrits à la main (texte de la
-# spécification) ; littéraux non ASCII en \u00XX.
+# spécification), en caractères UTF-8 bruts (« », é, à) dans le fichier ; la
+# ligne marquée UTF-8 est contrôlée à chaque cas.
 local({
   # Avertissements R comptés au second appel (comme au test de #344) : sous
   # LC_ALL=C, le premier usage des chaînes UTF-8 du package avertit « strings
