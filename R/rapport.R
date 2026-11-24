@@ -677,7 +677,7 @@ texte_canonique <- function(donnees, roles, fichier) {
   r <- sort(names(roles), method = "radix")
   con <- file(fichier, open = "wb")
   on.exit(close(con))
-  writeBin(charToRaw(sprintf("%s\t%d\t%d\n", ENTETE_CANONIQUE, nrow(donnees), length(r))), con)
+  writeBin(charToRaw(sprintf("%s\t%d\t%d\n", ENTETE_CANONIQUE, .row_names_info(donnees, 2L), length(r))), con)
   for (role in r) {
     # Colonne lue par lire_champ() (R/outils.R, #128) : donnees[[nom]] lève une
     # erreur R sur un nom de colonne d'encodage « bytes ».

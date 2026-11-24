@@ -531,6 +531,17 @@ local({
     })
   verifier("#342 table_reference(), sexe en facteur bien form\u00e9 : admis",
            is.null(attrape(table_reference(tr(fac(c(1L, 1L), "H")), "t", "importee", "source de test"))))
+  # Texte du refus (#356, spécification d'actuary, commentaire 7124476603) : le
+  # type attendu de sexe est « chaîne ou facteur bien formé » (avant #356 :
+  # « chaîne », faux pour un facteur bien formé, admis). Message écrit à la main.
+  verifier("#356 table_reference(), sexe en facteur mal form\u00e9 : texte exact du refus table_colonne_mal_typee, module donnees", {
+    x <- attrape(table_reference(tr(fac(c(1L, 2L), "H")), "t", "importee", "source de test"))
+    inherits(x, "refus_tablexp") && identical(x$motif, "table_colonne_mal_typee") && identical(x$module, "donnees") &&
+      identical(conditionMessage(x),
+                paste0("Table \u00ab t \u00bb : colonne(s) mal typ\u00e9e(s) ou avec valeur manquante \u00ab sexe \u00bb ",
+                       "(age : entier >= 0 ; annee : entier ; generation : entier ; ",
+                       "sexe : cha\u00eene ou facteur bien form\u00e9 ; qx : double ; lx : nombre)."))
+  })
 })
 verifier("#342 les m\u00e9thodes de session sont retir\u00e9es de globalenv()",
          !any(c("levels.k342", "length.k342", "[.k342", "Ops.k342", "is.na.k342") %in% ls(globalenv(), all.names = TRUE)))
@@ -2839,6 +2850,81 @@ for (k in c("nom", "source", "classe"))
     if (r_nom$statut == 0L && identical(loc, "C") && length(l) == 1L && grepl(" TRUE", l, fixed = TRUE)) TRUE
     else paste("statut", r_nom$statut, ":", paste(r_nom$sortie, collapse = " | "))
   })
+# Liste des colonnes et noms de longueurs différentes à l'entrée de
+# table_reference() (#355, F355 ; spécification d'actuary, commentaire
+# 7124469548 de #355) : sous une classe dont length() rend 1, `[.data.frame`
+# rend une liste d'un élément munie des trois noms (age, sexe, qx), puis
+# reclassée. Avant #355 : arrêt de R (segmentation fault, code de sortie 139,
+# pile type_conforme(x$sexe, "categorie"), mesuré à d3b11ac) ; d'où un
+# sous-processus Rscript par cas (bibliothèque des batteries, locale de la
+# batterie), dont le résultat revient par saveRDS(). Un environnement classé
+# « data.frame » recevait table_colonne_manquante (faux constat) : il reçoit
+# le refus « un data.frame est attendu » (garde is.list(), précédent de
+# controler_roles()). Messages attendus écrits à la main (texte de la
+# spécification), en caractères UTF-8 bruts (« », é, à) dans le fichier ; la
+# ligne marquée UTF-8 est contrôlée à chaque cas.
+local({
+  # Avertissements R comptés au second appel (comme au test de #344) : sous
+  # LC_ALL=C, le premier usage des chaînes UTF-8 du package avertit « strings
+  # not representable in native encoding will be translated to UTF-8 », appel
+  # nominal compris (mesuré en sous-processus).
+  script <- tempfile("t355_", fileext = ".R")
+  on.exit(unlink(script))
+  writeLines(c(
+    "a <- commandArgs(TRUE)",
+    sprintf("suppressPackageStartupMessages(library(tablexp, lib.loc = %s))", deparse(.harnais$bibliotheque)),
+    "length.k355 <- function(x) 1L",
+    "incoherente <- function(d, classe = 'data.frame') {",
+    "  x <- structure(d, class = c('k355', 'data.frame'))[-2L, , drop = FALSE]; class(x) <- classe; x }",
+    "env_df <- function() { e <- new.env(); class(e) <- 'data.frame'; e }",
+    "TRI <- data.frame(age = 0:2, sexe = 'H', qx = c(.01, .02, .03))",
+    "x <- switch(a[2L], liste = incoherente(TRI), sous_classe = incoherente(TRI, c('k355', 'data.frame')),",
+    "            sans_qx = incoherente(setNames(TRI, c('age', 'sexe', 'foo'))), env = env_df())",
+    "appel <- function() tryCatch({ table_reference(x, 't', 'importee', 's'); NULL }, refus_tablexp = function(e) e, error = function(e) e)",
+    "r <- suppressWarnings(appel())",
+    "n_avert <- 0L",
+    "withCallingHandlers(appel(), warning = function(w) { n_avert <<- n_avert + 1L; invokeRestart('muffleWarning') })",
+    "saveRDS(list(classe = class(r), module = r$module, motif = r$motif,",
+    "             message = if (!is.null(r)) conditionMessage(r), details = r$details, avertissements = n_avert), a[1L])"),
+    script)
+  executer <- function(k) {
+    sortie <- tempfile("t355_", fileext = ".rds")
+    on.exit(unlink(sortie))
+    p <- executer_rscript(script, c(shQuote(sortie), k))
+    if (!file.exists(sortie)) return(sprintf("aucun résultat : code de sortie %d (%s)", p$statut,
+                                             paste(utils::tail(p$sortie, 3L), collapse = " | ")))
+    readRDS(sortie)
+  }
+  MSG <- function(classe) paste0(
+    "Table « t » : la table est un data.frame mal formé, dont la liste des colonnes et les noms ",
+    "de colonnes n'ont pas la même longueur (liste de 1 colonne(s) pour 3 nom(s) de colonne ; classe ", classe,
+    "). Le moteur ne choisit pas entre ces décomptes, et ne les corrige pas : passer un data.frame dont la ",
+    "liste des colonnes et les noms de colonnes ont la même longueur.")
+  cas <- list(
+    list("liste de 1 colonne pour 3 noms, classe data.frame", "liste", MSG("data.frame"),
+         list(classe = "data.frame", nombre_colonnes = 1L, nombre_noms = 3L)),
+    list("liste de 1 colonne pour 3 noms, classe k355/data.frame", "sous_classe", MSG("k355/data.frame"),
+         list(classe = c("k355", "data.frame"), nombre_colonnes = 1L, nombre_noms = 3L)),
+    list("liste de 1 colonne pour 3 noms dont aucun qx (cohérence jugée avant les colonnes)", "sans_qx",
+         MSG("data.frame"), list(classe = "data.frame", nombre_colonnes = 1L, nombre_noms = 3L)),
+    list("environnement classé data.frame (avant : table_colonne_manquante)", "env",
+         "Table « t » : un data.frame est attendu.", list()))
+  for (c1 in cas)
+    verifier(sprintf("#355 table_reference : %s -> refus table_mal_formee du module donnees, message et details exacts, une ligne marquée UTF-8, 0 avertissement R, sous-processus", c1[[1L]]), {
+      x <- executer(c1[[2L]])
+      if (is.character(x)) x
+      else if (!"refus_tablexp" %in% x$classe) sprintf("condition %s : %s", paste(x$classe, collapse = "/"),
+                                                       paste(x$message, collapse = ""))
+      else if (!identical(x$module, "donnees") || !identical(x$motif, "table_mal_formee")) sprintf("%s / %s", x$module, x$motif)
+      else if (!identical(x$message, c1[[3L]])) paste("message :", x$message)
+      else if (grepl("[\n\v\f]", x$message) || !validUTF8(x$message) || !identical(Encoding(x$message), "UTF-8"))
+        "message sur plusieurs lignes ou non marqué UTF-8"
+      else if (!identical(x$details, c1[[4L]])) paste("details :", paste(deparse(x$details), collapse = " "))
+      else if (x$avertissements != 0L) sprintf("%d avertissement(s) R", x$avertissements)
+      else TRUE
+    })
+})
+
 # Un nom d'état vide était refusé au second contrôle de la transition (non prise
 # en charge) ; il l'est au premier (forme), sous le même motif.
 verifier("transition : nom d'état vide (depart, puis arrivee) -> refus transition_inconnue",

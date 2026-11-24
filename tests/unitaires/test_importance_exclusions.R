@@ -1232,3 +1232,102 @@ local({
 })
 verifier("#343 les méthodes dim de session sont retirées de globalenv()",
          !any(c("dim.k343", "dim.k343h") %in% ls(globalenv(), all.names = TRUE)))
+
+# Bonne forme d'un facteur extrait au contrôle (3) de l'extraction (#357, F357 ;
+# spécification d'actuary, commentaire 7124474462 de #357) : contrôle (3 a) de
+# controler_lignes_extraites(), facteur_bien_forme() (F342) exigé de la colonne
+# de rôle extraite quand celle de l'entrée est un facteur, sur toutes les
+# colonnes de rôle, avant l'identité des libellés (3 b). Classe de colonne k357
+# (facteur sous-classé) dont la méthode « [ » remplace les codes NA par 99L.
+# Avant #357 (mesuré sur dd17d0c) : construire_table() levait l'erreur R
+# « malformed factor » à l'étape importance_exclusions ; l'appel direct de
+# l'outil, étapes donnees et importance_exclusions, ne refusait pas (lignes 5 à
+# 8 : codes 99 99 99 2, libellés NA NA NA H, égaux à ceux de l'entrée). Le
+# chemin par construire_table() vers l'étape donnees n'est pas atteint (une
+# ligne conservée à sexe NA est exclue par sexe_manquant, sinon ligne_invalide ;
+# avis d'actuary) : l'étape donnees est éprouvée par l'appel direct. Natures des
+# attendus : valeur écrite à la main (motif, module, message, details) ;
+# littéraux non ASCII en \u00XX ; avertissements de R comptés.
+local({
+  `[.k357` <- function(x, i, ...) {
+    r <- NextMethod(); u <- unclass(r); u[is.na(u)] <- 99L
+    structure(u, levels = attr(r, "levels"), class = oldClass(r)) }
+  `[.k357rev` <- function(x, i, ...) {
+    r <- NextMethod(); u <- unclass(r); structure(rev(as.vector(u)), levels = attr(u, "levels"), class = oldClass(r)) }
+  m357 <- list(`[.k357` = `[.k357`, `[.k357rev` = `[.k357rev`)
+  for (n in names(m357)) assign(n, m357[[n]], envir = globalenv())
+  on.exit(rm(list = names(m357), envir = globalenv()))
+  # Condition rattrapée et nombre d'avertissements de R.
+  mesurer <- function(expr) {
+    n <- 0L
+    r <- withCallingHandlers(tryCatch({ force(expr); NULL }, refus_tablexp = function(r) r, error = function(e) e),
+                             warning = function(w) { n <<- n + 1L; invokeRestart("muffleWarning") })
+    list(r = r, avertissements = n)
+  }
+  d <- T1; d$sexe <- structure(factor(T1$sexe, levels = c("F", "H")), class = c("k357", "factor"))
+  # (3 a) avant (3 b) : id_contrat extrait inversé (C8 C7 C6 C5 : défaut (3 b), qui seul ferait citer id_contrat),
+  # sexe mal formé (défaut (3 a)).
+  d2 <- d; d2$id_contrat <- structure(factor(T1$id_contrat), class = c("k357rev", "factor"))
+  # Deux colonnes mal formées, toutes citées dans l'ordre des rôles.
+  d3 <- d; d3$cause_sortie <- structure(factor(replace(T1$cause_sortie, 6L, NA)), class = c("k357", "factor"))
+  dk <- structure(d, class = c("kdf357", "data.frame"))
+  SUJ <- c(donnees = "Les lignes conserv\u00e9es",
+           importance_exclusions = paste("Les lignes relues par l'\u00e9tape \u00ab importance_exclusions \u00bb (lignes",
+                                         "exclues et, sous l'unit\u00e9 t\u00eate, lignes conserv\u00e9es des m\u00eames t\u00eates)"))
+  CONSTAT <- paste("comptent 4 ligne(s) comme demand\u00e9 mais leur(s) colonne(s) de r\u00f4le %s sont des facteurs mal",
+                   "form\u00e9s (niveaux absents ou non character, ou code qui n'est ni NA ni un integer de 1 au nombre",
+                   "de niveaux)")
+  message_col <- function(e, cites, cl)
+    paste0(SUJ[[e]], ", extraites des donn\u00e9es par la m\u00e9thode \u00ab [ \u00bb de la classe data.frame, qui applique",
+           " \u00e0 chaque colonne la m\u00e9thode \u00ab [ \u00bb de sa classe, ", sprintf(CONSTAT, cites),
+           " : le moteur ne corrige pas une extraction fausse ; passer un data.frame dont les colonnes cit\u00e9es (classe ",
+           cl, ") ont une m\u00e9thode \u00ab [ \u00bb qui rend exactement les lignes demand\u00e9es (ou n'ont pas de",
+           " m\u00e9thode \u00ab [ \u00bb propre).")
+  message_entree <- function(e, cites, cl)
+    paste0(SUJ[[e]], ", extraites des donn\u00e9es par la m\u00e9thode \u00ab [ \u00bb de la classe ", cl, ", ",
+           sprintf(CONSTAT, cites), " : le moteur ne corrige pas une extraction fausse ; passer un data.frame dont la",
+           " m\u00e9thode \u00ab [ \u00bb rend exactement les lignes demand\u00e9es (ou qui n'a pas de m\u00e9thode",
+           " \u00ab [ \u00bb propre).")
+  details <- function(cl, colonnes) list(classe = cl, classe_rendue = cl, lignes = 4L, attendu = 4L, colonnes = colonnes,
+                                         colonne = character(0), position = integer(0), lignes_colonne = numeric(0))
+  juger <- function(m, module, attendu, det) {
+    r <- m$r
+    if (is.null(r)) "aucun refus"
+    else if (!inherits(r, "refus_tablexp")) sprintf("condition %s : %s", class(r)[1L], conditionMessage(r))
+    else if (!identical(r$module, module) || !identical(r$motif, "donnees_mal_formees")) sprintf("%s / %s", r$module, r$motif)
+    else if (!identical(conditionMessage(r), attendu)) paste("message :", conditionMessage(r))
+    else if (grepl("[\n\v\f]", conditionMessage(r)) || !validUTF8(conditionMessage(r)) ||
+             !identical(Encoding(conditionMessage(r)), "UTF-8")) "message sur plusieurs lignes ou non UTF-8"
+    else if (!identical(r$details, det)) paste("details :", paste(deparse(r$details), collapse = " "))
+    else if (m$avertissements != 0L) sprintf("%d avertissement(s) de R", m$avertissements)
+    else TRUE
+  }
+  S1 <- "\u00ab sexe \u00bb (classe k357/factor)"
+  verifier("#357 construire_table(), colonne sexe k357 (codes NA rendus 99 par \u00ab [ \u00bb), \u00e9tape importance_exclusions -> refus importance_exclusions/donnees_mal_formees (valeur \u00e9crite \u00e0 la main), message, details, 0 avertissement de R (avant : erreur R \u00ab malformed factor \u00bb)",
+           juger(mesurer(construire_table(d, ROLES_SIM, plan_ie())), "importance_exclusions",
+                 message_col("importance_exclusions", S1, "k357/factor"), details("data.frame", "sexe")))
+  for (e in names(SUJ)) {
+    verifier(sprintf("#357 appel direct, \u00e9tape %s, lignes 5 \u00e0 8, colonne sexe k357 -> refus %s/donnees_mal_formees (valeur \u00e9crite \u00e0 la main), message, details, 0 avertissement de R (avant : aucun refus)", e, e),
+             juger(mesurer(tablexp:::controler_lignes_extraites(d, d[5:8, ], 5:8, ROLES_SIM, e)), e,
+                   message_col(e, S1, "k357/factor"), details("data.frame", "sexe")))
+    verifier(sprintf("#357 appel direct, \u00e9tape %s, sexe k357 mal form\u00e9 et id_contrat invers\u00e9 (k357rev) -> le contr\u00f4le (3 a) pr\u00e9c\u00e8de le (3 b) : seule sexe cit\u00e9e (valeur \u00e9crite \u00e0 la main)", e),
+             juger(mesurer(tablexp:::controler_lignes_extraites(d2, d2[5:8, ], 5:8, ROLES_SIM, e)), e,
+                   message_col(e, S1, "k357/factor"), details("data.frame", "sexe")))
+    verifier(sprintf("#357 appel direct, \u00e9tape %s, sexe et cause_sortie k357 mal form\u00e9es -> les deux colonnes cit\u00e9es, dans l'ordre des r\u00f4les (valeur \u00e9crite \u00e0 la main)", e),
+             juger(mesurer(tablexp:::controler_lignes_extraites(d3, d3[5:8, ], 5:8, ROLES_SIM, e)), e,
+                   message_col(e, paste(S1, "\u00ab cause_sortie \u00bb (classe k357/factor)", sep = ", "),
+                               "k357/factor"),
+                   details("data.frame", c("sexe", "cause_sortie"))))
+    verifier(sprintf("#357 appel direct, \u00e9tape %s, entr\u00e9e de sous-classe kdf357 (sans m\u00e9thode \u00ab [ \u00bb propre), sexe k357 -> message de l'entr\u00e9e, colonne cit\u00e9e sans classe (valeur \u00e9crite \u00e0 la main)", e),
+             juger(mesurer(tablexp:::controler_lignes_extraites(dk, dk[5:8, ], 5:8, ROLES_SIM, e)), e,
+                   message_entree(e, "\u00ab sexe \u00bb", "kdf357/data.frame"), details(c("kdf357", "data.frame"), "sexe")))
+  }
+  # Témoin : la même entrée, plan sans importance_exclusions, est construite (lignes conservées sans NA dans sexe).
+  verifier("#357 t\u00e9moin : colonne sexe k357, plan sans importance_exclusions -> objet construit, 0 avertissement de R", {
+    p <- plan_ie(); p$etapes$importance_exclusions <- NULL
+    m <- mesurer(construire_table(d, ROLES_SIM, p))
+    if (!is.null(m$r)) paste("condition :", conditionMessage(m$r)) else identical(m$avertissements, 0L)
+  })
+})
+verifier("#357 les m\u00e9thodes `[` de session sont retir\u00e9es de globalenv()",
+         !any(c("[.k357", "[.k357rev") %in% ls(globalenv(), all.names = TRUE)))

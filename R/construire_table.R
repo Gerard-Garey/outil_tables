@@ -2040,9 +2040,10 @@ rejouer_fiche <- function(donnees, fiche, tables_reference = NULL) {
                                  "colonnes des rôles de la fiche (%s), lignes dans l'ordre reçu : un autre ordre des",
                                  "lignes, une valeur ou un type de colonne différents suffisent à la changer ; les",
                                  "colonnes hors rôles n'y entrent pas."),
-                         sans_controle(e[["donnees"]]), empreinte, nrow(donnees), ENTETE_CANONIQUE,
-                         liste_guillemets(unname(roles))),
-                list(lu = e[["donnees"]], attendu = empreinte, lignes = nrow(donnees), colonnes = unname(roles)))
+                         sans_controle(e[["donnees"]]), empreinte, .row_names_info(donnees, 2L),
+                         ENTETE_CANONIQUE, liste_guillemets(unname(roles))),
+                list(lu = e[["donnees"]], attendu = empreinte, lignes = .row_names_info(donnees, 2L),
+                     colonnes = unname(roles)))
 
   # 7 bis. Tables de référence (ADR 0015, point 4.2) : reçues ou relues dans
   #    le package, empreinte de chacune contre la fiche. Le contrôle 1.3 sur
@@ -2134,7 +2135,8 @@ rejouer_fiche <- function(donnees, fiche, tables_reference = NULL) {
                 texte_lu(r$empreintes$resultat),
                 texte_moteur("non recalculée par le moteur (couche de lecture, E4.4)"), tc[["attendu"]]),
     lu = c(formuler("fiche : liste nommée de %d champs ; donnees : classe %s, %d lignes, %d colonnes",
-                    length(fiche), paste(sans_controle(class(donnees)), collapse = "/"), nrow(donnees), ncol(donnees)),
+                    length(fiche), paste(sans_controle(class(donnees)), collapse = "/"),
+                    .row_names_info(donnees, 2L), longueur_lue(donnees)),
            texte_moteur("champs lus de la forme attendue"),
            sprintf("%d", v), e[["algorithme"]], e[["representation"]],
            # provenance_lue : NULL écrit « NULL », sinon citer_fichiers_lus()

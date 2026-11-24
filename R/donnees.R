@@ -666,8 +666,9 @@ colonnes_lues <- function(x) {
 }
 
 # Constat d'une liste incohérente (rendu de colonnes_lues()), formé une fois et
-# cité tel quel par les refus de controler_lignes_donnees() (#344) et de
-# controler_lignes_extraites() (#345) : « liste de N colonne(s) pour M nom(s) de
+# cité tel quel par les refus de controler_lignes_donnees() (#344), de
+# controler_lignes_extraites() (#345), de table_reference() et
+# d'empiler_stocks() (#355) : « liste de N colonne(s) pour M nom(s) de
 # colonne ».
 constat_colonnes_lues <- function(lues)
   formuler("liste de %d colonne(s) pour %d nom(s) de colonne", lues$nombre_colonnes, lues$nombre_noms)
@@ -750,8 +751,9 @@ colonnes_ecart_citees <- function(nom_c, nom_d, premiere = NULL) {
 # Décomptes de lignes d'un data.frame (#312), contrôle « (1) forme » des
 # données : .row_names_info(donnees, 2L) (attribut row.names, lu sans dispatch ;
 # la valeur que lisent dim.data.frame, `[.data.frame` et le rapport), nrow()
-# (avec dispatch : la grandeur que lit preparer_donnees()) et le nombre de
-# lignes de chaque colonne, toutes les colonnes, doivent être égaux ; sinon
+# (avec dispatch : seule lecture avec dispatch du nombre de lignes de
+# l'entrée qu'admette la garde de #354) et le nombre de lignes de chaque
+# colonne, toutes les colonnes, doivent être égaux ; sinon
 # refus donnees_mal_formees, sans rien corriger. Une méthode dim() de la
 # classe qui lève une erreur la propage (R2 de #312). Colonnes parcourues par
 # position, décompte de chacune lu comme le décrivent les assistants
@@ -1270,7 +1272,7 @@ deces_par_tete <- function(g, sor, cause) {
 #                 date de sortie hors « en_cours » (motifs non mesurables,
 #                 #69, § 2) est une erreur de programmation.
 evaluer_motifs <- function(donnees, roles, debut, fin, borne, segmentation, lignes_tete = NULL) {
-  n <- nrow(donnees)
+  n <- .row_names_info(donnees, 2L)
   if (!is.null(lignes_tete) && (!is.integer(lignes_tete) || !is.null(attributes(lignes_tete)) ||
                                 anyNA(lignes_tete) || anyDuplicated(lignes_tete) ||
                                 any(lignes_tete < 1L | lignes_tete > n)))
@@ -1393,7 +1395,7 @@ sous_indicer_categorie <- function(x, i) {
 # comparées exactement. Rend list(motifs) : liste nommée code -> numéros de
 # ligne (1-based, croissants), dans l'ordre MOTIFS_LIGNES_AGREGATS.
 evaluer_motifs_agregats <- function(donnees, roles, p) {
-  n <- nrow(donnees)
+  n <- .row_names_info(donnees, 2L)
   col <- function(role) if (role %in% names(roles)) lire_champ(donnees, roles[[role]]) else NULL
   vrai <- function(x) !is.na(x) & x
   non_entier <- function(x) !is.na(x) & (!is.finite(x) | x != trunc(x))
@@ -1623,7 +1625,7 @@ evaluer_motifs_stocks <- function(donnees, roles, p, segmentation) {
   if (is.null(p$inventaires))
     stop("evaluer_motifs_stocks() : grille des inventaires absente de p (erreur de programmation).", call. = FALSE)
   grille <- as.numeric(unclass(p$inventaires)); M <- length(grille)
-  n <- nrow(donnees)
+  n <- .row_names_info(donnees, 2L)
   col <- function(role) if (role %in% names(roles)) lire_champ(donnees, roles[[role]]) else NULL
   jours <- function(role) as.numeric(unclass(col(role)))
   vrai <- function(x) !is.na(x) & x
@@ -1865,7 +1867,10 @@ observations_stocks <- function(lignes, numeros, roles, segmentation, p, donnees
 # donnees), dans l'ordre :
 #   empilement_table_invalide        : `inventaires` ou `evenements` n'est pas
 #                                      un data.frame (le moteur ne lit pas de
-#                                      fichier) ;
+#                                      fichier), ou est un data.frame dont la
+#                                      liste des colonnes et les noms n'ont
+#                                      pas la même longueur (#355 ; première
+#                                      table en défaut) ;
 #   empilement_colonne_type_invalide : `colonne_type` hors de la forme
 #                                      ci-dessus ;
 #   empilement_noms_invalides        : nom de colonne NA, vide, en double ou
@@ -1883,7 +1888,9 @@ observations_stocks <- function(lignes, numeros, roles, segmentation, p, donnees
 #                                      différents, toutes citées.
 empiler_stocks <- function(inventaires, evenements, colonne_type) {
   tables <- list(inventaires = inventaires, evenements = evenements)
-  non_df <- names(tables)[!vapply(tables, is.data.frame, logical(1L))]
+  # is.list() : un environnement classé « data.frame » n'a pas de colonnes à
+  # lire (colonnes_lues() : précondition ; précédent de controler_roles()).
+  non_df <- names(tables)[!vapply(tables, function(x) is.data.frame(x) && is.list(x), logical(1L))]
   if (length(non_df))
     refuser("donnees", "empilement_table_invalide",
             formuler(paste("Empilement des stocks successifs : un data.frame est attendu pour %s (classe(s) reçue(s) : %s) ;",
@@ -1892,6 +1899,21 @@ empiler_stocks <- function(inventaires, evenements, colonne_type) {
                      paste(vapply(tables[non_df], function(x) paste(citer(class(x)), collapse = "/"), character(1L)),
                            collapse = " ; ")),
             list(table = non_df, classe = lapply(tables[non_df], class)))
+  # Cohérence de la liste des colonnes et de ses noms (#355, F344), première
+  # table en défaut, avant toute lecture de colonne : sous une liste plus
+  # courte que ses noms, .subset2() levait « subscript out of bounds ».
+  for (nom_table in names(tables)) {
+    lues <- colonnes_lues(tables[[nom_table]])
+    if (!lues$coherente)
+      refuser("donnees", "empilement_table_invalide",
+              formuler(paste("Empilement des stocks successifs : la table « %s » est un data.frame mal formé, dont la",
+                             "liste des colonnes et les noms de colonnes n'ont pas la même longueur (%s ; classe %s).",
+                             "Le moteur ne choisit pas entre ces décomptes, et ne les corrige pas : passer un",
+                             "data.frame dont la liste des colonnes et les noms de colonnes ont la même longueur."),
+                       citer(nom_table), constat_colonnes_lues(lues), paste(citer(class(tables[[nom_table]])), collapse = "/")),
+              list(table = nom_table, classe = lapply(tables[nom_table], class),
+                   nombre_colonnes = lues$nombre_colonnes, nombre_noms = lues$nombre_noms))
+  }
   if (!chaine_unique(colonne_type) || Encoding(colonne_type) == "bytes")
     refuser("donnees", "empilement_colonne_type_invalide",
             formuler(paste("Empilement des stocks successifs : colonne_type, nom de la colonne du type de ligne",
@@ -2092,7 +2114,12 @@ SUJETS_LIGNES_EXTRAITES <- c(
 # chaque colonne de rôle (lue sans dispatch par lire_champ(), des deux côtés)
 # reprend les valeurs des lignes demandées, jugées sans dispatch (#322, point
 # 2, spécification d'actuary, Q1 ; M558) : colonne de l'entrée facteur
-# (a_classe(), sous-classes comprises) : la colonne extraite est un facteur et
+# (a_classe(), sous-classes comprises) : (3 a), sur toutes les colonnes de
+# rôle avant le (3 b), une colonne extraite facteur est bien formée
+# (facteur_bien_forme(), F342 ; #357, spécification d'actuary : un code hors
+# des niveaux, lu NA par libelles_facteur(), passerait le (3 b) et ferait
+# lever « malformed factor » à as.character() plus loin ; toutes les colonnes
+# en défaut citées, constat propre) ; (3 b) la colonne extraite est un facteur et
 # ses libellés (libelles_facteur()) sont ceux des numéros dans la colonne de
 # l'entrée, les niveaux n'étant pas comparés (une méthode `[` qui retire les
 # niveaux inutilisés, droplevels(), reste admise ; une méthode `[` de colonne
@@ -2125,7 +2152,7 @@ controler_lignes_extraites <- function(donnees, extraites, numeros, roles, etape
   forme <- a_classe(extraites, "data.frame") && is.list(extraites)
   # (1) décompte des lignes (noms de lignes, sans dispatch) ; (1 bis) mêmes colonnes que l'entrée (nombre lu sur la
   # liste, noms lus sans dispatch : le nombre de la liste est celui des noms et de l'entrée) ; (2) décompte de chaque colonne, toutes, selon la règle de
-  # controler_lignes_donnees() ; (3) identité des colonnes de rôle.
+  # controler_lignes_donnees() ; (3) (3 a) bonne forme du facteur extrait, (3 b) identité des colonnes de rôle.
   nc <- if (forme) .row_names_info(extraites, 2L) else NA_integer_
   ecart_compte <- forme && (is.na(nc) || nc != attendu)
   exact <- identical(class(donnees), "data.frame")
@@ -2139,7 +2166,7 @@ controler_lignes_extraites <- function(donnees, extraites, numeros, roles, etape
   coherente <- forme && lues$coherente
   ecart_colonnes <- forme && !ecart_compte &&
     (!coherente || lues$nombre_colonnes != length(unclass(donnees)) || !identical(nom_c, nom_d))
-  dec <- NULL; k <- integer(0); colonnes <- character(0); premiere <- NULL
+  dec <- NULL; k <- integer(0); colonnes <- character(0); premiere <- NULL; mal_formees <- FALSE
   # Entrée exactement « data.frame » et écart de colonnes : décomptes lus pour situer la première position écartée
   # (et les éléments NULL, que `[.data.frame` laisse à la place d'une colonne retirée).
   if (exact && ecart_colonnes && coherente) {
@@ -2150,17 +2177,29 @@ controler_lignes_extraites <- function(donnees, extraites, numeros, roles, etape
   if (forme && !ecart_compte && !ecart_colonnes) {
     dec <- decomptes_colonnes(extraites)
     k <- which(is.na(dec$lc) | dec$lc != attendu)
-    if (!length(k))
-      for (cc in unique(unname(roles))) {
-        a <- lire_champ(extraites, cc); b <- lire_champ(donnees, cc)
-        # Facteur : libellés lus sans dispatch, comparés, non les niveaux ; autre colonne (sans classe ou Date
-        # exacte, type_conforme()) : `[` interne ou de base.
-        identique <- if (a_classe(b, "factor"))
-                       a_classe(a, "factor") && identical(libelles_facteur(a, seq_len(longueur_lue(a))),
-                                                          libelles_facteur(b, numeros))
-                     else identical(a, b[numeros])
-        if (!identique) colonnes <- c(colonnes, cc)
+    if (!length(k)) {
+      cr <- unique(unname(roles))
+      # (3 a) bonne forme du facteur extrait (facteur_bien_forme(), F342 ; #357), sur toutes les colonnes de rôle,
+      # avant (3 b) : un code hors des niveaux n'a pas de libellé interprétable (libelles_facteur() le lit NA).
+      for (cc in cr) {
+        a <- lire_champ(extraites, cc)
+        if (a_classe(lire_champ(donnees, cc), "factor") && a_classe(a, "factor") && !facteur_bien_forme(a))
+          colonnes <- c(colonnes, cc)
       }
+      mal_formees <- length(colonnes) > 0L
+      # (3 b) identité des colonnes de rôle.
+      if (!mal_formees)
+        for (cc in cr) {
+          a <- lire_champ(extraites, cc); b <- lire_champ(donnees, cc)
+          # Facteur : libellés lus sans dispatch, comparés, non les niveaux ; autre colonne (sans classe ou Date
+          # exacte, type_conforme()) : `[` interne ou de base.
+          identique <- if (a_classe(b, "factor"))
+                         a_classe(a, "factor") && identical(libelles_facteur(a, seq_len(longueur_lue(a))),
+                                                            libelles_facteur(b, numeros))
+                       else identical(a, b[numeros])
+          if (!identique) colonnes <- c(colonnes, cc)
+        }
+    }
   }
   if (!forme || ecart_compte || ecart_colonnes || length(k) || length(colonnes)) {
     # Classe d'entrée exactement « data.frame » (sans méthode « [ » propre) et cause « colonne » (écart de
@@ -2201,6 +2240,11 @@ controler_lignes_extraites <- function(donnees, extraites, numeros, roles, etape
     else if (length(k))
       formuler("comptent %d ligne(s) comme demandé mais leurs colonnes ne comptent pas toutes ce nombre de lignes (%s)",
                nc, paste(colonnes_decompte_citees(k, dec, classes), collapse = " ; "))
+    else if (mal_formees)
+      formuler(paste("comptent %d ligne(s) comme demandé mais leur(s) colonne(s) de rôle %s sont des facteurs mal",
+                     "formés (niveaux absents ou non character, ou code qui n'est ni NA ni un integer de 1 au nombre",
+                     "de niveaux)"), nc,
+               if (is.null(classes)) liste_guillemets(colonnes) else colonnes_classe_citees(colonnes, classes))
     else
       formuler(paste("comptent %d ligne(s) comme demandé mais ne reprennent pas les valeurs des lignes demandées",
                      "dans la ou les colonne(s) de rôle %s"), nc,
@@ -2277,7 +2321,7 @@ controler_lignes_extraites <- function(donnees, extraites, numeros, roles, etape
 # numéro de son observation (composante fusionnée ou contrat ; la cellule
 # elle-même sous `agregats`).
 preparer_donnees <- function(donnees, roles, p, segmentation, exclusions, recette) {
-  n <- nrow(donnees)
+  n <- .row_names_info(donnees, 2L)
   if (!n) refuser("donnees", "base_vide", formuler("La base d'observation ne contient aucune ligne."))
   ev <- switch(recette$recette,
     lignes_dates_completes = evaluer_motifs(donnees, roles, p$debut, p$fin, p$borne, segmentation),
@@ -2711,8 +2755,22 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
                            "d'encodage bytes."),
                      nom_cite, paste(citer(class(x)), collapse = "/")),
             list(classe = class(x)))
-  if (!is.data.frame(x))
+  # !is.list() : un environnement classé « data.frame » n'a pas de colonnes à
+  # lire (colonnes_lues() : précondition ; précédent de controler_roles()).
+  if (!is.data.frame(x) || !is.list(x))
     refuser("donnees", "table_mal_formee", formuler("Table « %s » : un data.frame est attendu.", nom_cite))
+  # Cohérence de la liste des colonnes et de ses noms (#355, F344), avant toute
+  # lecture de colonne : sous une liste plus courte que ses noms, x$sexe
+  # arrêtait R (segmentation fault, type_conforme(x$sexe, "categorie")).
+  lues <- colonnes_lues(x)
+  if (!lues$coherente)
+    refuser("donnees", "table_mal_formee",
+            formuler(paste("Table « %s » : la table est un data.frame mal formé, dont la liste des colonnes et les noms",
+                           "de colonnes n'ont pas la même longueur (%s ; classe %s). Le moteur ne choisit pas entre ces",
+                           "décomptes, et ne les corrige pas : passer un data.frame dont la liste des colonnes et les",
+                           "noms de colonnes ont la même longueur."),
+                     nom_cite, constat_colonnes_lues(lues), paste(citer(class(x)), collapse = "/")),
+            list(classe = class(x), nombre_colonnes = lues$nombre_colonnes, nombre_noms = lues$nombre_noms))
   # Colonnes (spécification de #146, § 1.2 ; ADR 0019, point 1.2) : age, sexe,
   # au plus un axe temporel (annee ou generation), et exactement une des
   # colonnes qx ou lx ; lx ne se reçoit que sous la forme
@@ -2772,7 +2830,7 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
                                                       any(abs(x$generation) > .Machine$integer.max))))
   if (any(mal_typees))
     refuser("donnees", "table_colonne_mal_typee",
-            formuler("Table « %s » : colonne(s) mal typée(s) ou avec valeur manquante %s (age : entier >= 0 ; annee : entier ; generation : entier ; sexe : chaîne ; qx : double ; lx : nombre).",
+            formuler("Table « %s » : colonne(s) mal typée(s) ou avec valeur manquante %s (age : entier >= 0 ; annee : entier ; generation : entier ; sexe : chaîne ou facteur bien formé ; qx : double ; lx : nombre).",
                      nom_cite, liste_guillemets(names(mal_typees)[mal_typees])),
             list(colonne = names(mal_typees)[mal_typees]))
   sexe <- as.character(x$sexe)
