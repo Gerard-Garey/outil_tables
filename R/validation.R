@@ -238,34 +238,6 @@ PHRASES_ATTENDUS_FAIBLES <- list(
              "numérique) : la p asymptotique est trop grande ou trop petite selon la répartition des A_c ; seule",
              "p_monte_carlo a un niveau garanti sous H0 (i)"))
 
-# Mention d'indépendance des unités d'observation (#159), source unique de
-# la conséquence par nature de grandeur (#330, F330 ; spécification
-# d'actuary-approfondi, commentaire 7102990712 de #330) : préfixe commun
-# (marqueur et cause), puis la conséquence de la nature. tests : p-valeur ou
-# statistique de test ; intervalle ; variance : variance sous-évaluée, objet
-# exigé (ex. « Var(X2) »), seule nature qui en prend un ; valeur_h0 :
-# espérance ou variance sous H0 (i) dont le sens de l'écart n'est pas établi ;
-# niveau : test dont le sens de l'erreur n'est pas établi. Appelée par
-# STATUTS_VALIDATION, STATUTS_VALIDATION_POSITIONNEE et STATUTS_IMPORTANCE à
-# l'installation ; chaîne non marquée, comme les littéraux auxquels elle est
-# collée (le texte_moteur() de chaque table la marque).
-mention_independance <- function(nature, objet = NULL) {
-  natures <- c("tests", "intervalle", "variance", "valeur_h0", "niveau")
-  if (!is.character(nature) || length(nature) != 1L || !nature %in% natures)
-    stop("mention_independance() : nature inconnue (erreur de programmation).", call. = FALSE)
-  if (if (identical(nature, "variance")) !(is.character(objet) && length(objet) == 1L && !is.na(objet) && nzchar(objet))
-      else !is.null(objet))
-    stop("mention_independance() : objet exigé pour la nature variance, et pour elle seule (erreur de programmation).",
-         call. = FALSE)
-  consequence <- switch(nature,
-    tests = "les tests sont anti-conservateurs",
-    intervalle = "l'intervalle est trop étroit",
-    variance = paste(objet, "est sous-estimée"),
-    valeur_h0 = "la valeur sous H0 (i) diffère de celle de la loi réelle, dans un sens non établi en général",
-    niveau = "le niveau n'est plus garanti")
-  paste("unités d'observation indépendantes ; sous l'unité contrat, les décès sont sur-dispersés et", consequence)
-}
-
 # Statuts (E2.20) des grandeurs de resultat$statistiques, une ligne par
 # (statistique, grandeur), dans l'ordre du tableau ; sous_h0 : grandeur
 # définie par H0 (p-valeur, intervalle, espérance ou variance sous H0,
@@ -1962,17 +1934,15 @@ ETATS_P_EXACTE_HOMOGENEITE <- c("produite", "plus_de_deux_groupes", "convolution
 # d'exposition infimes) ; z et theta_80 non définis ; aucun signal ; spécification
 # d'actuary-approfondi de #336, D8, et de #333, Q4, § 1) ; produite.
 ETATS_SEGMENTS_HOMOGENEITE <- c("produite", "segment_sans_exposition", "evenement_sans_exposition", "variance_nulle")
-# Mention d'indépendance des unités (M278, #159), en fin de chaque statut
-# d'une loi.
-INDEPENDANCE_HOMOGENEITE <- paste("unités d'observation indépendantes ; sous l'unité contrat, les décès sont",
-                                  "sur-dispersés et le test est anti-conservateur (p-valeurs trop petites)")
-# Hypothèse nulle (spécification de #168, § 1), dans les paramètres de l'étape.
+# Hypothèse nulle (spécification de #168, § 1), dans les paramètres de l'étape ;
+# mention d'indépendance des unités (M278, #159) de nature tests, comme en fin
+# de chaque statut d'une loi de STATUTS_HOMOGENEITE (#359, F359).
 HYPOTHESE_HOMOGENEITE <- texte_moteur(paste(
   "H0 : D_sc ~ Poisson(E_sc mu_c) indépendants, mu_c commun à tous les segments s dans chaque cellule c de la",
   "plage (âge, et année civile si par_annee), force constante sur la cellule, exposition centrale E tenue pour",
   "fixe ; conditionnellement à D_.c, (D_1c, ..., D_Sc) suit la loi multinomiale (D_.c ; pi_c), pi_sc =",
   "E_sc / E_.c, libre de mu_c ; test par variable : mêmes lois, strates cellule x modalité de l'autre variable,",
-  "groupes modalités de la variable testée ;", INDEPENDANCE_HOMOGENEITE))
+  "groupes modalités de la variable testée ;", mention_independance("tests")))
 # Référence de méthode (forme M209, E2.12) : source relue sur l'image le
 # 07/11/2026 (M290, M305) ; URL, SHA-256 des fichiers lus et pages
 # consignés, écarts de l'outil à la source nommés.
@@ -2073,15 +2043,14 @@ statut_ecart_minimal <- function(superieur) {
         "précision à cette tolérance, qu'elle soit ou non représentable (pivot de l'élimination non fini ou non",
         "positif, limite indéterminée (dont une part d'exposition arrondie à 0 dans une strate où le segment et un",
         "autre segment sont exposés), résolution non convergée, ou postcondition |lambda_s(theta_80) / lambda_80 -",
-        "1| <= 1e-8 non tenue) ; unités d'observation indépendantes ; sous l'unité contrat, les décès sont",
-        "sur-dispersés et theta_80 est trop proche de 1 (écart minimal détectable sous-estimé)")
+        "1| <= 1e-8 non tenue) ;", mention_independance("ecart_minimal"))
 }
 
 # Statuts (E2.20) des grandeurs de l'étape, par table du résultat (tests,
 # segments, ecart_minimal) ; spécification de #168, § 4 ; deux lignes de
 # ecart_minimal en fin (#218, spécification, § 7).
 STATUTS_HOMOGENEITE <- local({
-  ind <- INDEPENDANCE_HOMOGENEITE
+  ind <- mention_independance("tests")
   l <- list(
     c("tests", "strates_informatives",
       paste("décompte exact : strates (cellules ; cellule x modalité de l'autre variable pour un test par",
@@ -2141,7 +2110,8 @@ STATUTS_HOMOGENEITE <- local({
             "H0 (V_ss -> infini, même régime que p_asymptotique), E tenue pour fixe ; V_ss = somme des w_sk (k",
             "différent de s), sans soustraction ; U du groupe de référence de sa composante pris égal à moins la",
             "somme des U des autres groupes (identité exacte) ; aucune p-valeur produite ; calcul en arithmétique",
-            "flottante, approximation numérique ; aucune correction de multiplicité ;", ind)),
+            "flottante, approximation numérique ; aucune correction de multiplicité ;",
+            mention_independance("variance", "V_ss"))),
     c("ecart_minimal", "theta_80_superieur", statut_ecart_minimal(TRUE)),
     c("ecart_minimal", "theta_80_inferieur", statut_ecart_minimal(FALSE)))
   texte_moteur(data.frame(table = vapply(l, `[`, "", 1L), grandeur = vapply(l, `[`, "", 2L),

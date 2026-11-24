@@ -65,15 +65,18 @@ verifier("A STATUTS_VALIDATION_POSITIONNEE : mêmes (statistique, grandeur, sous
     grepl("contraint_par_positionnement", k("smr", "p_centrale"), fixed = TRUE) &&
     grepl("loi non corrigée de l'estimation de theta", k("wilcoxon", "p_exacte"), fixed = TRUE) &&
     !any(grepl("Liddell|Garwood|Byar|Wilson|Hilferty|Clopper|Pearson \\(", b$statut)) &&
-    all(grepl("sous l'unité contrat, les décès sont sur-dispersés et les tests sont anti-conservateurs",
+    all(grepl(paste("sous l'unité contrat, les décès sont sur-dispersés et les tests sont anti-conservateurs à",
+                    "attendus grands (résultat asymptotique), l'erreur de niveau étant de sens non établi en général",
+                    "à petits attendus"),
               c(k("khi2_pearson", "p_asymptotique"), k("deviance", "p_monte_carlo"), k("deviance", "p_asymptotique"),
                 k("sous_groupes", "p_valeurs")), fixed = TRUE)) &&
     # Conséquence par nature (#330) : valeur sous H0 (i) pour les espérances
     # conditionnelles, intervalle pour les bornes des sous-groupes.
     grepl("sur-dispers\u00e9s et la valeur sous H0 (i) diff\u00e8re de celle de la loi r\u00e9elle",
           k("residus", "esperance_au_dela_2"), fixed = TRUE) &&
-    grepl("sur-dispers\u00e9s et l'intervalle est trop \u00e9troit", k("sous_groupes", "bornes_exactes"),
-          fixed = TRUE) &&
+    grepl(paste("sur-dispers\u00e9s et l'intervalle est trop \u00e9troit \u00e0 attendus grands (r\u00e9sultat",
+                "asymptotique), l'\u00e9cart de couverture \u00e9tant de sens non \u00e9tabli en g\u00e9n\u00e9ral \u00e0",
+                "petits attendus"), k("sous_groupes", "bornes_exactes"), fixed = TRUE) &&
     grepl("couverture >= niveau (intervalle exact conservatif)", k("sous_groupes", "bornes_exactes"), fixed = TRUE) &&
     grepl("si n - S = 0 (une cellule retenue par segment)", k("khi2_pearson", "ddl"), fixed = TRUE)
 })
@@ -101,7 +104,9 @@ verifier("A STATUTS_VALIDATION_POSITIONNEE (M309) : Wilcoxon, R2 et distance nom
   # d'indépendance des unités sur les 22 lignes de loi ; avant #159 :
   # 736e637e156df8d409b6943d333fe741) puis par #330 (conséquence de la
   # mention selon la nature de la grandeur, 9 lignes ; avant #330 :
-  # 4b66eb3d650c8a0483869866dce8cf12),
+  # 4b66eb3d650c8a0483869866dce8cf12) puis par #359 (natures tests et
+  # intervalle qualifiées, 13 lignes ; avant #359 :
+  # 8b23686a0db0aed8993e24c8fdbc62b4),
   # valeur écrite en dur (identité exacte) : octets bruts des
   # chaînes (charToRaw, sans conversion), champs séparés par une tabulation,
   # lignes par un saut de ligne ; indépendante de la locale d'installation
@@ -129,7 +134,7 @@ verifier("A STATUTS_VALIDATION_POSITIONNEE (M309) : Wilcoxon, R2 et distance nom
                         grepl("pbinom ; table positionnée sur ces données", k("signes", "p_exacte"), fixed = TRUE,
                               useBytes = TRUE))
                       TRUE else paste(grep("[^ ];", b$statut, useBytes = TRUE, value = TRUE), collapse = " | "),
-    independante = if (identical(unname(tools::md5sum(f)), "8b23686a0db0aed8993e24c8fdbc62b4")) TRUE
+    independante = if (identical(unname(tools::md5sum(f)), "571dbf165e06f7d2a95ed371558940ec")) TRUE
                    else "STATUTS_VALIDATION modifié")
 })
 verifier("A statuts_validation() : switch à trois valeurs, erreur de programmation par défaut", tous(
@@ -673,8 +678,9 @@ verifier("T179.1 statuts : p asymptotique de X2 avec 2 + 1/A_c (independante) et
     # d'actuary, Q2).
     g2 = if (all(grepl("selon la répartition des A_c", g2, fixed = TRUE)) &&
              !any(grepl("conservat", sub(" ; unités d'observation indépendantes.*", "", g2), fixed = TRUE)) &&
-             grepl("sous l'unité contrat, les décès sont sur-dispersés et les tests sont anti-conservateurs", g2[2L],
-                   fixed = TRUE))
+             grepl(paste("sous l'unité contrat, les décès sont sur-dispersés et les tests sont anti-conservateurs à",
+                         "attendus grands (résultat asymptotique), l'erreur de niveau étant de sens non établi en",
+                         "général à petits attendus"), g2[2L], fixed = TRUE))
            TRUE else "deviance",
     # Phrases partagées entre les deux tables (PHRASES_ATTENDUS_FAIBLES, #200) :
     # identiques ; `petits` précède « : sous H0 (i) » dans les quatre p
@@ -873,7 +879,8 @@ verifier("T178.3 statuts : ligne sous_groupes/p_valeurs_asymptotiques (sous_h0) 
   a <- tablexp:::STATUTS_VALIDATION; b <- tablexp:::STATUTS_VALIDATION_POSITIONNEE
   k <- function(s, g) s$statut[s$statistique == "sous_groupes" & s$grandeur == g]
   indep <- paste("; unités d'observation indépendantes ; sous l'unité contrat, les décès sont sur-dispersés et les",
-                 "tests sont anti-conservateurs")
+                 "tests sont anti-conservateurs à attendus grands (résultat asymptotique), l'erreur de niveau étant",
+                 "de sens non établi en général à petits attendus")
   texte_p <- paste("asymptotiques (sigma^2 -> infini) conditionnellement aux O_s : approximation normale de la somme",
                    "de binomiales indépendantes Bin(O_s, pi_b,s) d'un sous-groupe de plusieurs segments, moyenne somme",
                    "de O_s pi_b,s, variance sigma^2 = somme de O_s pi_b,s (1 - pi_b,s), correction de continuité",
@@ -910,7 +917,9 @@ verifier("T200.1 statuts : sous_groupes/bornes_exactes et p_valeurs, texte propr
                                  "[G_O^-1(alpha/2), G_(O+1)^-1(1 - alpha/2)] / A, G_k loi gamma de forme k (0 si O = 0) ;",
                                  "couverture >= niveau (intervalle exact conservatif) ; qgamma, approximation numérique ;",
                                  "unités d'observation indépendantes ; sous l'unité contrat, les décès sont",
-                                 "sur-dispersés et l'intervalle est trop étroit ;",
+                                 "sur-dispersés et l'intervalle est trop étroit à attendus grands (résultat",
+                                 "asymptotique), l'écart de couverture étant de sens non établi en général à petits",
+                                 "attendus ;",
                                  "relation ajustee_hors_outil : non produites, nombre p de paramètres estimés non établi,",
                                  "aucun intervalle du sous-groupe (ddl_non_etabli) ; colonnes NA"))) TRUE
                          else "texte bornes_exactes",
@@ -920,7 +929,9 @@ verifier("T200.1 statuts : sous_groupes/bornes_exactes et p_valeurs, texte propr
                                     "modèle de survie ; fonctions de répartition de Poisson (ppois), approximation",
                                     "numérique ; loi de référence du sous-groupe X ~ Poisson(A) ; aucune correction de",
                                     "multiplicité ; unités d'observation indépendantes ; sous l'unité contrat, les",
-                                    "décès sont sur-dispersés et les tests sont anti-conservateurs ;", ajustee_p))) TRUE
+                                    "décès sont sur-dispersés et les tests sont anti-conservateurs à attendus grands",
+                                    "(résultat asymptotique), l'erreur de niveau étant de sens non établi en général à",
+                                    "petits attendus ;", ajustee_p))) TRUE
                       else "texte p_valeurs",
     commun = if (endsWith(k(a, "p_valeurs"), ajustee_p) && endsWith(k(a, "p_valeurs_asymptotiques"), ajustee_p)) TRUE
              else "fragment ajustee_hors_outil",

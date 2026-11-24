@@ -66,12 +66,23 @@ verifier("A états : tests, p exacte, segments (precision_insuffisante des tests
     identical(tablexp:::ETATS_SEGMENTS_HOMOGENEITE,
               c("produite", "segment_sans_exposition", "evenement_sans_exposition", "variance_nulle"))
 })
+# Mention d'indépendance de nature tests (littéral de la spécification de
+# #359, commentaire 7137095929 ; F359 : INDEPENDANCE_HOMOGENEITE supprimée,
+# mention_independance("tests") de R/brut.R) : en fin de chaque statut d'une
+# loi et de l'hypothèse nulle.
+INDEPENDANCE_TESTS_359 <- paste("unités d'observation indépendantes ; sous l'unité contrat, les décès sont",
+                                "sur-dispersés et les tests sont anti-conservateurs à attendus grands (résultat",
+                                "asymptotique), l'erreur de niveau étant de sens non établi en général à petits",
+                                "attendus")
+# segments/z : nature variance, objet V_ss (avis d'actuary sur #359, Q2).
+INDEPENDANCE_Z_359 <- paste("unités d'observation indépendantes ; sous l'unité contrat, les décès sont",
+                            "sur-dispersés et V_ss est sous-estimée")
 verifier("A STATUTS_HOMOGENEITE : (table, grandeur) uniques ; mention d'indépendance sur chaque loi (M278) ; O/A non nommé SMR ; aucune attribution d'auteur (M200)", {
   s <- tablexp:::STATUTS_HOMOGENEITE
   loi <- paste(s$table, s$grandeur) %in% c("tests p_asymptotique", "tests p_exacte", "tests p_monte_carlo", "segments z")
   !anyDuplicated(paste(s$table, s$grandeur)) && all(nzchar(s$statut)) && sum(loi) == 4L &&
-    all(grepl("unités d'observation indépendantes ; sous l'unité contrat, les décès sont sur-dispersés et le test est anti-conservateur",
-              s$statut[loi], fixed = TRUE)) &&
+    all(endsWith(s$statut[loi][1:3], INDEPENDANCE_TESTS_359)) &&
+    endsWith(s$statut[loi][4L], INDEPENDANCE_Z_359) &&
     grepl("ce n'est pas un SMR", s$statut[s$grandeur == "rapport_observes_attendus"], fixed = TRUE) &&
     !any(grepl("Breslow|Day|Rao|Mantel|Haenszel|Cochran|Pearson", s$statut)) &&
     identical(Encoding(s$statut[1L]), "UTF-8")
@@ -82,7 +93,7 @@ verifier("A STATUTS_HOMOGENEITE : p exacte et p de Monte-Carlo asymptotiques sou
   pos <- function(motif, x) regexpr(motif, x, fixed = TRUE)
   f <- pos("E tenue pour fixe", st); a <- pos("asymptotique sous le modèle de survie", st)
   length(st) == 2L && all(f > 0L) && all(a > f) &&
-    all(endsWith(st, paste(";", tablexp:::INDEPENDANCE_HOMOGENEITE)))
+    all(endsWith(st, paste(";", INDEPENDANCE_TESTS_359)))
 })
 # T185 (spécification (0') de #185, M362, option 1a) : régime asymptotique de
 # p_asymptotique et de z, information du test croissante (plus petite valeur
@@ -95,7 +106,7 @@ verifier("T185.1 STATUTS_HOMOGENEITE : p_asymptotique sous le régime de la plus
              "petite valeur propre de V réduite -> infini), à nombre de groupes fixé, le nombre de strates étant",
              "fixe ou croissant (D_. pouvant rester borné dans chaque strate quand le nombre de strates croît) ;",
              "sous H0 avec E tenue pour fixe ; asymptotique aussi sous le modèle de survie ; queue supérieure ;",
-             tablexp:::INDEPENDANCE_HOMOGENEITE)
+             INDEPENDANCE_TESTS_359)
   identical(st("tests", "p_asymptotique"), p) &&
     grepl("de loi asymptotique N(0, 1) sous H0 (V_ss -> infini, même régime que p_asymptotique), E tenue pour fixe ;",
           st("segments", "z"), fixed = TRUE) &&
@@ -124,7 +135,7 @@ verifier("T202 STATUTS_HOMOGENEITE : p_asymptotique sans condition sur les parts
                        "différent de s), sans soustraction ; U du groupe de référence de sa composante pris égal à moins la",
                        "somme des U des autres groupes (identité exacte) ; aucune p-valeur produite ; calcul en",
                        "arithmétique flottante, approximation numérique ; aucune correction de multiplicité ;",
-                       tablexp:::INDEPENDANCE_HOMOGENEITE))
+                       INDEPENDANCE_Z_359))
 })
 # Texte de statistique (#334 ; spécification d'actuary-approfondi, Q3, § 4,
 # complété de l'état precision_insuffisante du test, M570, P1 (a)) : littéral.

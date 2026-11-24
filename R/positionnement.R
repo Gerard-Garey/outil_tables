@@ -277,8 +277,7 @@ REFERENCE_METHODE_POSITIONNEMENT <- texte_moteur(paste(
 # colonnes ; chaque statut qui porte sur une loi se termine par la mention
 # d'indépendance des unités (M278, #159). Formules sans attribution (M200).
 STATUTS_POSITIONNEMENT <- local({
-  indep <- paste("unités d'observation indépendantes ; sous l'unité contrat, les décès sont sur-dispersés et",
-                 "l'intervalle est trop étroit")
+  indep <- mention_independance("intervalle")
   exact <- paste("exact sous la loi supposée (O ~ Poisson(theta A), A fixe), couverture >= niveau (intervalle exact",
                  "conservatif) ; asymptotique sous le modèle de survie ; qgamma, approximation numérique ;")
   asym <- paste("asymptotique (O -> infini) : ln theta^ de loi normale, de variance 1/O (inverse de l'information de",

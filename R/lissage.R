@@ -171,11 +171,9 @@ STATUTS_LISSAGE_POISSON <- local({
                   "confiance ; couverture fréquentiste non établie (aucun constat de simulation versé)")
   # Mention d'indépendance des unités (#159, #329 ; spécification
   # d'actuary-approfondi, #329, commentaire 7102999392) en fin de statut des
-  # deux bornes seules (nature intervalle) : le module lissage précède
-  # validation (ORDRE_MODULES), d'où ce fragment propre, égal à l'octet à
-  # mention_independance("intervalle") de R/validation.R (test C3).
-  bornes <- paste(bornes, ";", paste("unités d'observation indépendantes ; sous l'unité contrat, les décès sont",
-                                     "sur-dispersés et l'intervalle est trop étroit"))
+  # deux bornes seules (nature intervalle), par la source unique
+  # mention_independance() de R/brut.R (#359, F359).
+  bornes <- paste(bornes, ";", mention_independance("intervalle"))
   l <- list(
     c("table_lissee/qx",
       paste("-expm1(-exp(theta^)), theta^ maximum de la vraisemblance de Poisson pénalisée (mode a posteriori),",

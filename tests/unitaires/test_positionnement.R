@@ -64,8 +64,10 @@ verifier("A STATUTS_POSITIONNEMENT : (table, grandeur) uniques ; mention d'indé
   s <- tablexp:::STATUTS_POSITIONNEMENT
   b <- grepl("^borne_", s$grandeur)
   !anyDuplicated(paste(s$table, s$grandeur)) && all(nzchar(s$statut)) && sum(b) == 8L &&
-    all(grepl("unités d'observation indépendantes ; sous l'unité contrat, les décès sont sur-dispersés", s$statut[b],
-              fixed = TRUE)) &&
+    all(endsWith(s$statut[b], paste("unités d'observation indépendantes ; sous l'unité contrat, les décès sont",
+                                    "sur-dispersés et l'intervalle est trop étroit à attendus grands (résultat",
+                                    "asymptotique), l'écart de couverture étant de sens non établi en général à",
+                                    "petits attendus"))) &&
     !any(grepl("Liddell|Garwood|Byar|Wilson|Hilferty", s$statut))
 })
 # T185 (spécification (0') de #185, M362, option 1a) : statut de qx aligné sur
