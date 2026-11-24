@@ -3097,7 +3097,7 @@ local({
                                                       refus_tablexp = function(e) e), "refus_tablexp"),
                        0:(length(corps) - 1L))
     verifier(sprintf("R1 : chacun des %d préfixes stricts du corps de la fiche écrite refusé par lire_fiche()", length(corps)),
-             !length(acceptes) || sprintf("préfixe(s) accepté(s) : %s lignes", paste(acceptes, collapse = ", ")))
+             if (!length(acceptes)) TRUE else sprintf("préfixe(s) accepté(s) : %s lignes", paste(acceptes, collapse = ", ")))
     b <- unlist(tablexp:::BLOCS_LECTURE_FICHE)
     # hypotheses_recette : champ conditionnel, absent sous la recette des
     # lignes (ADR 0016, point 8.1 ; #169).

@@ -975,7 +975,7 @@ NOMS_131 <- list(rapport.R = charToRaw("rapport.R"), z.R = charToRaw("z.R"),
                  autre = charToRaw("b.r"))
 LOCALE_UTF8_131 <- locale_utf8_disponible()
 verifier("#131 : une locale UTF-8 est disponible pour les témoins (sinon la moitié des témoins ne porte pas)",
-         nzchar(LOCALE_UTF8_131) || "aucune locale de LOCALES_UTF8 acceptée par Sys.setlocale")
+         if (nzchar(LOCALE_UTF8_131)) TRUE else "aucune locale de LOCALES_UTF8 acceptée par Sys.setlocale")
 racine_131 <- tempfile("racine_131_"); dir.create(file.path(racine_131, "R"), recursive = TRUE)
 writeLines(c("Package: tablexp", "Version: 1"), file.path(racine_131, "DESCRIPTION"))
 CONTENUS_131 <- vapply(seq_along(NOMS_131), function(i) sprintf("v%d <- %d\n", i, i), "")

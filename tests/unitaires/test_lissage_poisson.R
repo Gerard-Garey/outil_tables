@@ -136,19 +136,19 @@ verifier("A réponse de travail theta - 1 aux cellules exposées sans décès (r
   r <- lp(DS, E, 1e-6, 4, X, ldp(N, 4))
   ch <- tablexp:::choisir_lambda_poisson(DS, E, 4, X, c(1e-6, 1e8), ldp(N, 4))
   d <- numeric(N); d[20] <- 10
-  tous(list(identical(r$statut, "produite") || sprintf("statut %s", r$statut),
-            (is.null(ch$echec) && is.na(ch$borne)) || "lambda^ non intérieur ou échec",
-            isTRUE(proche(ch$ajustement$lambda, 371297.92, rel = 1e-6, abs = 0)) ||
-              sprintf("lambda^ = %.17g", ch$ajustement$lambda),
-            identical(lp(d, E, 1e3, 3, X, ldp(N, 3))$statut, "non_convergent") || "z = 3 : statut produit"))
+  tous(list(if (identical(r$statut, "produite")) TRUE else sprintf("statut %s", r$statut),
+            if (is.null(ch$echec) && is.na(ch$borne)) TRUE else "lambda^ non intérieur ou échec",
+            if (isTRUE(proche(ch$ajustement$lambda, 371297.92, rel = 1e-6, abs = 0))) TRUE
+            else sprintf("lambda^ = %.17g", ch$ajustement$lambda),
+            if (identical(lp(d, E, 1e3, 3, X, ldp(N, 3))$statut, "non_convergent")) TRUE else "z = 3 : statut produit"))
 })
 verifier("A lambda_a_la_borne (règle Q1 d'actuary) : lambda retenu = la borne déclarée elle-même, identical(), sans recherche de Brent ; borne inférieure : z = 1, [1e3, 1e12] ; borne supérieure : z = 2, [1e-6, 1e12] (point de Brent 969 106 641 493,46 retenu avant la règle) (identité exacte sur la règle)", {
   bas <- tablexp:::choisir_lambda_poisson(D, E, 1, X, c(1e3, 1e12), ldp(N, 1))
   haut <- tablexp:::choisir_lambda_poisson(D, E, 2, X, c(1e-6, 1e12), ldp(N, 2))
-  tous(list(identical(bas$borne, "inferieure") || sprintf("borne %s", bas$borne),
-            identical(bas$ajustement$lambda, 1e3) || sprintf("lambda = %.17g", bas$ajustement$lambda),
-            identical(haut$borne, "superieure") || sprintf("borne %s", haut$borne),
-            identical(haut$ajustement$lambda, 1e12) || sprintf("lambda = %.17g", haut$ajustement$lambda)))
+  tous(list(if (identical(bas$borne, "inferieure")) TRUE else sprintf("borne %s", bas$borne),
+            if (identical(bas$ajustement$lambda, 1e3)) TRUE else sprintf("lambda = %.17g", bas$ajustement$lambda),
+            if (identical(haut$borne, "superieure")) TRUE else sprintf("borne %s", haut$borne),
+            if (identical(haut$ajustement$lambda, 1e12)) TRUE else sprintf("lambda = %.17g", haut$ajustement$lambda)))
 })
 verifier("A exactement z cellules exposées, toutes à décès > 0 : statut produite, interpolation (leviers des cellules exposées à 1 à 1e-10 près), z = 1 à 4", {
   ok <- vapply(1:4, function(z) {
