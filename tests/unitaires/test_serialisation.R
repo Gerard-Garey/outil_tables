@@ -713,7 +713,10 @@ local({
     invisible(gc(reset = TRUE))
     duree <- system.time(r <- tryCatch({ lire_plan(texte(c_[[2L]], c_[[3L]])); NULL },
                                        refus_tablexp = function(e) e, error = function(e) e))[["elapsed"]]
-    pic <- sum(gc()[, 6L])
+    # Colonne lue par nom : la colonne Mb qui suit « max used » (R_MAX_VSIZE
+    # ajoute « limit (Mb) » et décale les positions ; #362).
+    g1 <- gc()
+    pic <- sum(g1[, match("max used", colnames(g1)) + 1L])
     verifier(sprintf("R1 d'audit : @longueur %s -> texte_longueur_incoherente en ligne 2, en moins d'1 s, pic gc sous 200 Mo", c_[[1L]]),
              inherits(r, "refus_tablexp") && identical(r$motif, "texte_longueur_incoherente") &&
                identical(r$details$ligne, 2L) && duree < 1 && pic < 200 ||
