@@ -1093,6 +1093,18 @@ et~\ref{sec:brut-etats}).
 normale, rejet pour \code{sample()} \\
 \catalogue{fonctions-outils}{MOTIF\_CODE\_REFUS} & constante & --- & motif
 d'un code de refus ou d'avertissement~: \verb|^[a-z][a-z0-9_]*$| \\
+\catalogue{fonctions-outils}{LIMITE\_SOMMES\_DOUBLE} & constante & --- &
+moitié de \code{.Machine\$double.xmax} (8.9884656743115785e+307)~: borne
+d'une somme de termes positifs~; si une somme calculée $\hat T$ de $k <
+2^{51}$ termes est au plus cette borne, toute somme partielle calculée
+$\hat P$, dans n'importe quel ordre, en double ou en \code{long double},
+vérifie $\hat P < 1{,}72\,\hat T$, au plus 0,86~fois
+\code{.Machine\$double.xmax}, et reste finie (résultat exact~; constat
+de simulation concordant)~; lue par les modules \code{exposition}
+(refus \code{exposition\_hors\_plage}) et \code{validation} (garde de
+l'étape \code{homogeneite}), sans contenu métier
+(section~\ref{sec:exposition-cellules}~; issue~\#353, décision M579~;
+ADR 0009, annotation du 23/11/2026) \\
 \catalogue{fonctions-outils}{refus\_tablexp()} & interne & \code{module},
 \code{motif}, \code{message}, \code{details} (liste, vide par défaut) &
 condition de classe \code{refus\_tablexp}, sans la lever~; \code{stop()} si un
@@ -2966,7 +2978,39 @@ Les empreintes du résultat de ces trois plans et celle du code changent
 en conséquence~; aucune grandeur numérique, aucune structure ne change~;
 R1 à R14 restent identiques, en comparaison réussie, sur la plateforme de
 référence (processeur Intel Xeon Platinum 8370C, consigné sans
-contrôle).
+contrôle). Les régénérations suivantes ne sont pas détaillées ici~: R1 à
+R17 le 19/11/2026 (exécution 44586537589, calcul sur \code{b29caa5},
+commit \code{58ba7a1}~; issues~\#159 et~\#218) et le 20/11/2026
+(exécution 44698750703, calcul sur \code{c35eb9d}, commit
+\code{e6bbcad}~; issue~\#218), R11 et R12 le 21/11/2026 (exécution
+44894726135, commit \code{3cc2b71}~; issues~\#340 et~\#331) et le
+22/11/2026 (exécution 45021813451, commit \code{e04002c}~; issues~\#334
+et~\#333)~; celles du 20/11 et du 22/11/2026 sont décrites ci-dessus,
+«~Plans R11 et R12~». Les références R8, R9, R10, R16 et R17 ont été
+régénérées le 23/11/2026, en mode \code{regeneration} sur ces cinq plans
+seulement (exécution 45258747737 du workflow, calcul sur \code{cac4b84},
+commit \code{df5a5cd}, visa d'\code{actuary} du 23/11/2026~; issues~\#330
+et~\#329), régénération unique de la branche
+\code{claude/statuts-independance}, pour les seuls changements de texte
+annoncés en transition par ces issues~: la conséquence de la mention
+d'indépendance des unités, propre à la nature de la grandeur
+(section~\ref{sec:validation-statistiques}), dans 9~éléments sur~62 de
+\code{etapes/validation/resultat/statistiques/statut} de R8, de R9 et
+de R10 (positions 2, 4, 7, 34, 35, 44, 54, 60 et~62~: espérances et
+variance sous $H_0$~(i), p-valeurs de Monte-Carlo des signes, des suites
+et de Wilcoxon), plus, dans R10, l'élément~2 sur~4 de
+\code{etapes/validation/parametres/statuts\_sous\_groupes/statut}
+(\code{bornes\_exactes}, désormais «~l'intervalle est trop étroit~»)
+(\#330)~; la mention ajoutée en fin de statut des deux bornes de
+crédibilité, éléments 3 et~4 de
+\code{etapes/lissage/parametres/statuts/statut} (12~éléments dans R16,
+11~dans R17, où \code{parametre\_lissage} est absente, $\lambda$ étant
+déclaré~; \#329). Les empreintes du résultat de ces cinq plans changent
+en conséquence, celle du code aussi~; aucune grandeur numérique, aucune
+structure ne change~; R1 à R7 et R11 à R15 restent identiques, en
+comparaison réussie, sur la plateforme de référence (processeur Intel
+Xeon 6975P-C, consigné sans contrôle), sans table finale, verdict ni
+valeur de table homologuée changés.
 
 \begin{encadre}
 \small
@@ -4462,7 +4506,8 @@ de l'étape \code{coherence\_regularite} (section~\ref{sec:coherence-regularite}
 sur une extraction de lignes fausse de son contrefactuel (issue~\#320),
 ceux de l'étape \code{exposition}
 sur la table qu'elle forme (\code{trop\_de\_cellules},
-\code{evenements\_hors\_plage}, \code{denombrement\_hors\_plage} et
+\code{evenements\_hors\_plage}, \code{denombrement\_hors\_plage},
+\code{exposition\_hors\_plage} (issue~\#353) et
 \code{periode\_sans\_exposition},
 section~\ref{sec:troncature-censure}), et ceux de l'étape \code{donnees}
 sur ses lignes (\code{base\_vide}, refus par défaut
@@ -10867,7 +10912,69 @@ même quand chaque cellule tient dans la plage, l'étape refuse
 issue~\#199, décision M397), là où \code{sum()} d'un \code{integer}
 aurait rendu un \code{double} sans avertissement~; un total égal à
 \code{.Machine\$integer.max} est admis (section~\ref{sec:non-regression},
-«~Type des dénombrements~»). Sous les recettes à fenêtres d'exposition
+«~Type des dénombrements~»). Le total de chaque exposition déclarée
+(\code{exposition\_centrale}, \code{exposition\_initiale}), somme des
+cellules de la table, est gardé ensuite, sur le même principe (garde du
+total là où il se forme, décision M397), contre la plage de calcul en
+double précision (issue~\#353, décision M579~; ADR 0009, annotation du
+23/11/2026)~: s'il n'est pas au plus \code{LIMITE\_SOMMES\_DOUBLE}
+(moitié de \code{.Machine\$double.xmax}, environ $8{,}99 \cdot 10^{307}$~;
+\code{NaN} et infini compris, une somme de cellule infinie rendant le
+total infini), l'étape refuse (\code{exposition\_hors\_plage}, module
+\code{exposition}~; détails \code{role}, \code{valeur} (le total) et
+\code{limite}~; le message cite le rôle, le total au format
+\code{\%.17g}, ou «~non fini~», et la limite au même format,
+8.9884656743115785e+307). Ce refus est distinct de la clé de diagnostic
+homonyme \code{exposition\_hors\_plage} des étapes
+\code{validation}, \code{positionnement} et \code{homogeneite}, qui
+restitue l'exposition des cellules hors de la plage d'âges
+(section~\ref{sec:validation-etape} et section~\ref{sec:homogeneite}),
+comme \code{evenements\_hors\_plage} désigne à la fois un refus de
+l'étape \code{exposition} et un diagnostic de ces étapes. \textbf{Pourquoi
+une marge}~: en arithmétique exacte, le total d'une somme de termes
+positifs majore toute somme partielle, mais en double, près du plus grand
+réel, ce n'est plus vrai~: \code{sum()} accumule en \code{long double}
+(sur la plateforme de référence x86-64, format étendu à 64~bits de
+mantisse et 15~bits d'exposant~; mesuré~: \code{sum(c(xmax, xmax,
+-xmax))} rend \code{xmax}, quand \code{rowsum()} rend \code{Inf}),
+alors que \code{rowsum()} (sommes par strate, segment ou groupe de
+tirage) et l'accumulation séquentielle se font en double~; sur 39\,533 tirages
+adverses à total fini, 398 donnent une somme par groupe infinie
+(\emph{constat de simulation} d'\code{actuary}, spécification de
+l'issue~\#353, §~3), si bien qu'une garde sur le seul total non fini ne
+protège pas les sommes en aval. Avec la marge, le résultat est
+\emph{exact}, par l'analyse d'erreur de la sommation récursive de
+termes positifs~: pour $k$ termes positifs de total exact $T$ et de total
+calculé $\hat T$, et pour toute somme partielle $P$ de ces termes,
+calculée dans n'importe quel ordre avec une unité d'arrondi $u \le
+2^{-53}$, $\hat P \le (1+u)^{k-1} P \le (1+u)^{k-1} T$ et $T \le \hat
+T/(1-u)^k$~; pour $k < 2^{51}$, $(k-1)u < 1/4$ et $(1-u)^k > 3/4$, d'où
+$\hat P \le \bigl(e^{1/4}/(3/4)\bigr)\,\hat T < 1{,}72\,\hat T$, au plus
+0,86~fois \code{.Machine\$double.xmax} dès que $\hat T$ est au plus la
+borne~: toute somme partielle reste finie, en double comme en
+\code{long double}, et la borne reste exacte si \code{long double} se
+réduit au double (même inégalité, $u = 2^{-53}$). La condition $k <
+2^{51}$ est toujours tenue~: $2^{51}$ doubles occupent 16~Pio~; constat de simulation concordant (32\,889~cas à total au plus la
+borne, aucune somme partielle non finie, même spécification). La garde
+couvre ainsi toutes les sommes d'expositions des étapes qui travaillent
+sur les cellules de la construction (pour \code{homogeneite}~:
+expositions agrégées, de strate, de segment et poids d'un groupe de
+tirage, section~\ref{sec:homogeneite}). Elle ne couvre pas, par lecture
+et sans mesure, les produits $E^c \mu$ (attendus de la validation et du
+positionnement), $(E^c)^2$ du rapport de variance de
+\code{importance\_exclusions}, ni les expositions des lignes exclues de
+cette étape (limite assumée, issue~\#360, ouverte). \textbf{Changement
+de comportement} (accepté par M579)~: une construction dont une seule
+cellule porte une exposition de $10^{308}$, finie et produite jusque-là
+($z = \mp 3{,}496029$ à l'étape \code{homogeneite}, état
+\code{produite}~; mesuré sur le code d'avant l'issue (\code{d84e86a}, R~4.3.3~;
+spécification de l'issue~\#353, §~1~; remesuré par \code{actuary} à
+l'étape~(6) de B35)), est
+désormais refusée, $10^{308}$ dépassant la borne. Les recettes en lignes
+ne sont pas concernées~: les dates sont bornées (refus
+\code{date\_hors\_domaine}) et un vecteur de R compte au plus $2^{52}$
+lignes, d'où un total d'exposition d'environ $1{,}6 \cdot 10^{22}$~jours
+au plus. Sous les recettes à fenêtres d'exposition
 (\code{exposition\_fenetres()}), ce total est le nombre des événements des
 fenêtres, \code{integer} par construction, sans garde. Les expositions
 sont sommées en arithmétique flottante, dans l'ordre des lignes, comme sous
@@ -11189,7 +11296,7 @@ d'exposition d'une construction en lignes et de ceux de cette construction
 leur tolérance d'arrondi~: dérive d'arrondi présente puis absorbée, écart
 d'un jour relevé à $10^5$~années dans les deux sens, tolérance relative et
 non absolue, rapportée à la plus grande et non à la plus petite des deux
-expositions), les refus et leurs messages (C2, C7, C8) et les champs de la fiche (C9)~;
+expositions), les refus et leurs messages (C2, C7, C8, et, pour \code{exposition\_hors\_plage}, total égal à \code{LIMITE\_SOMMES\_DOUBLE} admis, total au double supérieur refusé avec valeur et limite au format \code{\%.17g}, somme de cellule infinie citée «~non fini~», rôle \code{exposition\_initiale} cité~; issue~\#353) et les champs de la fiche (C9)~;
 contre-exemple écrit à la main de deux jeux de lignes aux mêmes agrégats et
 aux estimations de Kaplan-Meier 0,5 et~1, qui motive le refus de cet
 estimateur sous la recette (C8)~; forme agrégats du simulateur (C10,
@@ -11355,7 +11462,7 @@ n'est constaté que sur les cas énumérés.
 \catalogue{fonctions-exposition}{HYPOTHESE\_CENSURE\_DECLAREE} & constante & --- & hypothèse sur les sorties concurrentes sous la forme \code{cellules} (traitement fait par le producteur, non vérifiable), inscrite à la place de \code{HYPOTHESE\_CENSURE} \\
 \catalogue{fonctions-exposition}{STATUT\_HYPOTHESE\_DECLAREE} & constante & --- & statut commun des hypothèses de la recette \code{agregats}~: hypothèse déclarée, non vérifiable par le moteur \\
 \catalogue{fonctions-exposition}{hypotheses\_agregats()} & interne & rôles d'exposition déclarés, présence du rôle \code{annee}, convention retenue & hypothèses de la recette \code{agregats} (\code{data.frame}~: code, énoncé, nature, statut), celles des expositions pour les seules expositions déclarées~; champ \code{hypotheses\_recette} des paramètres et de la fiche \\
-\catalogue{fonctions-exposition}{exposition\_cellules()} & interne & mêmes arguments & forme \code{cellules} (recette \code{agregats})~: somme des cellules reçues par clé (segmentation, âge, année sous \code{par\_annee}), sans en créer~; relevés \code{annees\_sommees}, \code{ages\_manquants}, \code{evenement\_sans\_exposition}, avertissement \code{convention\_declaree}~; refus \code{evenements\_hors\_plage}~; aucun objet \code{fenetres\_exposition} \\
+\catalogue{fonctions-exposition}{exposition\_cellules()} & interne & mêmes arguments & forme \code{cellules} (recette \code{agregats})~: somme des cellules reçues par clé (segmentation, âge, année sous \code{par\_annee}), sans en créer~; relevés \code{annees\_sommees}, \code{ages\_manquants}, \code{evenement\_sans\_exposition}, avertissement \code{convention\_declaree}~; refus \code{evenements\_hors\_plage}, \code{denombrement\_hors\_plage} (total des événements) et \code{exposition\_hors\_plage} (total de chaque exposition déclarée au-delà de \code{LIMITE\_SOMMES\_}\allowbreak\code{DOUBLE}, issue~\#353)~; aucun objet \code{fenetres\_exposition} \\
 \catalogue{fonctions-exposition}{hypotheses\_stocks()} & interne & hypothèse d'entrée validée & les neuf hypothèses nommées de la recette \code{stocks\_successifs} (\code{data.frame}~: code, énoncé, nature, statut~; énoncé et statut de deux lignes selon le mode)~; champ \code{hypotheses\_recette} des paramètres et de la fiche \\
 \catalogue{fonctions-exposition}{fenetres\_stocks\_successifs()} & interne & observations de l'étape \code{donnees}, valeurs validées \code{p} (dont la grille), segmentation, hypothèse d'entrée & une observation à fenêtre par unité exposable (début $\hat a$, fin $\hat s$, cause), paramètres (\code{entree\_entre\_}\allowbreak\code{inventaires}, \code{hypotheses\_recette}), diagnostics (\code{unites\_sans\_fenetre}, \code{exposition\_}\allowbreak\code{imputee\_jours}, \code{fenetres\_vides}), avertissements \code{entres\_sortis\_}\allowbreak\code{entre\_inventaires} et \code{intervalle\_}\allowbreak\code{inventaires\_long} (section~\ref{sec:stocks-fenetres}) \\
 \catalogue{fonctions-exposition}{CONVENTIONS\_VALIDATION} & constante & --- & conventions d'âge retenues admises~: \code{dernier\_anniversaire} (étapes \code{lissage}, \code{positionnement} et \code{validation}) \\
@@ -12137,8 +12244,8 @@ trois estimateurs, des statuts de l'étape et de la fiche \code{identical()}
 à \code{STATUTS\_BRUT}.
 
 \medskip
-\code{tests/unitaires/test\_independance\_unites.R} (issue~\#159, critère
-C3~; onze tests) vérifie la mention d'indépendance des unités, comptée par
+\code{tests/unitaires/test\_independance\_unites.R} (issues~\#159, \#330
+et~\#329, critère C3~; seize tests) vérifie la mention d'indépendance des unités, comptée par
 ligne sur les octets, donc sans dépendre de la locale~: exactement une fois
 sur les lignes~2, 3, 5, 6, 8, 9, 11 et~12 de \code{STATUTS\_BRUT} et sur
 aucune autre, à la fin du statut (sauf la ligne~12, inchangée), jamais dans
@@ -12146,11 +12253,30 @@ aucune autre, à la fin du statut (sauf la ligne~12, inchangée), jamais dans
 \code{STATUTS\_VALIDATION}, sur les 16~lignes de
 \code{STATUTS\_VALIDATION\_POSITIONNEE}, sur aucune de
 \code{STATUTS\_VALIDATION\_LISSEE}, sur les quatre lignes de loi de
-\code{STATUTS\_IMPORTANCE}, avec le texte et la place attendus~; au plus
-une fois par ligne dans les sept tables de statuts (positionnement et
-homogénéité compris)~; les mêmes décomptes dans un sous-processus sous
-\code{LC\_ALL=C}~; trois témoins d'altération, sur des copies des tables,
-où le contrôle signale l'écart (littéraux de la spécification, identité
+\code{STATUTS\_IMPORTANCE}, avec la place attendue et, ligne par ligne, le
+texte exact de la conséquence de sa nature (10~\code{tests}, 3~\code{intervalle},
+une \code{variance}, 5~\code{valeur\_h0} et 3~\code{niveau} dans
+\code{STATUTS\_VALIDATION}~; 6, une, 6 et~3 de \code{tests},
+\code{intervalle}, \code{valeur\_h0} et \code{niveau} dans
+\code{STATUTS\_VALIDATION\_POSITIONNEE}~; 3~\code{intervalle} et une
+\code{variance} dans \code{STATUTS\_IMPORTANCE})~; les textes rendus par
+\code{mention\_independance()} pour chacune des cinq natures, et ses refus
+(nature inconnue, \code{variance} sans objet ou d'objet numérique, objet
+donné à une autre nature, chaîne vide, \code{NA} ou nombre)~; sur les
+deux bornes de crédibilité de \code{STATUTS\_LISSAGE\_POISSON}, et sur
+aucune de ses dix autres lignes (clé \code{grandeur} seule), en fin de
+statut, texte égal à celui de \code{mention\_independance("intervalle")}~;
+au plus une fois par ligne dans les huit tables de statuts (positionnement,
+homogénéité et lissage de Poisson compris)~; les mêmes décomptes dans un
+sous-processus sous \code{LC\_ALL=C}~; cinq témoins d'altération, sur des copies des tables,
+où le contrôle signale l'écart, dont celui d'une
+ligne \code{sous\_groupes}/\allowbreak\code{bornes\_exactes} de
+\code{STATUTS\_VALIDATION\_POSITIONNEE} qui reprendrait la conséquence des
+tests au lieu de celle d'un intervalle, défaut corrigé par l'issue~\#330,
+et celui de \code{STATUTS\_LISSAGE\_POISSON}, dont une copie perd la
+mention sur la borne inférieure de crédibilité, puis une autre la reçoit
+sur \code{segments/}\allowbreak\code{parametre\_lissage} (issue~\#329)
+(littéraux de la spécification, identité
 exacte et valeurs calculées à la main).
 
 \medskip
@@ -13132,7 +13258,31 @@ ne redonnent pas le total des événements est une erreur de programmation.\par}
     numérique, aucune propriété fréquentiste revendiquée~; leviers et
     \code{segments/ddl\_effectifs}, trace de $(W + P)^{-1} W$ à la
     convergence, définition du cas normal transposée, approximation
-    numérique~; bornes de crédibilité~: ci-dessus~; \code{regle\_force},
+    numérique~; bornes de crédibilité~: ci-dessus, statut terminé, après
+    «~(aucun constat de simulation versé)~», par la mention d'indépendance
+    des unités de nature \code{intervalle} (section~\ref{sec:validation-statistiques})~:
+    «~unités d'observation indépendantes~; sous l'unité contrat, les décès
+    sont sur-dispersés et l'intervalle est trop étroit~» (issue~\#329). Le
+    sens est un \emph{résultat exact} d'algèbre matricielle, conditionnel
+    à $\lambda$ et à $W$ tenue pour fixe~: sous une sur-dispersion
+    $\varphi \ge 1$, la quasi-vraisemblance remplace $W$ par $W/\varphi$,
+    et $W/\varphi + P \preceq W + P$ au sens de Loewner, ces deux
+    matrices étant définies positives, donne $(W/\varphi +
+    P)^{-1} \succeq (W + P)^{-1}$, donc des éléments diagonaux, et des
+    demi-largeurs, plus grands~; il ne dit rien de la couverture
+    fréquentiste, déjà non établie. Le module \code{lissage} précédant
+    \code{validation} dans l'ordre des modules, le fragment est écrit dans
+    \code{R/lissage.R}, égal à l'octet au texte de
+    \code{mention\_independance("intervalle")} (contrôle~C3).
+    \code{segments/parametre\_lissage} et \code{segments/laml} ne portent
+    pas la mention~: l'un est un maximiseur, l'autre la valeur d'un
+    critère, et aucune n'affirme de loi~; l'effet de la sur-dispersion sur
+    $\hat\lambda$ n'est pas établi par une source lue (V.~A.~Djeundje Biatat et I.~D.~Currie, «~Smoothing dispersed counts
+    with applications to mortality data~», \emph{Annals of Actuarial
+    Science} 5(1), 2011, p.~33-52, doi:10.1017/S1748499510000047~: référence
+    vérifiée, contenu non lu sur ce point), et un constat de
+    simulation sur un seul plan (spécification de l'issue~\#329, §~1) ne
+    fonde aucune conséquence générale~; \code{regle\_force},
     transformation exacte, hypothèse même de l'estimateur d'entrée~;
     \code{segments/parametre\_lissage} (sous \code{laml} seulement)~:
     maximiseur local d'un critère approché, unimodalité non établie,
@@ -13421,7 +13571,7 @@ ici (E3.4).
 \catalogue{fonctions-lissage}{HYPOTHESE\_LISSAGE\_POISSON} & constante & --- & texte de l'hypothèse de \code{wh\_poisson}, règles non tirées de la source comprises (section~\ref{sec:lissage-poisson}) \\
 \catalogue{fonctions-lissage}{REFERENCE\_METHODE\_LISSAGE\_POISSON} & constante & --- & identité de la source de \code{wh\_poisson}~: Biessy, arXiv:2306.06932 v5, SHA-256, sections lues \\
 \catalogue{fonctions-lissage}{STATUTS\_LISSAGE} & constante & --- & statut de chaque grandeur sous \code{wh\_quadratique} (\code{grandeur}, \code{statut}~; section~\ref{sec:lissage-quadratique}) \\
-\catalogue{fonctions-lissage}{STATUTS\_LISSAGE\_POISSON} & constante & --- & statut de chaque grandeur sous \code{wh\_poisson} (section~\ref{sec:lissage-poisson}) \\
+\catalogue{fonctions-lissage}{STATUTS\_LISSAGE\_POISSON} & constante & --- & statut de chaque grandeur sous \code{wh\_poisson} (section~\ref{sec:lissage-poisson}), mention d'indépendance comprise sur les deux bornes de crédibilité (issue~\#329) \\
 \catalogue{fonctions-lissage}{CONSTANTES\_LISSAGE} & constante & --- & \code{data.frame} (\code{constante}, \code{valeur}, \code{origine}) à zéro ligne~: aucune constante numérique sous \code{wh\_quadratique} \\
 \catalogue{fonctions-lissage}{EPSILON\_DEPART\_LISSAGE} & constante & --- & $10^{-8}$~: plancher des décès au départ de l'algorithme de \code{wh\_poisson} \\
 \catalogue{fonctions-lissage}{EPSILON\_DEVIANCE\_LISSAGE} & constante & --- & $10^{-8}$~: seuil relatif d'arrêt sur la déviance pénalisée (\code{wh\_poisson}) \\
@@ -14505,7 +14655,8 @@ pas comptés dans $O$~: ils sont restitués à part
 nombre de cellules et de décès, sans refus. Les décès et l'exposition des
 lignes d'exposition hors de la plage sont restitués eux aussi
 (\code{cellules\_hors\_plage}, \code{evenements\_hors\_plage},
-\code{exposition\_hors\_plage})~; l'identité $O +
+\code{exposition\_hors\_plage}, diagnostics homonymes de refus de
+l'étape \code{exposition}, section~\ref{sec:exposition-cellules})~; l'identité $O +
 \text{\code{evenements\_sans\_attendu}} +
 \text{\code{evenements\_hors\_plage}} = \sum \text{\code{evenements}}$ de
 la table d'exposition est contrôlée à chaque exécution, un écart étant une
@@ -14593,16 +14744,56 @@ $E$ étant l'exposition d'une tête dont les $k$ contrats couvrent la même
 période (exact sous le modèle de Poisson par tête dans ce cas), ce qui rend les tests
 \textbf{anti-conservateurs} (p-valeurs trop petites, intervalles trop
 étroits)~; $\varphi$ n'est pas mesurable sans identifiant de tête, et le
-rapport figé le mentionne (section~\ref{sec:rapport-fige}). Dans
+rapport figé le mentionne (section~\ref{sec:rapport-fige}). Ce sens de
+l'erreur des tests est un énoncé \emph{asymptotique} (attendus grands)~:
+à petits attendus, un test peut être conservateur (issues~\#359
+et~\#361, ouvertes~; exemple chiffré ci-dessous). Le texte de la
+conséquence \code{tests} rendu dans les statuts («~les tests sont
+anti-conservateurs~», ci-dessous) ne porte pas encore cette réserve
+(issue~\#359). Dans
 \code{STATUTS\_VALIDATION} (relations \code{independante} et
 \code{ajustee\_hors\_outil}), le statut de chacune des 22~grandeurs qui affirment une loi se termine par cette
-hypothèse (issue~\#159)~: «~unités d'observation indépendantes~; sous
-l'unité contrat, les décès sont sur-dispersés et les tests sont
-anti-conservateurs~» pour 19~d'entre elles (espérances et variance sous
-$H_0$~(i), p-valeurs fondées sur $H_0$~(i), dont celles de Monte-Carlo,
-racine cubique du SMR, p-valeurs des sous-groupes), «~\ldots{} et
-l'intervalle est trop étroit~» pour les trois bornes exactes (SMR global
-et sous-groupes)~; dans les deux lignes des sous-groupes, elle précède le
+hypothèse (issue~\#159), écrite «~unités d'observation indépendantes~;
+sous l'unité contrat, les décès sont sur-dispersés et~» puis la
+conséquence propre à la \emph{nature} de la grandeur (issue~\#330), l'une
+de cinq~:
+\begin{itemize}[leftmargin=*, itemsep=1pt]
+  \item \code{tests}, «~les tests sont anti-conservateurs~», pour les
+    10~p-valeurs et statistiques de test fondées sur $H_0$~(i)~: p-valeurs
+    asymptotiques et de Monte-Carlo de $X^2$ et de $G^2$, trois p-valeurs
+    exactes, $z$ et p-valeur de la racine cubique du SMR, p-valeurs des
+    sous-groupes~;
+  \item \code{intervalle}, «~l'intervalle est trop étroit~», pour les trois
+    bornes exactes (SMR global et sous-groupes)~;
+  \item \code{variance}, «~Var(X2) est sous-estimée~», pour
+    \code{khi2\_pearson}/\allowbreak\code{variance\_h0}~: \emph{résultat
+    exact} sous le modèle de Poisson composé, où une tête porte $k \ge 1$
+    contrats~: les cumulants d'ordre~2 et~4 de $D_c$ sont au moins égaux à
+    $A_c$, d'où $\operatorname{Var}((D_c - A_c)^2) = \kappa_4 + 2\kappa_2^2 \ge
+    A_c + 2A_c^2$, et la covariance entre cellules des contrats d'une même
+    tête, $\kappa_{22} + 2\kappa_{11}^2 \ge 0$, ne fait qu'ajouter~;
+  \item \code{valeur\_h0}, «~la valeur sous H0 (i) diffère de celle de la
+    loi réelle, dans un sens non établi en général~», pour les cinq
+    espérances sous $H_0$~(i) (\code{residus}/\allowbreak\code{esperance\_au\_dela\_2}
+    et \code{\_3}, \code{signes}/\allowbreak\code{esperance\_positifs\_h0},
+    \code{fluctuation}/\allowbreak\code{esperance\_hors\_intervalle\_exact} et
+    \code{\_asymptotique})~;
+  \item \code{niveau}, «~le niveau n'est plus garanti~», pour les p-valeurs
+    de Monte-Carlo des signes, des suites et de Wilcoxon, tests dont le sens
+    de l'erreur n'est pas établi.
+\end{itemize}
+Le sens de l'écart d'une espérance sous $H_0$~(i) dépend des $A_c$~: une
+part $w$ de l'exposition étant portée par des têtes à deux contrats, $D =
+N_1 + 2N_2$, $N_1 \sim \mathcal{P}(A(1-w))$, $N_2 \sim \mathcal{P}(Aw/2)$
+indépendants (moyenne $A$, $\varphi = 1 + w$)~; à $w = 0{,}5$, calcul
+exact par la loi de $D$, $P(|D - A| > 2\sqrt{A})$ vaut 0,04877 sous
+Poisson et 0,03681 sous la loi réelle à $A = 0{,}05$ (forme close
+$1 - e^{-A(1 - w/2)} < 1 - e^{-A}$, seul $D \ge 1$ comptant), mais 0,03694
+et 0,08171 à $A = 0{,}3$~; la valeur sous Poisson surestime dans le premier
+cas et sous-estime dans le second. Le même calcul à $A = 0{,}05$ donne au
+test unilatéral \code{smr}/\allowbreak\code{p\_superieure}, qui rejette dès
+$O \ge 1$ au niveau 0,05, un niveau réel de 0,03681 contre 0,04877~: conservateur (issue~\#359).
+Dans les deux lignes des sous-groupes, la mention précède le
 texte propre à la relation \code{ajustee\_hors\_outil}. Les autres
 grandeurs (décomptes et grandeurs descriptives, degrés de liberté, SMR
 ponctuel, erreurs de Monte-Carlo, grandeurs calculées sous une hypothèse
@@ -14611,8 +14802,33 @@ qui n'est pas $H_0$~(i), grandeurs non produites, soit
 \code{independante} comme sous \code{ajustee\_hors\_outil}) ne la portent pas. Sous \code{positionnee},
 toutes les lignes de loi de \code{STATUTS\_VALIDATION\_POSITIONNEE} sont
 des lignes remplacées, qui portent leur propre mention (décision M278~;
-16~lignes) et n'héritent donc pas de celle de \code{STATUTS\_VALIDATION}~;
-sous \code{lissee}, aucune ligne ne la porte (issue~\#329). Les
+16~lignes) et n'héritent donc pas de celle de \code{STATUTS\_VALIDATION}~:
+6~de nature \code{tests} (p-valeurs asymptotiques et de Monte-Carlo de
+$X^2$ et de $G^2$, p-valeurs exactes et asymptotiques des sous-groupes),
+une de nature \code{intervalle} (bornes exactes des sous-groupes), 6~de
+nature \code{valeur\_h0} (les cinq espérances, plus
+\code{khi2\_pearson}/\allowbreak\code{variance\_h0}) et 3~de nature
+\code{niveau} (mêmes lignes que sous \code{independante}). La variance
+de $X^2$ y est de nature \code{valeur\_h0}, non \code{variance}~:
+conditionnellement aux $O_s$, la sur-dispersion ne la sous-estime pas
+toujours (trois cellules équiprobables, $O_s = 2$, chaque tête portant deux
+contrats de la même cellule~: les deux décès y tombent ensemble, $X^2 = 4$ est
+certain et sa variance réelle est nulle, contre~2 par la loi
+multinomiale, calcul exact). Les textes des cinq conséquences ont une
+source unique, la fonction interne \code{mention\_independance()}
+(tableau~\ref{tab:fonctions-validation}), qu'appellent
+\code{STATUTS\_VALIDATION}, \code{STATUTS\_VALIDATION\_POSITIONNEE} et
+\code{STATUTS\_IMPORTANCE} (section~\ref{sec:importance-exclusions}).
+Sous \code{lissee}, aucune ligne ne porte la mention (issue~\#329)~: les
+seules lignes de loi produites, \code{khi2\_pearson}/\allowbreak\code{p\_asymptotique}
+et \code{deviance}/\allowbreak\code{p\_asymptotique}, disent déjà
+«~approximation non établie~» et que «~le niveau réel du test fondé sur
+cette p n'est pas établi~»~; «~les tests sont anti-conservateurs~»
+supposerait un niveau de base connu, et «~le niveau n'est plus garanti~»
+serait faux, ce niveau n'ayant jamais été garanti. Hors de la validation,
+les deux bornes de crédibilité de \code{wh\_poisson}
+(\code{STATUTS\_LISSAGE\_POISSON}) portent la mention de nature
+\code{intervalle} (section~\ref{sec:lissage-poisson}). Les
 statistiques portent sur les seules cellules de $C^{+}$~; la
 table~\ref{tab:statistiques-validation} en donne la liste et les statuts,
 que la constante \code{STATUTS\_VALIDATION} écrit, grandeur par grandeur,
@@ -14926,7 +15142,9 @@ soit $\theta$, asymptotiques sous le modèle de survie. Par grandeur~:
     niveau)~; pour un sous-groupe de plusieurs segments, p-valeurs exactes
     sous la loi d'une somme de binomiales indépendantes
     $\mathcal{B}(O_s, \pi_{b,s})$, calculée par convolution
-    (\code{loi\_somme\_binomiales()}), bornes non produites (état
+    (\code{loi\_somme\_binomiales()}, sur le support de chaque
+    binomiale, sans vecteur de longueur $O_s + 1$~: section~\ref{sec:homogeneite},
+    p-valeur exacte~; issue~\#350), bornes non produites (état
     \code{bornes\_non\_definies})~; la convolution n'est faite que si son
     nombre de produits, calculé avant elle
     (\code{cout\_convolution\_binomiales()}), est au plus
@@ -15482,7 +15700,46 @@ n'étant appariée (différence voulue avec l'étape \code{validation}).\par}
     convolution (\code{loi\_somme\_binomiales()}, brique partagée avec la
     relation \code{positionnee}), faite si son nombre de produits est au
     plus \code{N\_MAX\_PRODUITS\_CONVOLUTION}. Sinon état
-    \code{convolution\_au\_dela\_n\_max}~; plus de deux groupes, état
+    \code{convolution\_au\_dela\_n\_max}. Depuis l'issue~\#350,
+    chaque binomiale est évaluée sur son seul support, $\{k :{}$
+    \code{dbinom(k, n, p)} ${}> 0\}$ en double, dont les bornes sont trouvées
+    par bisection autour du mode (\code{support\_binomiale()}), et la
+    loi est rendue sur son support~: aucun vecteur de longueur
+    proportionnelle à $n$ n'est formé, ni par le calcul du coût ni par la
+    convolution. Une strate seule, sans produit de convolution, est donc
+    toujours calculée~: son support compte au plus 1\,775\,728~valeurs,
+    à $n = 2^{31} - 1$ (le total des événements étant gardé sous l'entier
+    maximal, issue~\#348) et $p = 0{,}5$, où la largeur du support,
+    d'ordre $\sqrt{np(1-p)}$, est la plus grande (mesuré aussi à $p =
+    0{,}3$~; $0{,}1$~; $0{,}01$~; $10^{-3}$~; $10^{-6}$~: supports plus
+    courts, 1\,627\,578~; 1\,065\,807~; 353\,753~; 112\,460~;
+    3\,529~valeurs)~; avant l'issue, une strate de
+    $10^9 + 10^9$~décès arrêtait le calcul sur une erreur d'allocation de
+    R. Les termes non nuls et leur ordre de sommation étant inchangés,
+    coûts, lois et p-valeurs des cas calculés auparavant sont restés
+    identiques au bit près (\emph{constat} sur 100~cas tirés et
+    240~supports, tests ci-dessous), et aucun état ni texte de statut ne
+    change.
+    \textbf{Statut de la contiguïté du support}~: en arithmétique réelle,
+    la loi binomiale est log-concave, donc unimodale, et tout ensemble
+    $\{k : f(k) > s\}$ est un intervalle~; si \code{dbinom()} rendait
+    $f(k)$ correctement arrondi, l'ensemble des $k$ de densité calculée
+    positive serait donc exactement un intervalle, ce que la bisection
+    suppose~; \code{dbinom()} n'étant pas correctement arrondie, la
+    contiguïté en double est \emph{mesurée}, non démontrée~: aux
+    frontières, la log-densité vaut environ $-745$ (seuil d'arrondi à
+    zéro, sous $2^{-1075} \approx 2{,}5 \cdot 10^{-324}$, moitié du plus
+    petit dénormalisé positif) et la pente du logarithme de la
+    densité entre voisins est au moins $1{,}65 \cdot 10^{-3}$, très
+    au-dessus du bruit de calcul, au plus $1{,}3 \cdot 10^{-12}$ (mesure
+    d'\code{actuary} du 23/11/2026 sur 44~frontières, $n$ de $10^6$ à
+    $2^{31} - 1$, $p$ de $10^{-6}$ à $1 - 10^{-6}$~; même pente minimale
+    remesurée par \code{docwriter}, commit \code{f37cc5c}, sur
+    54~frontières)~; selon la même mesure, un défaut
+    éventuel n'omettrait qu'une masse inférieure à $10^{-316}$, sans effet
+    sur aucune p-valeur ni aucun verdict. L'identité du support avec
+    celui de \code{dbinom(0:n, n, p)} est vérifiée par les tests de la
+    relation \code{positionnee} (section~\ref{sec:validation-verifications})~; plus de deux groupes, état
     \code{plus\_de\_deux\_groupes}~; somme des tranches, état
     \code{non\_produite\_par\_cette\_version} (la loi exacte d'une somme de
     statistiques de tranche n'est pas mise en œuvre).
@@ -15655,7 +15912,23 @@ première garde dépassée citée) au lieu de faire échouer
 \code{rmultinom()} (issue~\#348~; forme F348, spécification
 d'\code{actuary-approfondi}, Q5)~; garde défensive, le total de l'étape
 \code{exposition} étant déjà gardé. L'identité est vérifiée après, en
-\code{double}.
+\code{double}. Trois préconditions, erreurs de programmation
+inatteignables sous \code{construire\_table()} une fois le total des
+expositions gardé à l'étape \code{exposition}
+(\code{exposition\_hors\_plage}, section~\ref{sec:exposition-cellules}~;
+issue~\#353), arrêtent un appel direct~: une exposition agrégée non
+finie, ou de somme au-delà de \code{LIMITE\_SOMMES\_DOUBLE}, avant tout
+score~; des poids de tirage non finis ou une somme de poids d'un groupe
+non finie dans \code{replications\_multinomiales()}~; une variance du
+score non définie au calcul d'une portée. Aucun état n'est ajouté~; aucun
+$z$, aucun attendu ni aucune exposition de segment non finis ne sont
+plus rendus à l'état \code{produite} (avant l'issue, un appel direct à
+exposition infinie rendait $z$ \code{NaN} \code{produite}, et une
+construction à expositions de $10^{308} + 10^{308}$ dans un segment, $z =
+\mp 7{,}980239 \cdot 10^{152}$ \code{produite}, ou une erreur de R de
+\code{rmultinom()} dans une cellule~; mesuré sur le code d'avant l'issue (\code{d84e86a}, R~4.3.3~;
+spécification de l'issue~\#353, §~1~; remesuré par \code{actuary} à
+l'étape~(6) de B35)).
 
 \medskip
 {\sloppy \textbf{Écart minimal détectable par segment} (indicateur de
@@ -16578,7 +16851,22 @@ l'ordre des gardes (un total hors plage seul, refusé sur
 \code{evenements\_hors\_plage}~; les deux premières gardes dépassées, la
 première citée)~; l'erreur de programmation de
 \code{replications\_multinomiales()} pour un effectif au-delà de
-l'entier maximal, avant tout tirage~; l'état \code{precision\_insuffisante} par appel
+l'entier maximal, avant tout tirage~; la p-valeur exacte d'une strate
+de $10^9 + 10^9$~décès, calculée sur son support (issue~\#350~: une
+strate, deux segments d'exposition $5 \cdot 10^{10}$~; décès $(10^9,
+10^9)$~: statistiques nulles, p exacte~1, \code{produite}~; décès
+$(10^9, 10^9 + 50\,000)$~: statistique égale à sa valeur calculée à la
+main, p exacte \code{produite}, égale à son recoupement par
+\code{pbinom()} et à la valeur mesurée~; somme des tranches
+\code{non\_produite\_par\_cette\_version}~; aucune erreur de R,
+mémoire et durée bornées)~; les gardes de l'issue~\#353~: erreur de
+programmation de \code{calculer\_homogeneite()} en appel direct pour une
+exposition infinie ou de somme au-delà de la borne, refus
+\code{exposition\_hors\_plage} par \code{construire\_table()} pour les
+trois cas d'agrégats à $10^{308}$ (cellule, segment, cellule seule), témoin
+inchangé et total à la borne construit, messages propres de
+\code{replications\_multinomiales()} pour des poids infinis, \code{NaN} ou
+de somme de groupe infinie~; l'état \code{precision\_insuffisante} par appel
 direct (strate unique, deux segments égaux~: $10^{20}$ décès, quatre
 branches \code{precision\_insuffisante}, sans erreur~; $10^{15}$ décès,
 branches produites, postcondition recalculée)~; la règle d'une branche
@@ -17490,7 +17778,14 @@ comparateur~2) se terminent par l'hypothèse d'indépendance des unités
 (issue~\#159)~: «~unités d'observation indépendantes~; sous l'unité
 contrat, les décès sont sur-dispersés et l'intervalle est trop étroit~»,
 ou, pour le rapport de variance, «~\ldots{} et $\operatorname{Var}(\hat A)$
-est sous-estimée~»~; pour le comparateur~2, la mention précède le texte
+est sous-estimée~» (résultat exact~: $\hat A = \sum_c
+(E^c_{e,c}/E^c_{r,c}) D_{r,c}$ est une combinaison à coefficients
+positifs~; sous le modèle de Poisson composé, chaque variance est
+multipliée par $\varphi_c \ge 1$, et les covariances entre cellules,
+nulles sous Poisson, sont positives ou nulles ($\kappa_{11} \ge 0$))~; ces textes sont ceux des natures
+\code{intervalle} et \code{variance} de la source commune
+\code{mention\_independance()} (section~\ref{sec:validation-statistiques},
+issue~\#330)~; pour le comparateur~2, la mention précède le texte
 propre à la relation \code{ajustee\_hors\_outil}. Les textes de \code{STATUTS\_IMPORTANCE} désignent les
 intervalles par leur formule, sans attribution d'auteur (issue~\#31~;
 décision M267).
@@ -17772,6 +18067,19 @@ chaque test nommant la nature de son attendu (ADR 0007, point~11.4)~:
     \code{NA} sous les trois relations hors de l'état
     \code{convolution\_au\_dela\_n\_max}, aucune ligne portant une
     p-valeur exacte et une p-valeur asymptotique, textes des statuts)~;
+    support de chaque binomiale (issue~\#350)~: bornes de
+    \code{support\_binomiale()} et valeurs de \code{binomiale\_elaguee()}
+    identiques à l'élagage de \code{dbinom(0:n, n, p)} sur 240~cas
+    ($n \le 5 \cdot 10^6$), support contigu, cas dégénérés, coût nul de
+    $\mathcal{B}(10^9~; 0{,}5)$ et support de 1\,775\,728~valeurs à $n =
+    2^{31} - 1$ sans allocation proportionnelle à $n$, loi de
+    $\mathcal{B}(10^9~; 1) + \mathcal{B}(10~; 0{,}3)$ (coût~11, longueur~11,
+    début $10^9$), coût, loi et p-valeur exacte de l'homogénéité
+    identiques à l'algorithme d'avant sur 100~cas tirés, p-valeurs des
+    sous-groupes identiques aux valeurs mesurées avant l'issue, et
+    sous-groupe d'un segment complet de $10^9$~décès calculé, deux
+    segments partiels de $10^9$ restant à l'état
+    \code{convolution\_au\_dela\_n\_max}~;
     les trois refus inter-étapes et \code{relation\_table\_invalide}~;
     comparateur~2 non produit~; rejeu \code{identical()} hors
     \code{execution}~; mention de la table de référence prise telle quelle
@@ -17908,6 +18216,7 @@ reproduites ici, E3.4).
 \catalogue{fonctions-validation}{ETATS\_GRANDEUR\_VALIDATION} & constante & --- & les états d'une grandeur, dont \code{contraint\_par\_}\allowbreak\code{positionnement}, \code{contraint\_par\_}\allowbreak\code{lissage} et \code{non\_etabli\_}\allowbreak\code{sous\_lissage} (section~\ref{sec:validation-statistiques}) \\
 \catalogue{fonctions-validation}{ETATS\_SOUS\_GROUPES\_VALIDATION} & constante & --- & les états d'une ligne des sous-groupes~: \code{produite}, \code{ddl\_non\_etabli}, \code{aucune\_cellule\_}\allowbreak\code{retenue}, et, sous \code{positionnee}, \code{contraint\_par\_}\allowbreak\code{positionnement}, \code{bornes\_non\_}\allowbreak\code{definies}, \code{convolution\_au\_dela\_}\allowbreak\code{n\_max}, et, sous \code{lissee}, \code{contraint\_par\_}\allowbreak\code{lissage}, \code{non\_etabli\_}\allowbreak\code{sous\_lissage} \\
 \catalogue{fonctions-validation}{PHRASES\_ATTENDUS\_FAIBLES} & constante & --- & liste de trois phrases écrites une seule fois et lues par \code{STATUTS\_VALIDATION} et \code{STATUTS\_VALIDATION\_}\allowbreak\code{POSITIONNEE}~: \code{petits} (approximation non garantie aux attendus $A_c$ petits, statuts de \code{khi2\_pearson}/\allowbreak\code{p\_asymptotique} et de \code{deviance}/\allowbreak\code{p\_asymptotique}), \code{fin\_x2} (niveau réel de la p asymptotique de $X^2$ non établi, au-dessus du niveau nominal dans les constats de simulation) et \code{g2} (espérance de la contribution d'une cellule à $G^2$)~; section~\ref{sec:validation-statistiques}, issues~\#179 et~\#200 \\
+\catalogue{fonctions-validation}{mention\_independance()} & interne & nature (\code{tests}, \code{intervalle}, \code{variance}, \code{valeur\_h0}, \code{niveau}), objet (chaîne non vide, pour \code{variance} seule) & mention d'indépendance des unités~: préfixe commun (marqueur et cause) suivi de la conséquence propre à la nature, l'objet en tête de celle de \code{variance} (section~\ref{sec:validation-statistiques})~; source unique de la mention dans les statuts des relations \code{independante}, \code{ajustee\_hors\_outil} et \code{positionnee} et de l'étape \code{importance\_exclusions}~; nature hors des cinq, \code{variance} sans objet, objet donné à une autre nature~: erreur de programmation (issue~\#330) \\
 \catalogue{fonctions-validation}{STATUTS\_VALIDATION} & constante & --- & \code{data.frame} (\code{statistique}, \code{grandeur}, \code{sous\_h0}, \code{statut})~: une ligne par grandeur, dans l'ordre du résultat~; \code{sous\_h0} désigne les grandeurs non produites sous \code{ajustee\_hors\_outil} (tableau~\ref{tab:statistiques-validation}) \\
 \catalogue{fonctions-validation}{STATUTS\_VALIDATION\_POSITIONNEE} & constante & --- & mêmes lignes que \code{STATUTS\_VALIDATION}, statuts remplacés sous \code{positionnee} (lois conditionnelles, ddl $n - S$, table positionnée~; décision M309) \\
 \catalogue{fonctions-validation}{STATUTS\_VALIDATION\_LISSEE} & constante & --- & mêmes lignes que \code{STATUTS\_VALIDATION}, statuts remplacés sous \code{lissee} (grandeurs sous $H_0$ non établies, ddl effectifs, approximation non établie, table lissée) \\
@@ -17924,10 +18233,11 @@ reproduites ici, E3.4).
 \catalogue{fonctions-validation}{signe\_residu()} & interne & résidus, attendus & signe à la tolérance~; seul ensemble de zéros \\
 \catalogue{fonctions-validation}{statistiques\_test()} & interne & matrice de décès (une colonne par jeu), attendus, début des séquences & $X^2$, $G^2$, signes, $R$, $z$ de Wilcoxon par colonne~; observé et répliques \\
 \catalogue{fonctions-validation}{replications\_poisson()} & interne & $A$, $B$, graine, fonction de réduction & statistiques des $B$ réplications, tirées par blocs sous \code{sous\_graine()} \\
-\catalogue{fonctions-validation}{replications\_multinomiales()} & interne & poids, groupe de chaque cellule, effectifs des groupes, $B$, graine, fonction de réduction & statistiques des $B$ réplications multinomiales par groupe, tirées réplique par réplique puis groupe par groupe sous \code{sous\_graine()}, par blocs~; erreur de programmation, avant tout tirage, pour un poids non positif, un groupe hors de~1 à~$G$, un effectif manquant, négatif ou au-delà de \code{.Machine\$integer.max} (issue~\#348~; les appelants rangent le total des événements en \code{integer} avant tout tirage), ou un groupe d'effectif positif sans cellule \\
-\catalogue{fonctions-validation}{binomiale\_elaguee()} & interne & $n$, $p$ & \code{dbinom(0:n, n, p)} réduite à l'intervalle de ses valeurs non nulles, et sa première valeur \\
-\catalogue{fonctions-validation}{cout\_convolution\_binomiales()} & interne & effectifs, probabilités & nombre de produits de la convolution, calculé avant elle \\
-\catalogue{fonctions-validation}{loi\_somme\_binomiales()} & interne & effectifs, probabilités & loi d'une somme de binomiales indépendantes, par convolution directe~; attribut \code{produits}~; brique partagée avec l'étape \code{homogeneite} \\
+\catalogue{fonctions-validation}{replications\_multinomiales()} & interne & poids, groupe de chaque cellule, effectifs des groupes, $B$, graine, fonction de réduction & statistiques des $B$ réplications multinomiales par groupe, tirées réplique par réplique puis groupe par groupe sous \code{sous\_graine()}, par blocs~; erreur de programmation, avant tout tirage, pour un poids non positif, un groupe hors de~1 à~$G$, un effectif manquant, négatif ou au-delà de \code{.Machine\$integer.max} (issue~\#348~; les appelants rangent le total des événements en \code{integer} avant tout tirage), ou un groupe d'effectif positif sans cellule~; de même pour un poids non fini (\code{NaN} compris) ou une somme de poids d'un groupe non finie (issue~\#353) \\
+\catalogue{fonctions-validation}{support\_binomiale()} & interne & $n$, $p$ & bornes entières $[a, b]$ du support $\{k :{}$ \code{dbinom(k, n, p)} ${}> 0\}$ en double, sans former \code{dbinom(0:n)}~: $[0, 0]$ si $n = 0$ ou $p = 0$, $[n, n]$ si $p = 1$, sinon bisection de chaque côté du mode $\lfloor (n+1)p \rfloor$, en $O(\log n)$ évaluations~; mode de densité nulle~: erreur de programmation (issue~\#350~; contiguïté~: section~\ref{sec:homogeneite}, p-valeur exacte) \\
+\catalogue{fonctions-validation}{binomiale\_elaguee()} & interne & $n$, $p$ & \code{dbinom()} sur le support rendu par la fonction de la ligne précédente, et sa première valeur (\code{debut})~; égale à \code{dbinom(0:n, n, p)} réduite à ses valeurs non nulles, sans former ce vecteur (issue~\#350) \\
+\catalogue{fonctions-validation}{cout\_convolution\_binomiales()} & interne & effectifs, probabilités & nombre de produits de la convolution, calculé avant elle, à partir des seules longueurs des supports, sans aucun vecteur \code{dbinom} (issue~\#350) \\
+\catalogue{fonctions-validation}{loi\_somme\_binomiales()} & interne & effectifs, probabilités & loi d'une somme de binomiales indépendantes, par convolution directe, rendue sur son support (zéros exacts hors de lui)~; attributs \code{debut} et \code{produits}, l'appelant indexant par $k = \code{debut} + i - 1$ (issue~\#350)~; brique partagée avec l'étape \code{homogeneite} \\
 \catalogue{fonctions-validation}{p\_somme\_binomiales\_normale()} & interne & effectifs, probabilités, valeur observée $o$ & p-valeurs inférieure, supérieure et centrale de l'approximation normale d'une somme de binomiales indépendantes, avec correction de continuité (\code{pnorm()})~; erreur de programmation si la variance est nulle (issue~\#178) \\
 \catalogue{fonctions-validation}{pvaleur\_monte\_carlo()} & interne & observé, répliques, sens & $p_{MC}$ et erreur de Monte-Carlo \\
 \catalogue{fonctions-validation}{statistiques\_validation()} & interne & cellules ($D$, $E^c$, $\tilde q$, $\tilde\mu$, $A$, état, séquence, âge), niveau, relation, $B$, graine, segment (sous \code{positionnee} seulement), somme des leviers retenus (sous \code{lissee} seulement) & S1 à S4 et S6 à S12 au format long, colonnes par cellule, suites par séquence, nombre de tirages~; cœur partagé (ADR 0015, point~7.5) \\
@@ -17957,7 +18267,7 @@ reproduites ici, E3.4).
 \catalogue{fonctions-validation}{non\_centralite\_ecart\_minimal()} & interne & ddl, niveau, puissance (par défaut, les deux constantes) & $\lambda_{80}$~: racine par \code{uniroot()} de la puissance du khi-deux non central (\code{pchisq()}) égale à la puissance visée \\
 \catalogue{fonctions-validation}{resoudre\_branche\_ecart\_minimal()} & interne & $\lambda_s$ du segment, signe de la branche, $\lambda_{80}$, seuil, indicateur des pivots, nombre maximal d'itérations (1\,000 par défaut) & $\theta_{80}$ d'une branche et son état (\code{produite}, \code{non\_atteint}, \code{precision\_}\allowbreak\code{insuffisante})~: contrôles dans l'ordre~: pivots (avant toute évaluation de $\lambda_s$), limite \code{NA}, \code{NaN} ou $-\infty$, \code{non\_atteint}, puis, limite $+\infty$ comprise, encadrement par doublement jusqu'à $|u| = 1024$ au plus et \code{uniroot()} sur $\lambda_s$ tronquée au plus grand double, sous \code{check.conv = TRUE}~; pivots, limite indéterminée, $\lambda_s(\pm 1024)$ au plus $\lambda_{80}$ (garde défensive inaccessible), non-convergence ou postcondition non tenue~: \code{precision\_}\allowbreak\code{insuffisante}, sans signal~; toute autre erreur relancée (forme F339, section~\ref{sec:homogeneite}) \\
 \catalogue{fonctions-validation}{ecart\_minimal\_homogeneite()} & interne & objet du score du test global, état du test, états des lignes globales des segments, $S$ & $\theta_{80}^{+}$, $\theta_{80}^{-}$ et leurs états par segment, $\lambda_{80}$~; chaque segment référence de sa composante connexe, $\lambda_s$ calculée sans soustraction par l'élimination partagée avec le test, sur la matrice $W$ du test global (issue~\#334), état du test global transmis aux deux branches s'il n'est pas \code{produite}, branche \code{precision\_}\allowbreak\code{insuffisante} quand une part d'exposition s'arrondit à~0 dans une strate où le segment et un autre segment sont exposés (issue~\#333), résolution en $\log\theta$, chaque branche par la fonction de la ligne précédente~; \code{precision\_}\allowbreak\code{insuffisante} est un état, jamais un arrêt (section~\ref{sec:homogeneite}) \\
-\catalogue{fonctions-validation}{calculer\_homogeneite()} & interne & table d'exposition, segmentation, découpage, convention, plage, tranches, $B$, graine & fonction d'étape \code{homogeneite}~: paramètres, résultat (\code{tests}, \code{segments}, \code{ecart\_minimal}, \code{monte\_carlo}), diagnostics, avertissements (dont \code{ecart\_minimal\_}\allowbreak\code{detectable})~; lignes saines agrégées par (segment, cellule), à la première occurrence du couple, avant tout score (issue~\#335)~; décomptes d'événements rangés en \code{integer} avant tout tirage (refus \code{denombrement\_hors\_plage}, issue~\#348)~; ne contrôle aucun paramètre \\
+\catalogue{fonctions-validation}{calculer\_homogeneite()} & interne & table d'exposition, segmentation, découpage, convention, plage, tranches, $B$, graine & fonction d'étape \code{homogeneite}~: paramètres, résultat (\code{tests}, \code{segments}, \code{ecart\_minimal}, \code{monte\_carlo}), diagnostics, avertissements (dont \code{ecart\_minimal\_}\allowbreak\code{detectable})~; lignes saines agrégées par (segment, cellule), à la première occurrence du couple, avant tout score (issue~\#335)~; décomptes d'événements rangés en \code{integer} avant tout tirage (refus \code{denombrement\_hors\_plage}, issue~\#348)~; exposition agrégée non finie ou de somme au-delà de \code{LIMITE\_SOMMES\_}\allowbreak\code{DOUBLE}, ou variance du score non définie~: erreur de programmation, inatteignable sous \code{construire\_table()} (issue~\#353)~; ne contrôle aucun paramètre \\
 \catalogue{fonctions-validation}{REFERENCE\_METHODE\_COHERENCE\_REGULARITE} & constante & --- & identité de la source de l'étape \code{coherence\_regularite}~: Lignes directrices, chap.~4, II (p.~36-38) et III.1 (p.~38), SHA-256 du PDF \\
 \catalogue{fonctions-validation}{MENTION\_CONVENTION\_TABLE\_REFERENCE} & constante & --- & convention d'âge restituée pour une table de référence évaluée~: «~non portée par la table de référence~» \\
 \catalogue{fonctions-validation}{NOM\_TABLE\_CONSTRUITE} & constante & --- & nom restitué de la table construite, sans nom d'étape productrice \\
@@ -20536,7 +20846,8 @@ sur l'intervalle déclaré (grille, puis Brent, ou la borne à l'état
 bayésiens asymptotiques, conditionnels au paramètre de lissage retenu,
 qui ne sont pas des intervalles de confiance (couverture fréquentiste non
 établie)~» (la mention du rapport~; le statut des bornes ajoute
-«~aucun constat de simulation versé~»), l'interpolation des cellules sans exposition et le renvoi aux
+«~aucun constat de simulation versé~», puis la mention d'indépendance des
+unités, issue~\#329), l'interpolation des cellules sans exposition et le renvoi aux
 constantes et à l'hypothèse~; la mention
 \code{lissage\_conservation\_poisson}~: «~Somme des E\^{}c mu\^{} = somme
 des D (SMR = 1) par l'équation du score, et somme des x E\^{}c mu\^{} =

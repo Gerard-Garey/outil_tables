@@ -566,6 +566,41 @@ verifier("garde du total (#199, M397) : deux cellules à 1,5e9 événements (sou
                else if (inherits(x, "refus_tablexp")) paste("refus inattendu :", x$motif) else "total à la borne")
 })
 
+# Garde du total des expositions déclarées (#353, M579 ; ADR 0009, annotation
+# du 23/11/2026) : borne LIMITE_SOMMES_DOUBLE = .Machine$double.xmax / 2
+# (valeur calculée à la main) ; total égal à la borne admis, total au-dessus
+# (borne x (1 + 2^-52), plus proche double supérieur) refusé avec sa valeur
+# au format %.17g ; total infini (somme de cellule infinie) refusé, « non
+# fini » ; le rôle cité est celui de l'exposition en cause (exposition
+# initiale, l'exposition centrale restant dans la plage).
+verifier("exposition_hors_plage (appel direct du seam cellules, #353) : total = .Machine$double.xmax / 2 admis ; au-dessus -> refus exposition, valeur et limite au format %.17g, détails (role, valeur, limite) ; somme de cellule infinie -> « non fini » ; rôle exposition_initiale cité", {
+  rec <- tablexp:::deduire_recette(c(age = "a", evenements = "d", exposition_centrale = "e"))
+  rec_i <- tablexp:::deduire_recette(c(age = "a", evenements = "d", exposition_centrale = "e", exposition_initiale = "i"))
+  cv <- tablexp:::resoudre_convention("dernier_anniversaire", NA_character_)
+  L <- .Machine$double.xmax / 2
+  cel <- function(o, rc = rec) rf(tablexp:::exposition_cellules(o, P_BV, character(0), rc, cv, FALSE))
+  texte <- function(role, v) sprintf(paste("Total de l'exposition déclarée du rôle « %s » hors de la plage de calcul du",
+                                           "moteur (%s ; au plus %.17g, moitié du plus grand réel en double précision) ;",
+                                           "vérifier la colonne de ce rôle ; la construction est refusée."), role, v, L)
+  borne <- cel(data.frame(age = c(60, 61), exposition_centrale = c(L / 2, L / 2), evenements = c(1, 1)))
+  dessus <- cel(data.frame(age = 60, exposition_centrale = L * (1 + 2^-52), evenements = 1))
+  infini <- cel(data.frame(age = c(60, 60), exposition_centrale = c(1e308, 1e308), evenements = c(1, 1)))
+  initiale <- cel(data.frame(age = c(60, 61), exposition_centrale = c(1, 1), exposition_initiale = c(1e308, 1e308),
+                             evenements = c(1, 1)), rec_i)
+  tous(constante = if (identical(tablexp:::LIMITE_SOMMES_DOUBLE, L)) TRUE else "LIMITE_SOMMES_DOUBLE",
+       borne = if (is.null(borne)) TRUE else paste("refus inattendu :", borne$motif),
+       dessus = if (isTRUE(controle(dessus, "exposition", "exposition_hors_plage")) &&
+                    identical(msg(dessus), texte("exposition_centrale", "8.9884656743115795e+307")) &&
+                    identical(dessus$details, list(role = "exposition_centrale", valeur = L * (1 + 2^-52), limite = L)))
+                 TRUE else msg(dessus),
+       infini = if (isTRUE(controle(infini, "exposition", "exposition_hors_plage")) &&
+                    identical(msg(infini), texte("exposition_centrale", "non fini")) &&
+                    identical(infini$details$valeur, Inf)) TRUE else msg(infini),
+       initiale = if (isTRUE(controle(initiale, "exposition", "exposition_hors_plage")) &&
+                      identical(initiale$details$role, "exposition_initiale") &&
+                      identical(msg(initiale), texte("exposition_initiale", "non fini"))) TRUE else msg(initiale))
+})
+
 # --- C5 et C6 : sommes et ordre ------------------------------------------------------
 
 verifier("C5 sommes sur un segment non employé et sur les années (par_annee = FALSE), valeurs dyadiques : D et E égaux aux sommes, identical()", {

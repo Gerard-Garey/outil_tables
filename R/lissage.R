@@ -169,6 +169,13 @@ STATUTS_LISSAGE_POISSON <- local({
                   "lissage retenu : theta^ ± z_alpha sqrt(diag((W + P)^-1)), z_alpha quantile d'ordre (1 + niveau) /",
                   "2 de la loi normale, image par q = 1 - exp(-exp(theta)) ; ce ne sont pas des intervalles de",
                   "confiance ; couverture fréquentiste non établie (aucun constat de simulation versé)")
+  # Mention d'indépendance des unités (#159, #329 ; spécification
+  # d'actuary-approfondi, #329, commentaire 7102999392) en fin de statut des
+  # deux bornes seules (nature intervalle) : le module lissage précède
+  # validation (ORDRE_MODULES), d'où ce fragment propre, égal à l'octet à
+  # mention_independance("intervalle") de R/validation.R (test C3).
+  bornes <- paste(bornes, ";", paste("unités d'observation indépendantes ; sous l'unité contrat, les décès sont",
+                                     "sur-dispersés et l'intervalle est trop étroit"))
   l <- list(
     c("table_lissee/qx",
       paste("-expm1(-exp(theta^)), theta^ maximum de la vraisemblance de Poisson pénalisée (mode a posteriori),",

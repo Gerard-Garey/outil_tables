@@ -472,6 +472,14 @@ TRANSITIONS_EN_COURS <- list()
 # B33 (exécution 45021813451, sur 5aa23d7) : transition_334(),
 # transition_333(), apres_334() et les constantes SUBST_334, SUBST_333 et
 # CHEMIN_STATUTS_334 retirées.
+# Transitions #330 (conséquence de la mention d'indépendance adaptée à la
+# nature de la grandeur : statuts de validation/resultat/statistiques de R8,
+# R9 et R10, et de statuts_sous_groupes/bornes_exactes de R10) et #329
+# (mention d'indépendance en fin de statut des deux bornes de crédibilité de
+# wh_poisson, R16 et R17) de B35, closes par la régénération (R) de B35
+# (exécution 45258747737, sur cac4b84) : transition_330(), apres_330(),
+# transition_329() et les constantes M_330, CONSEQUENCES_330,
+# NATURES_STATISTIQUES_330 et GRANDEURS_329 retirées.
 
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
 CHAMPS_CHANGEMENT <- list(type = c("de", "vers"), valeur = c("valeurs", "positions"),

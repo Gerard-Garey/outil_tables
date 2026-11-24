@@ -757,6 +757,28 @@ exposition_cellules <- function(observations, p, segmentation, recette, conv, pa
   # avertissement). Après la garde par cellule ; les sommes des étapes en aval
   # portent sur des sous-ensembles de ces cellules.
   evenements_total <- denombrement_entier(sum(d), "exposition", "evenements")
+  # Total de chaque exposition déclarée (#353, M579 ; ADR 0009, annotation du
+  # 23/11/2026) : refusé au-delà de LIMITE_SOMMES_DOUBLE (NaN et infini
+  # compris ; une somme de cellule infinie rend le total infini). Le total
+  # au plus cette borne, toute somme d'expositions des cellules formée en
+  # aval (strate, segment, groupe de tirage) reste finie, quel que soit
+  # l'ordre de sommation (R/outils.R). Valeur et limite citées au format
+  # %.17g (les deux s'écrivent sinon « 8.98847e+307 » juste au-dessus de la
+  # borne). Les recettes en lignes ne sont pas concernées : les dates sont
+  # bornées à [0001-01-01, 9999-12-31] (date_hors_domaine, R/donnees.R) et
+  # un vecteur R compte au plus 2^52 lignes, d'où un total d'exposition
+  # d'environ 1,6e22 au plus (en jours ; 4,5e19 en années).
+  for (r in declarees) {
+    total_r <- sum(table_exp[[r]])
+    if (!(total_r <= LIMITE_SOMMES_DOUBLE))
+      refuser("exposition", "exposition_hors_plage",
+              formuler(paste("Total de l'exposition déclarée du rôle « %s » hors de la plage de calcul du moteur",
+                             "(%s ; au plus %.17g, moitié du plus grand réel en double précision) ; vérifier la",
+                             "colonne de ce rôle ; la construction est refusée."),
+                       neutraliser_citation(r), if (is.finite(total_r)) formuler("%.17g", total_r) else "non fini",
+                       LIMITE_SOMMES_DOUBLE),
+              list(role = r, valeur = total_r, limite = LIMITE_SOMMES_DOUBLE))
+  }
 
   # Relevés.
   sommees <- !par_annee && "annee" %in% names(observations)

@@ -10,6 +10,9 @@
 #  - denombrement_entier() : rangement en integer d'une somme d'événements
 #    formée en double, refus au-delà de .Machine$integer.max (ADR 0009,
 #    point 9.6 ; #199) ;
+#  - LIMITE_SOMMES_DOUBLE : moitié du plus grand réel en double précision,
+#    borne des sommes de termes positifs (ADR 0009, annotation du
+#    23/11/2026 ; #353, M579) ;
 #  - forme_exacte() : type de base exact, aucun attribut hors de ceux admis
 #    (forme canonique des valeurs du plan, #23) ;
 #  - liste_aux_noms() et chaine_unique() : les deux contrôles de forme qui s'y
@@ -48,6 +51,16 @@ GENERATEUR <- c(kind = "Mersenne-Twister", normal.kind = "Inversion",
 
 # Motif d'un code de refus : code court stable, minuscules ASCII et soulignés.
 MOTIF_CODE_REFUS <- "^[a-z][a-z0-9_]*$"
+
+# Borne d'une somme de termes positifs (#353, M579 ; ADR 0009, annotation du
+# 23/11/2026) : moitié de .Machine$double.xmax. Si une somme calculée de k
+# termes positifs (k < 2^51) est au plus cette borne, toute somme partielle
+# de ces termes, calculée dans n'importe quel ordre, en double (rowsum(),
+# accumulation séquentielle) ou en long double (sum()), reste finie
+# (analyse d'erreur de la sommation récursive ; spécification
+# d'actuary-approfondi de #353, § 3). Constante de plateforme, sans contenu
+# métier : lue par les modules qui gardent un total.
+LIMITE_SOMMES_DOUBLE <- .Machine$double.xmax / 2
 
 # Construit la condition de refus (classe c("refus_tablexp", "error",
 # "condition")) sans la lever. module : module qui refuse ; motif : code court

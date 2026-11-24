@@ -66,9 +66,14 @@ verifier("A STATUTS_VALIDATION_POSITIONNEE : mêmes (statistique, grandeur, sous
     grepl("loi non corrigée de l'estimation de theta", k("wilcoxon", "p_exacte"), fixed = TRUE) &&
     !any(grepl("Liddell|Garwood|Byar|Wilson|Hilferty|Clopper|Pearson \\(", b$statut)) &&
     all(grepl("sous l'unité contrat, les décès sont sur-dispersés et les tests sont anti-conservateurs",
-              c(k("residus", "esperance_au_dela_2"), k("khi2_pearson", "p_asymptotique"), k("deviance", "p_monte_carlo"),
-                k("deviance", "p_asymptotique"),
-                k("sous_groupes", "bornes_exactes"), k("sous_groupes", "p_valeurs")), fixed = TRUE)) &&
+              c(k("khi2_pearson", "p_asymptotique"), k("deviance", "p_monte_carlo"), k("deviance", "p_asymptotique"),
+                k("sous_groupes", "p_valeurs")), fixed = TRUE)) &&
+    # Conséquence par nature (#330) : valeur sous H0 (i) pour les espérances
+    # conditionnelles, intervalle pour les bornes des sous-groupes.
+    grepl("sur-dispers\u00e9s et la valeur sous H0 (i) diff\u00e8re de celle de la loi r\u00e9elle",
+          k("residus", "esperance_au_dela_2"), fixed = TRUE) &&
+    grepl("sur-dispers\u00e9s et l'intervalle est trop \u00e9troit", k("sous_groupes", "bornes_exactes"),
+          fixed = TRUE) &&
     grepl("couverture >= niveau (intervalle exact conservatif)", k("sous_groupes", "bornes_exactes"), fixed = TRUE) &&
     grepl("si n - S = 0 (une cellule retenue par segment)", k("khi2_pearson", "ddl"), fixed = TRUE)
 })
@@ -94,7 +99,9 @@ verifier("A STATUTS_VALIDATION_POSITIONNEE (M309) : Wilcoxon, R2 et distance nom
   # sous_groupes/bornes_exactes, p_valeurs et p_valeurs_asymptotiques ;
   # avant #215 : 7c535735fdb65e7aa57c22f86d60ffb3) puis par #159 (mention
   # d'indépendance des unités sur les 22 lignes de loi ; avant #159 :
-  # 736e637e156df8d409b6943d333fe741),
+  # 736e637e156df8d409b6943d333fe741) puis par #330 (conséquence de la
+  # mention selon la nature de la grandeur, 9 lignes ; avant #330 :
+  # 4b66eb3d650c8a0483869866dce8cf12),
   # valeur écrite en dur (identité exacte) : octets bruts des
   # chaînes (charToRaw, sans conversion), champs séparés par une tabulation,
   # lignes par un saut de ligne ; indépendante de la locale d'installation
@@ -122,7 +129,7 @@ verifier("A STATUTS_VALIDATION_POSITIONNEE (M309) : Wilcoxon, R2 et distance nom
                         grepl("pbinom ; table positionnée sur ces données", k("signes", "p_exacte"), fixed = TRUE,
                               useBytes = TRUE))
                       TRUE else paste(grep("[^ ];", b$statut, useBytes = TRUE, value = TRUE), collapse = " | "),
-    independante = if (identical(unname(tools::md5sum(f)), "4b66eb3d650c8a0483869866dce8cf12")) TRUE
+    independante = if (identical(unname(tools::md5sum(f)), "8b23686a0db0aed8993e24c8fdbc62b4")) TRUE
                    else "STATUTS_VALIDATION modifié")
 })
 verifier("A statuts_validation() : switch à trois valeurs, erreur de programmation par défaut", tous(
@@ -1084,4 +1091,172 @@ local({
     motif = controle(r, "validation", "denombrement_hors_plage"),
     grandeur = if (identical(r$details$grandeur, "evenements_sans_attendu") && identical(r$details$valeur, 4e9)) TRUE
                else paste(r$details$grandeur, r$details$valeur)))
+})
+
+# --- #350 : support de chaque binomiale par bisection, sans dbinom(0:n) ------
+#
+# Règle (A) de la spécification d'actuary-approfondi de #350 (commentaire
+# 7103012151, § 2 et § 6 ; M580). Avant (copie de 1f0109a, sous ulimit -v
+# 4000000) : cout_convolution_binomiales(1e9, 0.5) et les sous-groupes d'un
+# segment complet de 1e9 décès s'arrêtent sur « cannot allocate vector of
+# size 7.5 Gb ». Natures : identité exacte avec l'algorithme d'avant
+# (dbinom(0:n) élaguée, recopiée ci-dessous) ; valeurs écrites en dur,
+# mesurées sur une installation de 1f0109a ; valeur calculée à la main
+# (loi_bin()) ; mesure de mémoire par gc() (Vcells, maximum depuis la remise
+# à zéro, moins l'usage à la remise à zéro ; ce maximum compte aussi les
+# objets non encore collectés, d'où des bornes larges, très en deçà des 7,5
+# Gb d'un vecteur dbinom(0:1e9)).
+ancienne_elaguee_350 <- function(n, p) {
+  d <- stats::dbinom(0:n, n, p)
+  nz <- which(d > 0)
+  list(d = d[nz[1L]:nz[length(nz)]], debut = nz[1L] - 1)
+}
+# Colonnes lues par nom : la colonne Mb qui suit « used », celle qui suit
+# « max used » (R_MAX_VSIZE ajoute la colonne « limit (Mb) » et décale les
+# positions ; audit de l'étape (3)).
+mb_gc_350 <- function(g, colonne) g[2L, match(colonne, colnames(g)) + 1L]
+memoire_mb_350 <- function(expr) {
+  g0 <- gc(reset = TRUE)
+  t0 <- proc.time()[["elapsed"]]
+  v <- tryCatch(force(expr), error = function(e) e)
+  g1 <- gc()
+  list(valeur = v, mb = mb_gc_350(g1, "max used") - mb_gc_350(g0, "used"), s = proc.time()[["elapsed"]] - t0)
+}
+borne_350 <- function(m, mb, s) {
+  if (inherits(m$valeur, "error")) return(paste("erreur de R :", conditionMessage(m$valeur)))
+  if (!(m$mb <= mb)) return(sprintf("mémoire %.1f Mb > %g Mb", m$mb, mb))
+  if (!(m$s <= s)) return(sprintf("durée %.2f s > %g s", m$s, s))
+  TRUE
+}
+verifier("#350 support_binomiale() identique aux bornes de which(dbinom(0:n) > 0) et binomiale_elaguee() identical() à l'élagage de dbinom(0:n), sur la grille de la spécification (90 couples n x p, n <= 5e6, et 150 tirés sous une graine locale) ; support contigu", {
+  g <- rbind(expand.grid(n = c(1, 2, 10, 100, 1000, 1e4, 1e5, 1e6, 5e6),
+                         p = c(1e-12, 1e-6, 0.001, 0.01, 0.1, 0.3, 0.5, 0.7, 0.99, 1 - 1e-9)),
+             tablexp:::sous_graine(3500351L, data.frame(n = round(10^stats::runif(150, 0, 6.7)), p = stats::runif(150))))
+  e <- 0; nc <- 0
+  for (i in seq_len(nrow(g))) {
+    n <- g$n[i]; p <- g$p[i]
+    # ancienne_elaguee_350() sans second appel de dbinom(0:n) (durée).
+    d <- stats::dbinom(0:n, n, p); nz <- which(d > 0)
+    if (length(nz) != nz[length(nz)] - nz[1L] + 1L) nc <- nc + 1
+    if (!identical(tablexp:::support_binomiale(n, p), c(nz[1L] - 1, nz[length(nz)] - 1)) ||
+        !identical(tablexp:::binomiale_elaguee(n, p), list(d = d[nz[1L]:nz[length(nz)]], debut = nz[1L] - 1))) e <- e + 1
+  }
+  tous(ecarts = if (e == 0) TRUE else sprintf("%d écart(s) sur %d", e, nrow(g)),
+       contigu = if (nc == 0) TRUE else sprintf("%d support(s) non contigu(s)", nc))
+})
+verifier("#350 cas dégénérés de support_binomiale() : n = 0 ou p = 0 -> c(0, 0) ; p = 1 -> c(n, n)", {
+  s <- tablexp:::support_binomiale
+  if (identical(s(0, 0.3), c(0, 0)) && identical(s(25, 0), c(0, 0)) && identical(s(25, 1), c(25, 25)) &&
+      identical(s(1e9, 1), c(1e9, 1e9))) TRUE else "cas dégénérés"
+})
+verifier("#350 C4 : cout_convolution_binomiales(1e9, 0.5) = 0 et support_binomiale(.Machine$integer.max, 0.5) de longueur 1 775 728 (mesurée), sans allocation proportionnelle à n (moins de 50 Mb, moins de 5 s) ; binomiale_elaguee() à n = .Machine$integer.max : 1 775 728 éléments, total 1 à 1e-14 (moins de 500 Mb)", {
+  m1 <- memoire_mb_350(tablexp:::cout_convolution_binomiales(1e9, 0.5))
+  m2 <- memoire_mb_350(tablexp:::support_binomiale(.Machine$integer.max, 0.5))
+  m3 <- memoire_mb_350(tablexp:::binomiale_elaguee(.Machine$integer.max, 0.5))
+  tous(cout_borne = borne_350(m1, 50, 5), cout = if (identical(m1$valeur, 0)) TRUE else "coût non nul",
+       support_borne = borne_350(m2, 50, 5),
+       support = if (identical(diff(m2$valeur) + 1, 1775728)) TRUE else paste(m2$valeur, collapse = " "),
+       elaguee_borne = borne_350(m3, 500, 5),
+       elaguee = if (identical(length(m3$valeur$d), 1775728L)) TRUE else "longueur",
+       total = proche(sum(m3$valeur$d), 1, 1e-14, 0))
+})
+verifier("#350 coût et loi de Bin(1e9 ; 1) + Bin(10 ; 0,3) (spécification, § 6, test 4) : coût 11, loi de longueur 11, debut 1e9, produits 11, valeurs dbinom(0:10, 10, 0.3) (calculées à la main par loi_bin(), 1e-14) ; moins de 50 Mb", {
+  m <- memoire_mb_350(tablexp:::loi_somme_binomiales(c(1e9, 10), c(1, 0.3)))
+  l <- m$valeur
+  tous(borne = borne_350(m, 50, 5),
+       cout = if (identical(tablexp:::cout_convolution_binomiales(c(1e9, 10), c(1, 0.3)), 11)) TRUE else "coût",
+       longueur = if (identical(length(l), 11L)) TRUE else "longueur",
+       debut = if (identical(attr(l, "debut"), 1e9)) TRUE else "debut",
+       produits = if (identical(attr(l, "produits"), 11)) TRUE else "produits",
+       loi = proche(c(l), loi_bin(10, 0.3), 1e-14, 0))
+})
+verifier("#350 loi_somme_binomiales() et cout_convolution_binomiales() identiques à l'algorithme d'avant (dbinom(0:n) élaguée, vecteur 0..somme des n) sur 100 cas tirés (1 à 4 strates, n <= 2e4, p = 1 dans 10 % des cas) : coût, produits, loi sur son support identical(), zéros exacts hors du support ; p_exacte_homogeneite() identical() à la p calculée sur le vecteur complet", {
+  ancienne_loi <- function(n, p) {
+    loi <- 1; debut <- 0
+    for (s in seq_along(n)) {
+      e <- ancienne_elaguee_350(n[s], p[s]); a <- e$d; debut <- debut + e$debut
+      if (length(a) < length(loi)) { b <- a; a <- loi } else b <- loi
+      v <- numeric(length(a) + length(b) - 1L)
+      for (j in seq_along(b)) { ix <- j - 1L + seq_along(a); v[ix] <- v[ix] + a * b[j] }
+      loi <- v
+    }
+    r <- numeric(sum(n) + 1); r[debut + seq_along(loi)] <- loi; r
+  }
+  ancien_cout <- function(n, p) {
+    l <- vapply(seq_along(n), function(s) length(ancienne_elaguee_350(n[s], p[s])$d), 0)
+    if (length(l) < 2L) return(0)
+    cumul <- cumsum(l) - (seq_along(l) - 1); sum(cumul[-length(l)] * l[-1L])
+  }
+  tol <- tablexp:::TOLERANCE_RESIDU_NUL
+  ec <- tablexp:::sous_graine(3500352L, {
+    ec <- c(cout = 0, produits = 0, loi = 0, zeros = 0, p_exacte = 0)
+    for (i in 1:100) {
+      S_ <- sample(1:4, 1L); n <- round(10^stats::runif(S_, 0, 4.3)); p <- stats::runif(S_)
+      if (stats::runif(1L) < 0.1) p[1L] <- 1
+      o <- sum(round(n * p)) + sample(-3:3, 1L); A <- sum(n * p)
+      if (!identical(tablexp:::cout_convolution_binomiales(n, p), ancien_cout(n, p))) ec["cout"] <- ec["cout"] + 1
+      L <- ancienne_loi(n, p); M <- tablexp:::loi_somme_binomiales(n, p); ix <- attr(M, "debut") + seq_along(M)
+      if (!identical(attr(M, "produits"), ancien_cout(n, p))) ec["produits"] <- ec["produits"] + 1
+      if (!identical(L[ix], as.numeric(M))) ec["loi"] <- ec["loi"] + 1
+      if (any(L[-ix] != 0)) ec["zeros"] <- ec["zeros"] + 1
+      k <- seq_along(L) - 1
+      pe <- list(p = min(1, sum(L[abs(k - A) >= abs(o - A) - tol * A])), etat = "produite")
+      if (!identical(tablexp:::p_exacte_homogeneite(list(exacte = list(n = n, p = p, o = o, a = A))), pe))
+        ec["p_exacte"] <- ec["p_exacte"] + 1
+    }
+    ec
+  })
+  if (all(ec == 0)) TRUE else paste(names(ec), ec, sep = " = ", collapse = ", ")
+})
+# Six jeux tirés (2 à 4 segments de 2 à 4 cellules, décès jusqu'à 5e3, deux
+# sous-groupes croisant les segments, le segment 1 entièrement dans le
+# sous-groupe 1 dans 30 % des cas : pi = 1) ; p_inferieure et p_superieure
+# des deux sous-groupes mesurées sur une installation de 1f0109a
+# (sprintf("%.17g")).
+jeu_sg_350 <- function() {
+  S_ <- sample(2:4, 1L); nc <- sample(2:4, S_, replace = TRUE)
+  seg <- rep(seq_len(S_), nc); nn <- length(seg)
+  cle <- rep(1:2, length.out = nn)[sample.int(nn)]
+  if (stats::runif(1L) < 0.3) cle[seg == 1L] <- 1L
+  Dr <- round(10^stats::runif(nn, 0, 3.7)); Ar <- Dr * stats::runif(nn, 0.5, 1.5)
+  for (s_ in seq_len(S_)) Ar[seg == s_] <- Ar[seg == s_] * sum(Dr[seg == s_]) / sum(Ar[seg == s_])
+  list(cle = cle, seg = seg, Dr = Dr, Ar = Ar, O = c(sum(Dr[cle == 1L]), sum(Dr[cle == 2L])),
+       At = c(sum(Ar[cle == 1L]), sum(Ar[cle == 2L])))
+}
+verifier("#350 sous-groupes de positionnee : p_inferieure et p_superieure identical() aux valeurs mesurées sur 1f0109a, six jeux tirés (états bornes_non_definies et produite)", {
+  r <- tablexp:::sous_graine(3500350L, lapply(1:6, function(i) {
+    j <- jeu_sg_350()
+    tablexp:::sous_groupes_positionnee("tranche", j$cle, 2L, j$seg, rep(TRUE, length(j$seg)), j$Dr, j$Ar, j$O, j$At, 0.95)
+  }))
+  attendu <- list(
+    c(0.71170549778447045, 0.40610861050846647, 0.40610861050846692, 0.71170549778447056),
+    c(0.6641150426291067, 0.46014005728662988, 0.4601400572866296, 0.66411504262910626),
+    c(0.97842775164427809, 0.024893346710258477, 0.024893346710258658, 0.97842775164427831),
+    c(1.0174068628458104e-31, 0.99999999999999967, 1, 1.0174068628463464e-31),
+    c(0.16339800565362622, 0.87983019625538317, 0.87983019625538361, 0.16339800565362647),
+    c(0.65606024407996, 0.46212034766979937, 0.46212034766980625, 0.65606024407996144))
+  etats <- c("bornes_non_definies produite", rep("bornes_non_definies bornes_non_definies", 3L),
+             "bornes_non_definies produite", "bornes_non_definies bornes_non_definies")
+  tous(p = if (identical(lapply(r, function(x) c(x$p_inferieure, x$p_superieure)), attendu)) TRUE else "p-valeurs",
+       etats = if (identical(vapply(r, function(x) paste(x$etat, collapse = " "), ""), etats)) TRUE else "états")
+})
+verifier("#350 C4 sous-groupes de positionnee : segment 1 complet de 1e9 décès (pi = 1) et 3 décès sur 10 du segment 2 (pi = 0,3) dans le sous-groupe 1 : p inférieure P(Bin(10 ; 0,3) <= 3) et supérieure P(Bin(10 ; 0,3) >= 3) (calculées à la main par loi_bin(), 1e-14), état bornes_non_definies, moins de 50 Mb ; deux segments partiels de 1e9 (pi (0,3 ; 0,6) et (0,7 ; 0,4)) : coût > N_MAX_PRODUITS_CONVOLUTION, état convolution_au_dela_n_max, sans allocation", {
+  m <- memoire_mb_350(tablexp:::sous_groupes_positionnee("tranche", c(1L, 1L, 1L, 2L), 2L, c(1L, 1L, 2L, 2L), rep(TRUE, 4L),
+                                                          c(6e8, 4e8, 3, 7), c(6e8, 4e8, 3, 7), c(1e9 + 3, 7), c(1e9 + 3, 7), 0.95))
+  r <- m$valeur
+  m2 <- memoire_mb_350(tablexp:::sous_groupes_positionnee("tranche", c(1L, 2L, 1L, 2L), 2L, c(1L, 1L, 2L, 2L), rep(TRUE, 4L),
+                                                           c(3e8, 7e8, 6e8, 4e8), c(3e8, 7e8, 6e8, 4e8), c(9e8, 1.1e9), c(9e8, 1.1e9), 0.95))
+  lb <- loi_bin(10, 0.3)
+  # pi de l'appel m2 : A des cellules du sous-groupe sur A_s (A_s = 1e9 par
+  # segment) : sous-groupe 1 (cellules 1 et 3) (0,3 ; 0,6), sous-groupe 2
+  # (cellules 2 et 4) (0,7 ; 0,4) ; contrôle des deux coûts.
+  tous(borne = borne_350(m, 50, 5),
+       p = proche(c(r$p_inferieure[1L], r$p_superieure[1L]), c(sum(lb[1:4]), sum(lb[4:11])), 1e-14, 0),
+       etat = if (identical(r$etat[1L], "bornes_non_definies")) TRUE else r$etat[1L],
+       borne_partiels = borne_350(m2, 50, 5),
+       cout = if (all(vapply(list(c(0.3, 0.6), c(0.7, 0.4)), function(pi_)
+                    tablexp:::cout_convolution_binomiales(c(1e9, 1e9), pi_), 0) > tablexp:::N_MAX_PRODUITS_CONVOLUTION)) TRUE
+              else "coût <= N_MAX_PRODUITS_CONVOLUTION",
+       etat_partiels = if (identical(m2$valeur$etat, rep("convolution_au_dela_n_max", 2L))) TRUE
+                       else paste(m2$valeur$etat, collapse = ", "))
 })

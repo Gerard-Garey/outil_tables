@@ -30,8 +30,10 @@
 #    STATUTS_VALIDATION_LISSEE) ;
 #  - replications_poisson() et replications_multinomiales() (sous
 #    sous_graine()), pvaleur_monte_carlo() ;
-#  - loi_somme_binomiales() : loi d'une somme de binomiales indépendantes
-#    (convolution, brique partagée avec #168, F3) ;
+#  - support_binomiale(), binomiale_elaguee(), cout_convolution_binomiales(),
+#    loi_somme_binomiales() : loi d'une somme de binomiales indépendantes
+#    (convolution sur les supports, brique partagée avec #168, F3 ; aucune
+#    allocation proportionnelle à n, #350) ;
 #  - p_somme_binomiales_normale() : p-valeurs asymptotiques de cette somme
 #    (approximation normale, correction de continuité ; #178) ;
 #  - statistiques_validation() : S1 à S12 sur les cellules (cœur partagé avec
@@ -136,8 +138,13 @@ ELEMENTS_BLOC_REPLICATIONS <- 2^22
 # segments ; F3, M185 ; audit A2) : coût calculé avant la convolution par
 # cout_convolution_binomiales() ; au-delà, p-valeurs exactes NA, p-valeurs
 # asymptotiques par p_somme_binomiales_normale() (convolution_au_dela_n_max ;
-# #178). Mesures (hôte cloud Linux, R 4.3.3,
-# 07/11/2026 ; débit d'environ 1,1 à 1,4e8 produits/s) :
+# #178). Le coût se calcule sur les longueurs des supports
+# (support_binomiale(), sans former dbinom(0:n) ; #350) ; une binomiale
+# seule n'a aucun produit et se calcule sur son support : 1 775 728 éléments
+# au plus à n = .Machine$integer.max (garde du total des événements), en p =
+# 0,5, sur 164 valeurs de p de 1e-12 à 1 - 1e-12 ; dbinom sur ce support en
+# 0,11 s (mesuré le 23/11/2026, même hôte). Mesures (hôte cloud Linux, R
+# 4.3.3, 07/11/2026 ; débit d'environ 1,1 à 1,4e8 produits/s) :
 #   segments x n_s, pi                        produits        durée
 #   2 x 50 000, 0,5                           73 599 241      0,61 s
 #   3 x (20 000, 30 000, 10 000), (0,2 ; 0,7 ; 0,4)
@@ -231,6 +238,34 @@ PHRASES_ATTENDUS_FAIBLES <- list(
              "numérique) : la p asymptotique est trop grande ou trop petite selon la répartition des A_c ; seule",
              "p_monte_carlo a un niveau garanti sous H0 (i)"))
 
+# Mention d'indépendance des unités d'observation (#159), source unique de
+# la conséquence par nature de grandeur (#330, F330 ; spécification
+# d'actuary-approfondi, commentaire 7102990712 de #330) : préfixe commun
+# (marqueur et cause), puis la conséquence de la nature. tests : p-valeur ou
+# statistique de test ; intervalle ; variance : variance sous-évaluée, objet
+# exigé (ex. « Var(X2) »), seule nature qui en prend un ; valeur_h0 :
+# espérance ou variance sous H0 (i) dont le sens de l'écart n'est pas établi ;
+# niveau : test dont le sens de l'erreur n'est pas établi. Appelée par
+# STATUTS_VALIDATION, STATUTS_VALIDATION_POSITIONNEE et STATUTS_IMPORTANCE à
+# l'installation ; chaîne non marquée, comme les littéraux auxquels elle est
+# collée (le texte_moteur() de chaque table la marque).
+mention_independance <- function(nature, objet = NULL) {
+  natures <- c("tests", "intervalle", "variance", "valeur_h0", "niveau")
+  if (!is.character(nature) || length(nature) != 1L || !nature %in% natures)
+    stop("mention_independance() : nature inconnue (erreur de programmation).", call. = FALSE)
+  if (if (identical(nature, "variance")) !(is.character(objet) && length(objet) == 1L && !is.na(objet) && nzchar(objet))
+      else !is.null(objet))
+    stop("mention_independance() : objet exigé pour la nature variance, et pour elle seule (erreur de programmation).",
+         call. = FALSE)
+  consequence <- switch(nature,
+    tests = "les tests sont anti-conservateurs",
+    intervalle = "l'intervalle est trop étroit",
+    variance = paste(objet, "est sous-estimée"),
+    valeur_h0 = "la valeur sous H0 (i) diffère de celle de la loi réelle, dans un sens non établi en général",
+    niveau = "le niveau n'est plus garanti")
+  paste("unités d'observation indépendantes ; sous l'unité contrat, les décès sont sur-dispersés et", consequence)
+}
+
 # Statuts (E2.20) des grandeurs de resultat$statistiques, une ligne par
 # (statistique, grandeur), dans l'ordre du tableau ; sous_h0 : grandeur
 # définie par H0 (p-valeur, intervalle, espérance ou variance sous H0,
@@ -238,11 +273,11 @@ PHRASES_ATTENDUS_FAIBLES <- list(
 # (M254) ; les lignes `sous_groupes` décrivent resultat$sous_groupes.
 # Textes marqués UTF-8 (texte_moteur(), comme STATUTS_POSITIONNEMENT).
 # Mention d'indépendance des unités (#159), règle anti-doublon : la mention
-# (indep_tests, indep_int) s'ajoute ligne par ligne ci-dessous, en fin de
-# statut des seules lignes qui affirment une loi (intervalle, p-valeur, loi
-# de référence, espérance ou variance sous H0, niveau de Monte-Carlo ;
-# sous_groupes : avant la relation ajustee_hors_outil), jamais dans les
-# fragments exact_h0, mc ou chi2 ; les fragments collés par completer() (nc
+# (mention_independance(), nature déclarée à chaque ligne, #330) s'ajoute
+# ligne par ligne ci-dessous, en fin de statut des seules lignes qui
+# affirment une loi (intervalle, p-valeur, loi de référence, espérance ou
+# variance sous H0, niveau de Monte-Carlo ; sous_groupes : avant la relation
+# ajustee_hors_outil), jamais dans les fragments exact_h0, mc ou chi2 ; les fragments collés par completer() (nc
 # de STATUTS_VALIDATION_POSITIONNEE, cpl de STATUTS_VALIDATION_LISSEE) ne
 # contiennent jamais le marqueur « unités d'observation indépendantes » ;
 # une table dérivée qui remplace une ligne de loi écrit sa propre mention.
@@ -250,10 +285,6 @@ PHRASES_ATTENDUS_FAIBLES <- list(
 # ddl, erreurs de Monte-Carlo ni sur les tests sous leurs hypothèses propres
 # (signes, suites, Wilcoxon).
 STATUTS_VALIDATION <- local({
-  indep_tests <- paste("unités d'observation indépendantes ; sous l'unité contrat, les décès sont sur-dispersés et les",
-                       "tests sont anti-conservateurs")
-  indep_int <- paste("unités d'observation indépendantes ; sous l'unité contrat, les décès sont sur-dispersés et",
-                     "l'intervalle est trop étroit")
   desc <- "descriptif : calcul direct sur les cellules retenues (C+), valeur en arithmétique flottante"
   exact_h0 <- paste("exact sous H0 (i), E^c tenue pour fixe ; asymptotique sous le modèle de survie ;",
                     "fonctions de répartition de Poisson (ppois), approximation numérique")
@@ -282,28 +313,30 @@ STATUTS_VALIDATION <- local({
   l <- list(
     c("residus", "au_dela_2", "FALSE", "descriptif : nombre de cellules retenues où |D - A| / sqrt(A) > 2"),
     c("residus", "esperance_au_dela_2", "TRUE", paste(exact_h0, "; somme sur C+ de P(|D_c - A_c| > 2 sqrt(A_c)) ;",
-                                                           indep_tests)),
+                                                           mention_independance("valeur_h0"))),
     c("residus", "au_dela_3", "FALSE", "descriptif : nombre de cellules retenues où |D - A| / sqrt(A) > 3"),
     c("residus", "esperance_au_dela_3", "TRUE", paste(exact_h0, "; somme sur C+ de P(|D_c - A_c| > 3 sqrt(A_c)) ;",
-                                                           indep_tests)),
+                                                           mention_independance("valeur_h0"))),
     c("khi2_pearson", "statistique", "FALSE", "descriptif : X2 = somme sur C+ de (D - A)^2 / A"),
     c("khi2_pearson", "ddl", "TRUE", "n - p : n cellules retenues, p paramètres estimés sur ces données (0)"),
     c("khi2_pearson", "variance_h0", "TRUE",
       paste("exact sous H0 (i), E^c tenue pour fixe ; asymptotique sous le modèle de survie : Var(X2) = somme sur C+",
             "de (2 + 1/A_c) (moments de Poisson d'ordre 4), à comparer à 2 (n - p), variance de la loi de référence",
-            "de khi2_pearson/p_asymptotique (les espérances sont égales) ; arithmétique flottante ;", indep_tests)),
+            "de khi2_pearson/p_asymptotique (les espérances sont égales) ; arithmétique flottante ;",
+            mention_independance("variance", "Var(X2)"))),
     c("khi2_pearson", "p_asymptotique", "TRUE",
       paste(chi2, "; queue supérieure ;", petits, ": sous H0 (i), E^c tenue pour fixe, E[X2] = n - p exactement mais",
             "Var(X2) = somme sur C+ de (2 + 1/A_c) > 2 (n - p) (moments de Poisson, résultat exact ;",
-            "khi2_pearson/variance_h0) ;", fin_x2, ";", indep_tests)),
-    c("khi2_pearson", "p_monte_carlo", "TRUE", paste(mc, "; queue supérieure ;", indep_tests)),
+            "khi2_pearson/variance_h0) ;", fin_x2, ";", mention_independance("tests"))),
+    c("khi2_pearson", "p_monte_carlo", "TRUE", paste(mc, "; queue supérieure ;", mention_independance("tests"))),
     c("khi2_pearson", "erreur_monte_carlo", "TRUE", e_mc),
     c("deviance", "statistique", "FALSE",
       "descriptif : G2 = 2 somme sur C+ de [D ln(D / A) - (D - A)] (0 ln 0 = 0), rapport de vraisemblance"),
     c("deviance", "ddl", "TRUE", "n - p : n cellules retenues, p paramètres estimés sur ces données (0)"),
     c("deviance", "p_asymptotique", "TRUE",
-      paste(chi2, "; queue supérieure ;", petits, ": sous H0 (i), E^c tenue pour fixe,", g2, ";", indep_tests)),
-    c("deviance", "p_monte_carlo", "TRUE", paste(mc, "; queue supérieure ;", indep_tests)),
+      paste(chi2, "; queue supérieure ;", petits, ": sous H0 (i), E^c tenue pour fixe,", g2, ";",
+            mention_independance("tests"))),
+    c("deviance", "p_monte_carlo", "TRUE", paste(mc, "; queue supérieure ;", mention_independance("tests"))),
     c("deviance", "erreur_monte_carlo", "TRUE", e_mc),
     c("smr", "observes", "FALSE", "descriptif : O = somme de D sur C+"),
     c("smr", "attendus", "FALSE", "descriptif : A = somme de A_c sur C+"),
@@ -313,20 +346,22 @@ STATUTS_VALIDATION <- local({
     c("smr", "borne_inf_exacte", "TRUE",
       paste("exact sous la loi supposée (O ~ Poisson, A fixe) : G_O^-1(alpha/2) / A, G_k loi gamma de forme k",
             "(0 si O = 0) ; couverture >= niveau (intervalle exact conservatif) ; qgamma, approximation numérique ;",
-            indep_int)),
+            mention_independance("intervalle"))),
     c("smr", "borne_sup_exacte", "TRUE",
       paste("exact sous la loi supposée (O ~ Poisson, A fixe) : G_(O+1)^-1(1 - alpha/2) / A ; couverture >= niveau",
-            "(intervalle exact conservatif) ; qgamma, approximation numérique ;", indep_int)),
-    c("smr", "p_inferieure", "TRUE", paste(exact_h0, ": P(X <= O), X ~ Poisson(A) ;", indep_tests)),
-    c("smr", "p_superieure", "TRUE", paste(exact_h0, ": P(X >= O), X ~ Poisson(A) ;", indep_tests)),
+            "(intervalle exact conservatif) ; qgamma, approximation numérique ;",
+            mention_independance("intervalle"))),
+    c("smr", "p_inferieure", "TRUE", paste(exact_h0, ": P(X <= O), X ~ Poisson(A) ;", mention_independance("tests"))),
+    c("smr", "p_superieure", "TRUE", paste(exact_h0, ": P(X >= O), X ~ Poisson(A) ;", mention_independance("tests"))),
     c("smr", "p_centrale", "TRUE", paste(exact_h0, ": min(1, 2 min(P(X <= O), P(X >= O))) ;",
-                                               indep_tests)),
+                                               mention_independance("tests"))),
     c("smr", "z_racine_cubique", "TRUE",
       paste("asymptotique : racine cubique corrigée, O >= A : z = 3 sqrt(O) (1 - 1/(9 O) - (A/O)^(1/3)) ;",
-            "O < A : O* = O + 1, z = 3 sqrt(O*) ((A/O*)^(1/3) + 1/(9 O*) - 1) ;", indep_tests)),
+            "O < A : O* = O + 1, z = 3 sqrt(O*) ((A/O*)^(1/3) + 1/(9 O*) - 1) ;",
+            mention_independance("tests"))),
     c("smr", "p_racine_cubique", "TRUE",
       paste("asymptotique : 1 - Phi(z), approximation de la p-valeur unilatérale exacte dans le sens de l'écart",
-            "observé (P(X >= O) si O >= A, P(X <= O) sinon) ;", indep_tests)),
+            "observé (P(X >= O) si O >= A, P(X <= O) sinon) ;", mention_independance("tests"))),
     c("signes", "positifs", "FALSE", paste("descriptif : n+ = nombre de cellules retenues où D - A > 0", zero)),
     c("signes", "negatifs", "FALSE", paste("descriptif : n- = nombre de cellules retenues où D - A < 0", zero)),
     c("signes", "nuls", "FALSE",
@@ -338,10 +373,10 @@ STATUTS_VALIDATION <- local({
     c("signes", "p_exacte", "TRUE", paste("exacte sous", signes_h, ": loi binomiale (n, 1/2), p centrale ; pbinom")),
     c("signes", "esperance_positifs_h0", "TRUE",
       paste(exact_h0, ": somme sur C+ de P(D_c - A_c > 1e-10 A_c), diagnostic de l'écart entre H0 (i) et", signes_h,
-            ";", indep_tests)),
+            ";", mention_independance("valeur_h0"))),
     c("signes", "p_monte_carlo", "TRUE",
       paste(mc, "; p centrale sur (n+ - n-) / sqrt(n), valeur 0 si n = 0 pour une réplique ; NA si n = 0 pour l'observé",
-            ";", indep_tests)),
+            ";", mention_independance("niveau"))),
     c("signes", "erreur_monte_carlo", "TRUE", e_mc),
     c("runs", "sequences", "FALSE",
       paste("descriptif : nombre de séquences (segment x année), âges croissants, résidus nuls retirés", zero)),
@@ -358,7 +393,7 @@ STATUTS_VALIDATION <- local({
             "produite si la somme des n est au plus N_MAX_RUNS_EXACT")),
     c("runs", "p_monte_carlo", "TRUE",
       paste(mc, "; queue inférieure sur R ; statistique R non conditionnelle à (n+, n-) : sensible au déséquilibre",
-            "des signes comme au regroupement ;", indep_tests)),
+            "des signes comme au regroupement ;", mention_independance("niveau"))),
     c("runs", "erreur_monte_carlo", "TRUE", e_mc),
     c("wilcoxon", "effectif", "FALSE",
       paste("descriptif : n = nombre de cellules retenues où la différence d = D / E^c - mu~ (= mu^ - mu~) est",
@@ -378,7 +413,8 @@ STATUTS_VALIDATION <- local({
       paste("loi exacte sous l'hypothèse de", wilc_h, "; psignrank, approximation numérique (écart relatif mesuré",
             "<= 1e-13) ; sans ex aequo et n <= N_MAX_WILCOXON_EXACT ; p centrale")),
     c("wilcoxon", "p_monte_carlo", "TRUE",
-      paste(mc, "; p centrale sur z, z = 0 si n = 0 pour une réplique ; NA si n = 0 pour l'observé ;", indep_tests)),
+      paste(mc, "; p centrale sur z, z = 0 si n = 0 pour une réplique ; NA si n = 0 pour l'observé ;",
+            mention_independance("niveau"))),
     c("wilcoxon", "erreur_monte_carlo", "TRUE", e_mc),
     c("mape", "valeur", "FALSE", "descriptif, fragile : 100 / m+ somme sur C+, D > 0, de |D - A| / D (m+ cellules)"),
     c("r2", "valeur", "FALSE",
@@ -389,22 +425,24 @@ STATUTS_VALIDATION <- local({
     c("fluctuation", "hors_intervalle_exact", "TRUE",
       "nombre de cellules retenues où D est hors de [qpois(alpha/2, A), qpois(1 - alpha/2, A)]"),
     c("fluctuation", "esperance_hors_intervalle_exact", "TRUE", paste(exact_h0, ": somme sur C+ de P(D_c hors intervalle) ;",
-                                                                                  indep_tests)),
+                                                                                  mention_independance("valeur_h0"))),
     c("fluctuation", "hors_intervalle_asymptotique", "TRUE",
       "nombre de cellules retenues où D est hors de A +- z sqrt(A), z = qnorm(alpha/2, lower.tail = FALSE)"),
     c("fluctuation", "esperance_hors_intervalle_asymptotique", "TRUE",
-      paste(exact_h0, ": somme sur C+ de P(D_c hors de A +- z sqrt(A)) ;", indep_tests)),
+      paste(exact_h0, ": somme sur C+ de P(D_c hors de A +- z sqrt(A)) ;",
+            mention_independance("valeur_h0"))),
     c("sous_groupes", "smr", "FALSE", "résultat exact : O / A du sous-groupe (cellules retenues)"),
     c("sous_groupes", "bornes_exactes", "TRUE",
       paste("relation independante, table prise telle quelle (nombre p de paramètres estimés sur ces données nul) :",
             "exactes sous la loi supposée, O ~ Poisson(A) avec A fixe : [G_O^-1(alpha/2), G_(O+1)^-1(1 - alpha/2)] / A,",
             "G_k loi gamma de forme k (0 si O = 0) ; couverture >= niveau (intervalle exact conservatif) ; qgamma,",
-            "approximation numérique ;", indep_int, "; relation ajustee_hors_outil : non produites, nombre p de",
-            "paramètres estimés non établi, aucun intervalle du sous-groupe (ddl_non_etabli) ; colonnes NA")),
+            "approximation numérique ;", mention_independance("intervalle"),
+            "; relation ajustee_hors_outil : non produites, nombre p de paramètres estimés non établi, aucun",
+            "intervalle du sous-groupe (ddl_non_etabli) ; colonnes NA")),
     c("sous_groupes", "p_valeurs", "TRUE",
       paste("relation independante, table prise telle quelle (nombre p de paramètres estimés sur ces données nul) :",
             exact_h0, "; loi de référence du sous-groupe X ~ Poisson(A) ; aucune correction de multiplicité ;",
-            indep_tests, ";", ajustee_p)),
+            mention_independance("tests"), ";", ajustee_p)),
     c("sous_groupes", "p_valeurs_asymptotiques", "TRUE",
       paste("relation independante : non produites, la loi de Poisson exacte du sous-groupe étant toujours calculée",
             "(table prise telle quelle, nombre p de paramètres estimés sur ces données nul) ;", ajustee_p)))
@@ -421,15 +459,16 @@ STATUTS_VALIDATION <- local({
 # (texte_moteur()).
 STATUTS_VALIDATION_POSITIONNEE <- local({
   s <- STATUTS_VALIDATION
-  indep <- paste("; unités d'observation indépendantes ; sous l'unité contrat, les décès sont sur-dispersés et les",
-                 "tests sont anti-conservateurs")
+  # Mention d'indépendance précédée de « ; », nature déclarée à chaque
+  # appel (#330).
+  indep <- function(nature) paste(";", mention_independance(nature))
   cond <- paste("exact sous H0 (i) conditionnellement aux décès observés O_s de chaque segment, E^c tenue pour fixe,",
                 "quel que soit theta : D_c | O_s ~ Bin(O_s, pi_c), pi_c = A_c / A_s ; asymptotique sous le modèle de",
-                "survie ; fonctions de répartition binomiales (pbinom), approximation numérique", indep)
+                "survie ; fonctions de répartition binomiales (pbinom), approximation numérique", indep("valeur_h0"))
   # Corps de la loi de référence (#179, spécification (0') et visa
   # d'actuary) : X2 et G2 ont le même corps, « (A_c -> infini dans chaque
   # cellule retenue) » ; seul G2 précise que ses seuils sont calculés sous
-  # Poisson, sans conditionner par les O_s ; les deux finissent par `indep`.
+  # Poisson, sans conditionner par les O_s ; les deux finissent par indep("tests").
   loi_s <- "asymptotique : loi du khi-deux à n - S degrés de liberté"
   theta_s <- "theta estimé par maximum de vraisemblance sur ces cellules, un par segment positionné (S segments)"
   petits <- PHRASES_ATTENDUS_FAIBLES$petits
@@ -437,9 +476,12 @@ STATUTS_VALIDATION_POSITIONNEE <- local({
   g2 <- PHRASES_ATTENDUS_FAIBLES$g2
   var_s <- paste("Var(X2) = somme sur les segments de [2 (n_s - 1) + somme sur C+_s de 1/A_c - (n_s^2 + 2 n_s - 2) /",
                  "O_s]")
-  mc <- paste("niveau exact sous H0 (i) conditionnellement aux O_s, E^c tenue pour fixe, quel que soit theta :",
-              "P_H0(p_MC <= alpha | O_s) <= alpha ; réplications multinomiales (O_s ; pi_c) par segment ; e est",
-              "l'erreur due au nombre fini de réplications, distincte de l'erreur d'estimation", indep)
+  # mc sert aux p de Monte-Carlo de X2 et G2 (nature tests) et des signes,
+  # suites et Wilcoxon (nature niveau, #330).
+  mc <- function(nature)
+    paste("niveau exact sous H0 (i) conditionnellement aux O_s, E^c tenue pour fixe, quel que soit theta :",
+          "P_H0(p_MC <= alpha | O_s) <= alpha ; réplications multinomiales (O_s ; pi_c) par segment ; e est",
+          "l'erreur due au nombre fini de réplications, distincte de l'erreur d'estimation", indep(nature))
   ddl <- paste("n - S : n cellules retenues, p = 1 paramètre (theta) estimé sur ces données par segment positionné,",
                "S segments ; si n - S = 0 (une cellule retenue par segment) : loi conditionnelle dégénérée,",
                "D_c = O_s ; aucun test défini, aucun tirage (statistiques standardisées, moments des suites et",
@@ -462,24 +504,24 @@ STATUTS_VALIDATION_POSITIONNEE <- local({
               paste0(cond, " ; somme sur C+ de P(|D_c - A_c| > ", k, " sqrt(A_c))"))
   for (st in c("khi2_pearson", "deviance")) {
     remplacer(st, "ddl", ddl)
-    remplacer(st, "p_monte_carlo", paste(mc, "; queue supérieure"))
+    remplacer(st, "p_monte_carlo", paste(mc("tests"), "; queue supérieure"))
   }
   remplacer("khi2_pearson", "variance_h0",
             paste("exact sous H0 (i) conditionnellement aux O_s, E^c tenue pour fixe, quel que soit theta ;",
                   "asymptotique sous le modèle de survie : Var(X2 | O_s) = somme sur les segments de [2 (n_s - 1) +",
                   "somme sur C+_s de 1/A_c - (n_s^2 + 2 n_s - 2) / O_s], A_c = O_s pi_c (moments multinomiaux",
-                  "d'ordre 4), à comparer à 2 (n - S) ; arithmétique flottante", indep))
+                  "d'ordre 4), à comparer à 2 (n - S) ; arithmétique flottante", indep("valeur_h0")))
   remplacer("khi2_pearson", "p_asymptotique",
             paste0(loi_s, " (A_c -> infini dans chaque cellule retenue), ", theta_s, " ; queue supérieure ; ", petits,
                    " : sous H0 (i) conditionnellement aux O_s, E^c tenue pour fixe, E[X2] = n - S exactement et ",
                    var_s, " (moments multinomiaux, résultat exact ; khi2_pearson/variance_h0), supérieure à 2 (n - S)",
                    " quand des A_c sont petits devant ceux de leur segment, inférieure quand les A_c d'un segment",
-                   " sont égaux ; ", fin_x2, " ", indep))
+                   " sont égaux ; ", fin_x2, " ", indep("tests")))
   remplacer("deviance", "p_asymptotique",
             paste0(loi_s, " (A_c -> infini dans chaque cellule retenue), ", theta_s, " ; queue supérieure ; ", petits,
                    " : sous H0 (i), E^c tenue pour fixe, pour des cellules de loi de Poisson d'espérance A_c, sans",
                    " conditionner par les O_s (conditionnellement aux O_s, D_c suit une loi binomiale et les valeurs",
-                   " ci-après ne valent qu'approximativement, quand pi_c est petit), ", g2, " ", indep))
+                   " ci-après ne valent qu'approximativement, quand pi_c est petit), ", g2, " ", indep("tests")))
   remplacer("smr", "attendus",
             "descriptif : A = somme de A_c sur C+, A_c = theta^_s E^c mu~_c ; égal à O par construction, à l'arrondi près")
   remplacer("smr", "smr", "descriptif : O / A, égal à 1 par construction, à l'arrondi près")
@@ -492,15 +534,15 @@ STATUTS_VALIDATION_POSITIONNEE <- local({
             paste(cond, ": somme sur C+ de P(D_c - A_c > 1e-10 A_c), diagnostic de l'écart entre H0 (i) et",
                   "P(r_c > 0) = 1/2 par cellule, ce qui n'est pas H0 (i)"))
   remplacer("signes", "p_monte_carlo",
-            paste(mc, "; p centrale sur (n+ - n-) / sqrt(n), valeur 0 si n = 0 pour une réplique ; NA si n = 0 pour",
-                  "l'observé"))
+            paste(mc("niveau"), "; p centrale sur (n+ - n-) / sqrt(n), valeur 0 si n = 0 pour une réplique ; NA si n =",
+                  "0 pour l'observé"))
   for (g in c("esperance", "variance", "statistique", "p_asymptotique", "p_exacte")) completer("runs", g)
   remplacer("runs", "p_monte_carlo",
-            paste(mc, "; queue inférieure sur R ; statistique R non conditionnelle à (n+, n-) : sensible au",
+            paste(mc("niveau"), "; queue inférieure sur R ; statistique R non conditionnelle à (n+, n-) : sensible au",
                   "déséquilibre des signes comme au regroupement"))
   for (g in c("variance", "statistique", "p_asymptotique", "p_exacte")) completer("wilcoxon", g)
   remplacer("wilcoxon", "p_monte_carlo",
-            paste(mc, "; p centrale sur z, z = 0 si n = 0 pour une réplique ; NA si n = 0 pour l'observé"))
+            paste(mc("niveau"), "; p centrale sur z, z = 0 si n = 0 pour une réplique ; NA si n = 0 pour l'observé"))
   # Différences, R2 et distance sur la table positionnée (mu_pos = theta^_s
   # mu~, q_pos = 1 - exp(-mu_pos) ; M309), non sur la référence.
   zero <- "; zéro : |D - A| <= 1e-10 A"
@@ -534,14 +576,14 @@ STATUTS_VALIDATION_POSITIONNEE <- local({
                   "exact conservatif) de la probabilité conditionnelle qu'un décès du segment tombe dans le",
                   "sous-groupe, divisée par pi_b = A_b / A_s : intervalle exact binomial (qbeta) divisé par pi_b ;",
                   "qbeta, approximation numérique ; non produites pour un sous-groupe de plusieurs segments (état",
-                  "bornes_non_definies) ;", deg, indep))
+                  "bornes_non_definies) ;", deg, indep("intervalle")))
   remplacer("sous_groupes", "p_valeurs",
             paste("exactes conditionnellement aux O_s : O_b | O_s ~ Bin(O_s, pi_b) pour un sous-groupe d'un seul",
                   "segment (pbinom) ; somme de binomiales indépendantes Bin(O_s, pi_b,s) pour un sous-groupe de",
                   "plusieurs segments (convolution des dbinom, approximation numérique ; produites si le nombre de",
                   "produits de la convolution est au plus N_MAX_PRODUITS_CONVOLUTION, état",
                   "convolution_au_dela_n_max sinon, p-valeurs asymptotiques produites à leur place) ;", deg,
-                  "; aucune correction de multiplicité", indep))
+                  "; aucune correction de multiplicité", indep("tests")))
   # p asymptotiques au-delà du plafond (#178 ; spécification (0'), M361).
   remplacer("sous_groupes", "p_valeurs_asymptotiques",
             paste("asymptotiques (sigma^2 -> infini) conditionnellement aux O_s : approximation normale de la somme",
@@ -551,7 +593,8 @@ STATUTS_VALIDATION_POSITIONNEE <- local({
                   "sigma)), p centrale min(1, 2 min) ; produites seulement si le nombre de produits de la convolution",
                   "dépasse N_MAX_PRODUITS_CONVOLUTION (état convolution_au_dela_n_max), les p-valeurs exactes étant",
                   "alors NA ; jamais produites à côté d'une p-valeur exacte ; erreur relative croissante dans les",
-                  "queues (asymétrie de la somme, d'ordre 1/sigma) ; aucune correction de multiplicité", indep))
+                  "queues (asymétrie de la somme, d'ordre 1/sigma) ; aucune correction de multiplicité",
+                  indep("tests")))
   texte_moteur(s)
 })
 
@@ -923,18 +966,29 @@ replications_poisson <- function(A, B, graine, statistiques, elements_bloc = ELE
 # cellule où se répartir (erreur de programmation, contrôlée avant tout
 # tirage). Un effectif au-delà de .Machine$integer.max (size de rmultinom())
 # est aussi une erreur de programmation : les appelants rangent le total des
-# événements en integer avant tout tirage (#348).
+# événements en integer avant tout tirage (#348). Un poids non fini (NaN
+# compris) ou une somme de poids d'un groupe non finie est aussi une erreur
+# de programmation (#353) pour les appelants de l'homogénéité, qui tirent
+# sur des expositions dont le total est gardé à l'étape exposition
+# (LIMITE_SOMMES_DOUBLE, M579). L'appelant positionnee de
+# statistiques_validation() est hors de cette garde : il tire sur les
+# attendus Ar = theta^ E^c mu~, produits que LIMITE_SOMMES_DOUBLE ne couvre
+# pas (#360) ; sur ce chemin, l'erreur « poids ou effectifs invalides » peut
+# venir d'une entrée.
 replications_multinomiales <- function(poids, groupe, effectifs, B, graine, statistiques,
                                        elements_bloc = ELEMENTS_BLOC_REPLICATIONS) {
   n <- length(poids)
   G <- length(effectifs)
-  if (length(groupe) != n || anyNA(groupe) || any(groupe < 1L | groupe > G) || any(!(poids > 0)) ||
-      anyNA(effectifs) || any(effectifs < 0) || any(effectifs > .Machine$integer.max))
+  if (length(groupe) != n || anyNA(groupe) || any(groupe < 1L | groupe > G) || !all(is.finite(poids)) ||
+      any(!(poids > 0)) || anyNA(effectifs) || any(effectifs < 0) || any(effectifs > .Machine$integer.max))
     stop("replications_multinomiales() : groupes, poids ou effectifs invalides (erreur de programmation).",
          call. = FALSE)
   idx <- lapply(seq_len(G), function(g) which(groupe == g))
   if (any(!lengths(idx) & effectifs > 0))
     stop("replications_multinomiales() : groupe d'effectif positif sans cellule (erreur de programmation).",
+         call. = FALSE)
+  if (!all(is.finite(vapply(idx, function(i) sum(poids[i]), numeric(1L)))))
+    stop("replications_multinomiales() : somme des poids d'un groupe non finie (erreur de programmation).",
          call. = FALSE)
   pi_g <- lapply(idx, function(i) poids[i] / sum(poids[i]))
   taille <- max(1, floor(elements_bloc / max(1, n)))
@@ -954,21 +1008,74 @@ replications_multinomiales <- function(poids, groupe, effectifs, B, graine, stat
   })
 }
 
-# dbinom(0:n, n, p) réduite à l'intervalle de ses valeurs non nulles en
-# double (les valeurs retirées sont des zéros exacts de dbinom) : list(d,
-# debut = première valeur de X gardée).
+# Support {k : dbinom(k, n, p) > 0 en double} de Bin(n, p), sans former
+# dbinom(0:n) (#350, règle (A) de la spécification d'actuary-approfondi,
+# M580) : c(a, b), bornes entières du support. p = 0 ou n = 0 : c(0, 0) ;
+# p = 1 : c(n, n) ; sinon bisection de chaque côté du mode m = (n + 1) p
+# arrondi à l'entier inférieur, borné à [0, n], sur le prédicat dbinom(k, n,
+# p) > 0 : O(log n) évaluations scalaires, aucune allocation proportionnelle
+# à n. Statut de la contiguïté : en arithmétique réelle, le support de
+# Bin(n, p), 0 < p < 1, est {0..n} ; la loi est log-concave, donc
+# unimodale, et tout {k : f(k) > s} est un intervalle. Si dbinom() était
+# correctement arrondie, {k : dbinom(k, n, p) > 0} serait donc exactement un
+# intervalle, ce que suppose la bisection ; elle ne l'est pas : la
+# contiguïté en double est mesurée, non démontrée. Seuil : l'arrondi à zéro,
+# sous 2^-1075 (environ 2,5e-324, moitié du plus petit dénormalisé positif).
+# Sur 44
+# frontières (n de 1e6 à 2^31 - 1, p de 1e-6 à 1 - 1e-6), toutes à
+# log-densité d'environ -745, pente de log dbinom entre voisins >= 1,65e-3
+# contre un bruit de calcul <= 1,3e-12 (mesuré le 23/11/2026, actuary) ;
+# selon la même mesure, un défaut éventuel n'omettrait qu'une masse
+# < 1e-316, sans effet sur aucune p ni aucun verdict.
+# Identité avec which(dbinom(0:n, n, p) > 0) mesurée sur 240 cas, n <= 5e6
+# (spécification, § 2). Un mode de densité nulle en double est
+# une erreur de programmation (inatteignable : P(X = m) >= 1 / (n + 1)).
+support_binomiale <- function(n, p) {
+  if (n == 0 || p == 0) return(c(0, 0))
+  if (p == 1) return(c(n, n))
+  positive <- function(k) stats::dbinom(k, n, p) > 0
+  m <- min(n, max(0, floor((n + 1) * p)))
+  if (!positive(m))
+    stop("support_binomiale() : densité nulle au mode (erreur de programmation).", call. = FALSE)
+  # Gauche : plus petit k de [0, m] de densité positive (dbinom(bas) = 0,
+  # dbinom(haut) > 0).
+  if (positive(0)) a <- 0 else {
+    bas <- 0; haut <- m
+    while (haut - bas > 1) {
+      milieu <- floor((bas + haut) / 2)
+      if (positive(milieu)) haut <- milieu else bas <- milieu
+    }
+    a <- haut
+  }
+  # Droite : plus grand k de [m, n] de densité positive (dbinom(bas) > 0,
+  # dbinom(haut) = 0).
+  if (positive(n)) b <- n else {
+    bas <- m; haut <- n
+    while (haut - bas > 1) {
+      milieu <- floor((bas + haut) / 2)
+      if (positive(milieu)) bas <- milieu else haut <- milieu
+    }
+    b <- bas
+  }
+  c(a, b)
+}
+
+# dbinom(k, n, p) sur le support de Bin(n, p) (support_binomiale() ; les
+# valeurs hors du support sont des zéros exacts de dbinom, #350) : list(d,
+# debut = première valeur de X gardée). Identique élément par élément à
+# dbinom(0:n, n, p) restreint à ses valeurs non nulles.
 binomiale_elaguee <- function(n, p) {
-  d <- stats::dbinom(0:n, n, p)
-  nz <- which(d > 0)
-  list(d = d[nz[1L]:nz[length(nz)]], debut = nz[1L] - 1)
+  s <- support_binomiale(n, p)
+  list(d = stats::dbinom(s[1L]:s[2L], n, p), debut = s[1L])
 }
 
 # Coût de loi_somme_binomiales(n, p), calculé avant la convolution (audit
 # A2) : somme sur k >= 2 de len(loi_(k-1)) x len(d_k), len(d_k) longueur
-# élaguée de dbinom, len(loi_k) = somme des len(d_j), j <= k, moins (k - 1) ;
-# en O(somme des n_s).
+# du support de Bin(n_k, p_k) (support_binomiale() : aucun vecteur dbinom
+# formé, #350), len(loi_k) = somme des len(d_j), j <= k, moins (k - 1) ; en
+# O(somme des log n_s) évaluations de dbinom.
 cout_convolution_binomiales <- function(n, p) {
-  l <- vapply(seq_along(n), function(s) length(binomiale_elaguee(n[s], p[s])$d), 0)
+  l <- vapply(seq_along(n), function(s) diff(support_binomiale(n[s], p[s])) + 1, 0)
   if (length(l) < 2L) return(0)
   cumul <- cumsum(l) - (seq_along(l) - 1)
   sum(cumul[-length(l)] * l[-1L])
@@ -977,9 +1084,12 @@ cout_convolution_binomiales <- function(n, p) {
 # Loi d'une somme de binomiales indépendantes Bin(n_s, p_s) (F3 ; brique
 # partagée avec #168) : convolution directe des dbinom élaguées
 # (binomiale_elaguee()) ; approximation numérique (dbinom, sommes de
-# produits). Rend le vecteur P(X = 0), ..., P(X = somme des n_s), avec
-# l'attribut `produits` : nombre de produits effectués (égal à
-# cout_convolution_binomiales()).
+# produits). Rend la loi sur son support (#350) : le vecteur P(X = debut),
+# ..., P(X = debut + longueur - 1), hors duquel P(X = k) est un zéro exact
+# (aucun vecteur de longueur somme des n_s + 1 n'est formé), avec les
+# attributs `debut` et `produits` (nombre de produits effectués, égal à
+# cout_convolution_binomiales()). L'appelant indexe par k = debut +
+# seq_along(loi) - 1.
 loi_somme_binomiales <- function(n, p) {
   loi <- 1
   debut <- 0
@@ -999,10 +1109,9 @@ loi_somme_binomiales <- function(n, p) {
     }
     loi <- v
   }
-  r <- numeric(sum(n) + 1)
-  r[debut + seq_along(loi)] <- loi
-  attr(r, "produits") <- produits
-  r
+  attr(loi, "debut") <- debut
+  attr(loi, "produits") <- produits
+  loi
 }
 
 # p-valeurs asymptotiques d'une somme X de binomiales indépendantes Bin(n_s,
@@ -1479,6 +1588,7 @@ sous_groupes_validation <- function(cellules, segment, segments_cles, tranche, t
 #     de n_max (N_MAX_PRODUITS_CONVOLUTION ; autre valeur pour les seuls
 #     tests) : p-valeurs exactes et bornes NA, p-valeurs asymptotiques
 #     (p_somme_binomiales_normale() ; #178), état convolution_au_dela_n_max ;
+#     loi rendue sur son support, indexée par son attribut debut (#350) ;
 #     une ligne ne porte jamais à la fois une p exacte et une p asymptotique ;
 #   - groupe sans cellule retenue : NA, état aucune_cellule_retenue.
 # Colonnes p_*_asymptotique NA hors de l'état convolution_au_dela_n_max.
@@ -1530,8 +1640,9 @@ sous_groupes_positionnee <- function(nom, cle, n_g, segment, ret, Dr, Ar, O, At,
       next
     } else {
       loi <- loi_somme_binomiales(Os[j], pib)
-      pinf <- min(1, sum(loi[seq_len(ob + 1)]))
-      psup <- min(1, sum(loi[(ob + 1):length(loi)]))
+      k_loi <- attr(loi, "debut") + seq_along(loi) - 1
+      pinf <- min(1, sum(loi[k_loi <= ob]))
+      psup <- min(1, sum(loi[k_loi >= ob]))
       r$etat[k] <- "bornes_non_definies"
     }
     r$p_inferieure[k] <- pinf
@@ -2223,7 +2334,9 @@ score_homogeneite <- function(D, E, strate, groupe, K, G) {
 # retirée comme pour la statistique ; #334), p = P(|O_1 - A_1| >= |o_1 -
 # A_1|), égalité à TOLERANCE_RESIDU_NUL x A_1 près ; en arithmétique exacte,
 # O_1 - A_1 = -(O_2 - A_2) : p ne dépend du groupe retenu que par cette
-# tolérance (rapportée à A_1) et par l'arrondi ;
+# tolérance (rapportée à A_1) et par l'arrondi ; loi rendue sur son support,
+# indexée par son attribut debut (une seule strate, même de 1e9 décès, est
+# calculée sur son support, sans allocation proportionnelle à n ; #350) ;
 # coût au-delà de N_MAX_PRODUITS_CONVOLUTION : état
 # convolution_au_dela_n_max. Rend list(p, etat).
 p_exacte_homogeneite <- function(sc) {
@@ -2232,7 +2345,7 @@ p_exacte_homogeneite <- function(sc) {
   if (cout_convolution_binomiales(e$n, e$p) > N_MAX_PRODUITS_CONVOLUTION)
     return(list(p = NA_real_, etat = "convolution_au_dela_n_max"))
   loi <- loi_somme_binomiales(e$n, e$p)
-  k <- seq_along(loi) - 1
+  k <- attr(loi, "debut") + seq_along(loi) - 1
   ext <- abs(k - e$a) >= abs(e$o - e$a) - TOLERANCE_RESIDU_NUL * e$a
   list(p = min(1, sum(loi[ext])), etat = "produite")
 }
@@ -2516,6 +2629,18 @@ calculer_homogeneite <- function(exposition, segmentation, par_annee, convention
   n_a <- length(prem)
   D_a <- somme_par(D[i_s], a, n_a)
   E_a <- somme_par(E[i_s], a, n_a)
+  # Garde défensive (#353 ; spécification d'actuary-approfondi, § 5.1) :
+  # sous construire_table(), le total des expositions est gardé à l'étape
+  # exposition (refus exposition_hors_plage, M579). En appel direct, elle
+  # porte sur E_a, formée des seules cellules saines : une exposition non
+  # finie d'une cellule saine, ou une somme de E_a au-delà de
+  # LIMITE_SOMMES_DOUBLE (strate, segment ou groupe de tirage infini),
+  # s'arrête ici, avant tout score. Une exposition Inf d'une cellule fautive
+  # n'entre pas dans E_a et passe : elle donne des états
+  # evenement_sans_exposition, sans aucune valeur non finie produite.
+  if (!all(is.finite(E_a)) || !(sum(E_a) <= LIMITE_SOMMES_DOUBLE))
+    stop(paste("calculer_homogeneite() : exposition agrégée non finie ou hors de la plage de calcul",
+               "(erreur de programmation)."), call. = FALSE)
   cel_a <- cel[prem]
   sg_a <- sg[prem]
   tranche_a <- tranche[prem]
@@ -2653,6 +2778,10 @@ calculer_homogeneite <- function(exposition, segmentation, par_annee, convention
   # l_toutes : lignes de la plage de la portée (cellules fautives comprises) ;
   # l_a : lignes agrégées de la portée.
   portee <- function(nom, debut, fin, sc, l_toutes, l_a, faute) {
+    # Variance non définie : inatteignable après la garde de E_a (#353) ;
+    # sinon un indice NA écarterait l'état variance_nulle sans le dire.
+    if (anyNA(sc$v))
+      stop("calculer_homogeneite() : variance du score non définie (erreur de programmation).", call. = FALSE)
     e_tout <- somme_par(E[l_toutes], sg[l_toutes], S)
     d_tout <- somme_par(D[l_toutes], sg[l_toutes], S)
     d <- data.frame(portee = rep(nom, S), stringsAsFactors = FALSE)
@@ -3229,10 +3358,9 @@ ETATS_IMPORTANCE <- texte_moteur(data.frame(
   stringsAsFactors = FALSE))
 # Statuts (E2.20) des grandeurs de l'étape, par table du résultat.
 # Mention d'indépendance des unités (#159) sur les seules lignes de loi
-# (bornes, rapport_variance), même règle que STATUTS_VALIDATION.
+# (bornes, rapport_variance), même règle que STATUTS_VALIDATION, par
+# mention_independance() (#330).
 STATUTS_IMPORTANCE <- local({
-  indep_int <- paste("unités d'observation indépendantes ; sous l'unité contrat, les décès sont sur-dispersés et",
-                     "l'intervalle est trop étroit")
   l <- list(
     c("volumes", "lignes", paste("décompte exact ; identité lignes_recues = lignes_conservees + lignes_exclues",
                                  "vérifiée")),
@@ -3267,13 +3395,14 @@ STATUTS_IMPORTANCE <- local({
             "l'année si par_annee), pas sur le segment")),
     c("smr_comparateur_1", "bornes_exactes",
       paste("exact sous D_e ~ Poisson(theta A), A tenu pour fixe ; le comparateur est estimé : la couverture n'est",
-            "pas garantie ; qgamma, approximation numérique ;", indep_int)),
+            "pas garantie ; qgamma, approximation numérique ;",
+            mention_independance("intervalle"))),
     c("smr_comparateur_1", "bornes_asymptotiques",
-      paste("asymptotique : normal sur l'échelle de log(SMR), variance 1 / D_e ; non défini à D_e = 0 ;", indep_int)),
+      paste("asymptotique : normal sur l'échelle de log(SMR), variance 1 / D_e ; non défini à D_e = 0 ;",
+            mention_independance("intervalle"))),
     c("smr_comparateur_1", "rapport_variance",
       paste("somme E^c_e^2 mu^_r / E^c_r / A : estimation par substitution de Var(A^) / E(D_e) ; Var(A^) exacte sous",
-            "Poisson à mu connu, E^c fixe ; unités d'observation indépendantes ; sous l'unité contrat, les décès",
-            "sont sur-dispersés et Var(A^) est sous-estimée")),
+            "Poisson à mu connu, E^c fixe ;", mention_independance("variance", "Var(A^)"))),
     c("smr_comparateur_1", "sans_exposition_retenue",
       "cellules retirées sans exposition retenue (E^c_r = 0) : D_e et E^c_e restitués à part, hors du SMR"),
     c("smr_comparateur_2", "smr",
@@ -3286,8 +3415,8 @@ STATUTS_IMPORTANCE <- local({
     c("smr_comparateur_2", "bornes",
       paste("relation independante : bornes exactes, exact sous D_e ~ Poisson(theta A), A connu (table, E^c",
             "tenue pour fixe), qgamma, approximation numérique ; bornes asymptotiques, asymptotique (normal sur",
-            "l'échelle de log(SMR), variance 1 / D_e ; non défini à D_e = 0) ;", indep_int, "; relation",
-            "ajustee_hors_outil : valeurs ponctuelles seules, bornes non produites (ddl_non_etabli)")),
+            "l'échelle de log(SMR), variance 1 / D_e ; non défini à D_e = 0) ;", mention_independance("intervalle"),
+            "; relation ajustee_hors_outil : valeurs ponctuelles seules, bornes non produites (ddl_non_etabli)")),
     c("smr_comparateur_2", "conserves",
       paste("SMR des lignes conservées de l'étape validation (etapes/validation/resultat/statistiques, smr),",
             "côte à côte, sans rapport entre eux")))
