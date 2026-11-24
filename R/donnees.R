@@ -2151,7 +2151,7 @@ controler_lignes_extraites <- function(donnees, extraites, numeros, roles, etape
   forme <- a_classe(extraites, "data.frame") && is.list(extraites)
   # (1) décompte des lignes (noms de lignes, sans dispatch) ; (1 bis) mêmes colonnes que l'entrée (nombre lu sur la
   # liste, noms lus sans dispatch : le nombre de la liste est celui des noms et de l'entrée) ; (2) décompte de chaque colonne, toutes, selon la règle de
-  # controler_lignes_donnees() ; (3) identité des colonnes de rôle.
+  # controler_lignes_donnees() ; (3) (3 a) bonne forme du facteur extrait, (3 b) identité des colonnes de rôle.
   nc <- if (forme) .row_names_info(extraites, 2L) else NA_integer_
   ecart_compte <- forme && (is.na(nc) || nc != attendu)
   exact <- identical(class(donnees), "data.frame")
