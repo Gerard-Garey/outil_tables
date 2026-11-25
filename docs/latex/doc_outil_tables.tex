@@ -3010,7 +3010,24 @@ en conséquence, celle du code aussi~; aucune grandeur numérique, aucune
 structure ne change~; R1 à R7 et R11 à R15 restent identiques, en
 comparaison réussie, sur la plateforme de référence (processeur Intel
 Xeon 6975P-C, consigné sans contrôle), sans table finale, verdict ni
-valeur de table homologuée changés.
+valeur de table homologuée changés. Deux régénérations ont suivi sur la
+branche \code{claude/independance-suites}, pour les seuls changements de
+texte et de structure annoncés en transition, sans aucun écart
+numérique~: R1 à R17 le 24/11/2026 (exécution 45496372907, calcul sur
+\code{8bc0117}, commit \code{1a1fb65}~; issues~\#359 et~\#361), où
+281~chaînes de statut changent, 278 pour la mention d'indépendance
+qualifiée (section~\ref{sec:validation-statistiques}) et 3 pour la mention
+d'unité de l'hypothèse nulle de la validation (R8, R9 et~R10)~; puis R8,
+R9, R10, R13, R16 et R17 seulement, le 25/11/2026 (exécution 45591042044,
+calcul sur \code{2158990}, commit \code{c8caf94}~; issues~\#360, \#359
+et~\#361), pour l'état \code{attendus\_hors\_plage} du comparateur~2 de
+l'étape \code{importance\_exclusions} (R8 à R10~: 14~états au lieu de
+13, statut de \code{smr\_comparateur\_2}/\allowbreak\code{smr}, et, dans
+R8 et~R9, 25~colonnes au lieu de 23 pour \code{smr\_comparateur\_2}),
+la nature \code{credibilite} des bornes de crédibilité (R16, R17) et la
+fin de l'avertissement \code{unite\_agregat} (R13, R17)~; les onze autres
+références y restent identiques, en comparaison réussie. Visas
+d'\code{actuary}~; aucune table finale ni aucun verdict ne change.
 
 \begin{encadre}
 \small
@@ -4493,7 +4510,8 @@ refus \code{chaine\_codage\_bytes}, \code{chaine\_non\_utf8} et
 des données reçues (section~\ref{sec:empreinte}). Tout refus possible avant
 le calcul a donc lieu avant la première étape~; seuls les refus de l'étape
 \code{validation} qui portent sur ses cellules
-(\code{cellule\_sans\_valeur\_table}, \code{taux\_table\_egal\_un}),
+(\code{cellule\_sans\_valeur\_table}, \code{taux\_table\_egal\_un},
+\code{attendus\_hors\_plage}),
 et ceux de l'étape \code{positionnement} sur ses cellules et ses segments
 (les mêmes, plus \code{positionnement\_sans\_attendu} et
 \code{positionnement\_sans\_deces}), ceux de l'étape \code{lissage} sur
@@ -11088,7 +11106,15 @@ tirage, section~\ref{sec:homogeneite}). Elle ne couvre pas, par lecture
 et sans mesure, les produits $E^c \mu$ (attendus de la validation et du
 positionnement), $(E^c)^2$ du rapport de variance de
 \code{importance\_exclusions}, ni les expositions des lignes exclues de
-cette étape (limite assumée, issue~\#360, ouverte). \textbf{Changement
+cette étape~; l'issue~\#360 les couvre autrement~: les attendus par le
+refus \code{attendus\_hors\_plage} de \code{PLAGE\_ATTENDUS}
+(section~\ref{sec:validation-etape}) et, au comparateur~2, par l'état
+non calculable de même nom~; le rapport de variance et les expositions
+retirées, que l'étape \code{importance\_exclusions} ne calcule que sous
+une recette en lignes, à dates entières et bornées, par les gardes G1
+(\code{smr\_comparateur\_1()}) et G2 (\code{retrait\_contrefactuel()}),
+erreurs de programmation, la finitude y étant établie par majoration
+(spécification d'\code{actuary-approfondi} sur l'issue~\#360). \textbf{Changement
 de comportement} (accepté par M579)~: une construction dont une seule
 cellule porte une exposition de $10^{308}$, finie et produite jusque-là
 ($z = \mp 3{,}496029$ à l'étape \code{homogeneite}, état
@@ -14082,8 +14108,9 @@ section~\ref{sec:rapport-fige}).
 \medskip
 \textbf{Refus en cours d'étape}, dans cet ordre~:
 \code{cellule\_sans\_valeur\_table} (un sexe de la construction absent
-d'une table par sexe) et \code{taux\_table\_egal\_un} ($\tilde q = 1$ dans
-une cellule d'exposition $E^c > 0$), par les briques partagées, sous le
+d'une table par sexe), \code{taux\_table\_egal\_un} ($\tilde q = 1$ dans
+une cellule d'exposition $E^c > 0$) et \code{attendus\_hors\_plage}
+(attendu hors de \code{PLAGE\_ATTENDUS}~; section~\ref{sec:validation-etape}), par les briques partagées, sous le
 module \code{positionnement}~; puis \code{positionnement\_sans\_attendu}
 ($A_s = 0$~: aucune cellule retenue dans un segment, ou, en appel direct
 seulement, aucune cellule dans la table d'exposition, une période sans
@@ -14331,7 +14358,8 @@ de 5~\%, de $G^2$ au-dessous).
 \catalogue{fonctions-positionnement}{controler\_entrees\_validation()} & interne & table, clé, convention retenue, segmentation, plage, étape appelante & \code{TRUE} invisible, ou les six refus avant exécution, dans l'ordre, sous le module et le préfixe de l'étape (motif de convention propre à l'étape)~; appelée par \code{controler\_entrees()} seule, pour chaque étape qui lit une table, une fois par construction (au rejeu, par l'unique appel de \code{construire\_table()}~; issue~\#82) \\
 \catalogue{fonctions-positionnement}{apparier\_table()} & interne & table d'exposition, segmentation, découpage, table, plage, clé, étape appelante & grille des cellules (\code{grille\_plage()}, module \code{exposition}) et $\tilde q$ apparié par clé exacte~; refus \code{cellule\_sans\_}\allowbreak\code{valeur\_table} sous le module de l'étape, ou $\tilde q$ \code{NA} sans refus pour le comparateur~2 de l'étape \code{importance\_exclusions}~; décomptes hors plage, appariement retenu \\
 \catalogue{fonctions-positionnement}{PLAGE\_ATTENDUS} & constante & --- & $[10^{-100}, 10^{100}]$, bornes incluses~: plage de calcul de l'attendu $A = E^c\,(-\ln(1-\tilde q))$ d'une cellule exposée à $\tilde q > 0$, hors de laquelle \code{attendus\_cellules()} refuse (\code{attendus\_hors\_plage}, issue~\#360)~; convention de plateforme sans source chiffrée \\
-\catalogue{fonctions-positionnement}{attendus\_cellules()} & interne & $E^c$, $D$, $\tilde q$, clé, étape appelante & $\tilde\mu$, $A$ et état de chaque cellule~; refus \code{taux\_table\_egal\_un} sous le module de l'étape \\
+\catalogue{fonctions-positionnement}{hors\_plage\_attendus()} & interne & $E^c$, $\tilde q$ & vecteur logique~: cellules exposées à $\tilde q > 0$ dont l'attendu sort de \code{PLAGE\_ATTENDUS}, même calcul au bit près qu'\code{attendus\_cellules()}, qui l'emploie~; employée aussi par \code{smr\_comparateur\_2()}, qui écarte ces cellules avant le calcul des attendus (issue~\#360) \\
+\catalogue{fonctions-positionnement}{attendus\_cellules()} & interne & $E^c$, $D$, $\tilde q$, clé, étape appelante & $\tilde\mu$, $A$ et état de chaque cellule~; refus \code{taux\_table\_egal\_un}, puis \code{attendus\_hors\_plage} (issue~\#360), sous le module de l'étape~; clé \code{NULL} (relation \code{lissee})~: message qui nomme la table construite \\
 \catalogue{fonctions-positionnement}{smr\_poisson()} & interne & $O$, $A$, niveau & SMR, bornes exactes, p-valeurs inférieure, supérieure et centrale, $z$ et p de la racine cubique, vectorisé \\
 \catalogue{fonctions-positionnement}{METHODES\_POSITIONNEMENT} & constante & --- & méthodes admises~: \code{smr} seule (décision M293) \\
 \catalogue{fonctions-positionnement}{PARAMETRES\_ESTIMES\_POSITIONNEMENT} & constante & --- & 1~: paramètre estimé par segment positionné, égal à la valeur de la relation \code{positionnee} de l'étape \code{validation} \\
@@ -14782,12 +14810,36 @@ garantie par le refus \code{convention\_lissage\_non\_admise} de l'étape
 Au rejeu outillé, ces contrôles ne précèdent pas l'appel de
 \code{construire\_table()}~: ils sont faits une fois, par cet appel, sur la
 table reçue ou relue (section~\ref{sec:rejeu}, étape~8~; issue~\#82,
-décision M291). Deux refus ne peuvent être levés qu'en cours d'étape, sur les
-cellules~: \code{cellule\_sans\_valeur\_table} (un sexe de la construction
-absent d'une table par sexe) et \code{taux\_table\_egal\_un} ($\tilde q =
+décision M291). Trois refus ne peuvent être levés qu'en cours d'étape, sur les
+cellules, dans cet ordre~: \code{cellule\_sans\_valeur\_table} (un sexe de la construction
+absent d'une table par sexe), \code{taux\_table\_egal\_un} ($\tilde q =
 1$ dans une cellule d'exposition $E^c > 0$~: l'attendu serait infini, le
 modèle de Poisson ne s'applique pas~; une telle valeur sans exposition
-n'est pas refusée).
+n'est pas refusée) et \code{attendus\_hors\_plage} (issue~\#360~;
+décision du mainteneur P1~(a) du 24/11/2026)~: une cellule d'exposition
+$E^c > 0$ à $\tilde q > 0$ dont l'attendu $A = E^c\,(-\ln(1 - \tilde q))$,
+calculé en \code{double}, sort de \code{PLAGE\_ATTENDUS} $= [10^{-100},
+10^{100}]$, bornes incluses (produit infini ou nul en \code{double}
+compris). Message~: «~Validation~: \emph{n} cellule(s) exposée(s) dont
+l'attendu A = E\^{}c (-ln(1 - q\_x)) (table de clé «~\emph{clé}~») sort
+de la plage de calcul du moteur [1e-100, 1e+100]~; vérifier la colonne
+de l'exposition centrale et la table~; la construction est refusée.~»,
+«~(table construite)~» remplaçant «~(table de clé…)~» sous la relation
+\code{lissee}, où aucune table n'est lue~; \code{details}~: \code{cle},
+\code{cellules}, \code{limite\_inferieure}, \code{limite\_superieure}. La
+plage est une \textbf{convention de plateforme, sans source chiffrée},
+justifiée par majoration en double précision pour $D \le 2^{31}$
+(dénombrements rangés en \code{integer})~: $(D - A)^2 < 10^{201}$,
+$D^2/A < 5 \cdot 10^{118}$, sous la relation \code{positionnee} des
+attendus $\hat\theta_s A > 4 \cdot 10^{-210}$, nombres normaux, et des
+sommes finies sur moins de $2^{31}$ cellules (commentaire de la
+constante, spécification d'\code{actuary-approfondi} sur l'issue~\#360)~;
+elle protège donc les
+statistiques de la validation et du positionnement, et les tirages
+multinomiaux de la relation \code{positionnee}, contre un attendu
+infini, nul ou dénormalisé, que rien ne refusait avant l'issue~\#360.
+Les essais de \code{tests/unitaires/test\_attendus\_hors\_plage.R}
+vérifient le refus au-delà de chaque borne et son absence en deçà.
 
 \medskip
 \textbf{Valeurs appariées} (\code{apparier\_table()},
@@ -14844,8 +14896,10 @@ spécification du 06/11/2026, §~1), dans la colonne \code{etat} des cellules~:
 \end{center}
 
 \noindent
-$A = 0$ avec $E^c > 0$ vient de $\tilde q = 0$, ou d'un produit $E^c
-\tilde\mu$ nul en \code{double}. Les décès des deux derniers états ne sont
+$A = 0$ avec $E^c > 0$ vient de $\tilde q = 0$ seulement~: depuis
+l'issue~\#360, un produit $E^c \tilde\mu$ nul en \code{double} à $\tilde
+q > 0$ sort de \code{PLAGE\_ATTENDUS} et est refusé
+(\code{attendus\_hors\_plage}, ci-dessus). Les décès des deux derniers états ne sont
 pas comptés dans $O$~: ils sont restitués à part
 (\code{diagnostics\$evenements\_sans\_attendu}) et l'avertissement
 \code{evenements\_sans\_attendu} (module \code{validation}) en donne le
@@ -17933,13 +17987,23 @@ et Q2~(a), et M242). Le SMR des lignes exclues est $O/A$, où $A$ vient d'un
     n'a pas de valeur dans la table (sexe absent), l'état est
     \code{cellule\_sans\_valeur\_table}~; sinon, si une cellule retirée
     d'exposition $E^c > 0$ a $\tilde q = 1$ (attendu infini),
-    \code{taux\_table\_egal\_un}~; dans les deux cas, $O$, $A$, le SMR et
+    \code{taux\_table\_egal\_un}~; sinon, si une cellule retirée
+    d'exposition $E^c > 0$ à $\tilde q > 0$ a un attendu hors de
+    \code{PLAGE\_ATTENDUS} (\code{hors\_plage\_attendus()}),
+    \code{attendus\_hors\_plage}~; dans les trois cas, $O$, $A$, le SMR et
     ses bornes valent \code{NA}, sans refus et sans agrégat partiel, et les
-    décomptes de cellules et d'événements des deux cas sont toujours
-    restitués. L'étape \code{validation} refuse dans ces deux cas~; un SMR
+    décomptes de cellules et d'événements des trois cas sont toujours
+    restitués (colonnes \code{cellules\_attendus\_hors\_plage} et
+    \code{evenements\_attendus\_hors\_plage} depuis l'issue~\#360, \code{NA}
+    sur la ligne d'un ensemble non calculable). L'étape \code{validation} refuse dans ces trois cas~; un SMR
     partiel porterait sur un autre domaine que le sien. Les cellules à
-    $\tilde q = 1$ sont écartées avant le calcul des attendus, si bien
-    qu'aucun refus \code{taux\_table\_egal\_un} ne vient de cette étape. Le SMR
+    $\tilde q = 1$ et celles d'attendu hors de la plage sont écartées avant
+    le calcul des attendus, si bien qu'aucun refus \code{taux\_table\_egal\_un}
+    ni \code{attendus\_hors\_plage} ne vient de cette étape (décision du
+    mainteneur D-a~(a) du 25/11/2026~: auparavant, une cellule des seules
+    lignes exclues d'attendu hors de la plage faisait refuser toute la
+    construction, sous le module \code{validation}, alors que l'étape
+    \code{validation} avait abouti, contre l'ordre des états écrit ici). Le SMR
     des lignes conservées, lu dans
     \code{etapes/}\allowbreak\code{validation/}\allowbreak\code{resultat/}\allowbreak\code{statistiques}
     (statistique \code{smr}), est placé à côté (\code{observes\_conserves},
@@ -18016,7 +18080,7 @@ non calculable), \code{contrat\_duplique\_unite\_contrat},
 \code{tete\_indeterminee\_apres\_reintegration}, \code{aucun\_attendu},
 \code{observe\_sans\_attendu}, \code{sans\_exposition\_retenue} (aucune
 cellule retirée n'a d'exposition retenue), \code{cellule\_sans\_valeur\_table},
-\code{taux\_table\_egal\_un} et \code{ddl\_non\_etabli}. Une grandeur non
+\code{taux\_table\_egal\_un}, \code{attendus\_hors\_plage} (issue~\#360) et \code{ddl\_non\_etabli}. Une grandeur non
 produite reste une ligne de sa table, de valeur \code{NA}, avec son état.
 
 \medskip
@@ -18025,7 +18089,9 @@ produite reste une ligne de sa table, de valeur \code{NA}, avec son état.
 lignes par motif et événements déclarés~: \textbf{décomptes exacts}~;
 événements et jours retirés~: décomptes exacts, exposition centrale
 retirée calculée en arithmétique flottante~; SMR~: quotient des grandeurs
-précédentes~; bornes exactes du comparateur~1~: exactes sous $D_e \sim
+précédentes (pour le comparateur~2, le statut nomme aussi les trois états
+non calculables et leur priorité, dont la plage de calcul
+«~[1e-100, 1e+100]~» de \code{attendus\_hors\_plage}, issue~\#360)~; bornes exactes du comparateur~1~: exactes sous $D_e \sim
 \mathcal{P}(\theta A)$, $A$ tenu pour fixe, \textbf{couverture non
 garantie}, le comparateur étant estimé, \code{qgamma()} en approximation
 numérique~; bornes exactes du comparateur~2 sous \code{independante}~:
@@ -18553,10 +18619,10 @@ reproduites ici, E3.4).
 \catalogue{fonctions-validation}{classer\_lignes\_exclues()} & interne & lignes exclues par motif, unité, clés & lignes distinctes et leur classe~; seule source des ensembles $S$ \\
 \catalogue{fonctions-validation}{cle\_cellules()} & interne & cellules, clés, découpage & clé de chaque cellule (segmentation, âge, année) \\
 \catalogue{fonctions-validation}{exposition\_lignes()} & interne & numéros de lignes, clés, contexte & table d'exposition de ces lignes, par les fonctions des étapes \code{donnees} et \code{exposition}, sans refus de la période sans exposition (\code{refuser\_vide = FALSE}, issue~\#210)~; lignes extraites par la méthode \code{[} de la classe de l'entrée et contrôlées par l'outil de contrôle des extractions du module \code{donnees} (tableau~\ref{tab:fonctions-donnees}~; refus \code{donnees\_mal\_formees}, module \code{importance\_exclusions}~; issue~\#320)~; même unité que la construction, sinon erreur de programmation \\
-\catalogue{fonctions-validation}{retrait\_contrefactuel()} & interne & lignes $S$, clés, contexte & cellules retirées (événements, jours, $E^c$), têtes touchées et indéterminées~; garde de réintégration et invariants~; en unité tête, $R_t \cup S$ extraites et contrôlées comme par la fonction précédente, avant \code{evaluer\_motifs()} (issue~\#320) \\
+\catalogue{fonctions-validation}{retrait\_contrefactuel()} & interne & lignes $S$, clés, contexte & cellules retirées (événements, jours, $E^c$), têtes touchées et indéterminées~; garde de réintégration et invariants, dont la garde G2 (total de l'exposition centrale retirée fini et au plus \code{LIMITE\_SOMMES\_DOUBLE}, \code{NaN} compris~: erreur de programmation, issue~\#360)~; en unité tête, $R_t \cup S$ extraites et contrôlées comme par la fonction précédente, avant \code{evaluer\_motifs()} (issue~\#320) \\
 \catalogue{fonctions-validation}{cellules\_regroupees()} & interne & table d'exposition, découpage & cellules des lignes conservées au niveau~A, sommées sur les segments \\
-\catalogue{fonctions-validation}{smr\_comparateur\_1()} & interne & cellules retirées et conservées, clés, découpage, niveau & taux conservés et attendus par cellule~; $O$, $A$, SMR, bornes, rapport de variance, état \\
-\catalogue{fonctions-validation}{smr\_comparateur\_2()} & interne & cellules retirées, clés, découpage, table, plage, clé, relation, niveau & $O$, $A$, SMR, bornes et décomptes sous la table de l'étape \code{validation}~; tout ou rien \\
+\catalogue{fonctions-validation}{smr\_comparateur\_1()} & interne & cellules retirées et conservées, clés, découpage, niveau & taux conservés et attendus par cellule~; $O$, $A$, SMR, bornes, rapport de variance, état~; garde G1 (attendus non finis, ou rapport de variance non fini à attendus positifs~: erreur de programmation, issue~\#360) \\
+\catalogue{fonctions-validation}{smr\_comparateur\_2()} & interne & cellules retirées, clés, découpage, table, plage, clé, relation, niveau & $O$, $A$, SMR, bornes et décomptes sous la table de l'étape \code{validation}~; tout ou rien (états \code{cellule\_sans\_}\allowbreak\code{valeur\_table}, \code{taux\_table\_egal\_un}, \code{attendus\_hors\_plage}, dans cet ordre~; issue~\#360) \\
 \catalogue{fonctions-validation}{etats\_evenements\_exclus()} & interne & données, rôles, lignes, fenêtre, état d'arrivée & état des déclarations de chaque ligne~; \code{cause\_sortie} et \code{date\_sortie} lues sans dispatch par \code{lire\_champ()} (issues~\#255 et~\#320) \\
 \catalogue{fonctions-validation}{ligne\_resultat()} & interne & ensemble, niveau, valeurs & \code{data.frame} d'une ligne d'une table du résultat \\
 \catalogue{fonctions-validation}{calculer\_importance\_exclusions()} & interne & données, rôles, étapes préalables et \code{validation}, table, valeurs validées \code{p} (dont la période et le délai, issue~\#182), recette et convention validées, segmentation, niveau & fonction d'étape \code{importance\_exclusions}~: paramètres, résultat, diagnostics, avertissements (aucun)~; table \code{NULL} si et seulement si \code{validation} est absente ou sous \code{lissee} (erreur de programmation sinon)~; ne contrôle rien (issue~\#82), hormis une erreur de programmation si la ligne de matrice de la recette n'admet pas l'étape sans condition ou si la forme rendue au noyau n'est pas \code{fenetres}, ou si les lignes reçues, lues sans dispatch par \code{.row\_names\_info(, 2L)} (issue~\#343), ne sont pas les conservées plus les exclues (section~\ref{sec:importance-exclusions}, «~Volumes et événements déclarés~») (le refus utilisateur, \code{importance\_exclusions\_}\allowbreak\code{agregats}, est levé en amont, au contrôle des entrées, section~\ref{sec:recettes})~; refus de capacité \code{evenements\_retires\_}\allowbreak\code{hors\_plage}, levé par la fonction de la ligne suivante (issue~\#174), et refus \code{donnees\_mal\_formees} d'une extraction de lignes fausse, levé par l'outil de contrôle des extractions du module \code{donnees} (issue~\#320)~; \code{id\_tete} lu par \code{lire\_champ()} (issue~\#255) \\
