@@ -8057,7 +8057,23 @@ de l'étape et dans la fiche~:
     serait comptée plusieurs fois si l'agrégat compte des contrats~; sous une
     transition de contrat, des effectifs comptés en têtes ne lui conviennent
     pas~; dans les deux cas, les intervalles et les tests supposent des unités
-    indépendantes et sont trop étroits en cas de dépendance positive). Son
+    indépendantes~: en cas de dépendance positive, ils sont faussés, «~dans
+    un sens propre à chaque grandeur (colonne statut des résultats~; à
+    attendus grands, résultat asymptotique, intervalles de confiance trop
+    étroits et tests fondés sur la loi de Poisson
+    anti-conservateurs)~»). Jusqu'à l'issue~\#361, la fin du texte disait
+    que les intervalles et les tests «~sont trop étroits en cas de
+    dépendance positive~», sans réserve~; elle est alignée sur la mention
+    d'indépendance des statuts (section~\ref{sec:validation-statistiques},
+    issue~\#359). Elle dit «~intervalles de confiance~»~: les bornes de
+    crédibilité de \code{wh\_poisson}, intervalles bayésiens, n'ont pas
+    de couverture établie et la sur-dispersion n'y fait pas de «~trop
+    étroit~» (section~\ref{sec:lissage-poisson}). Elle renvoie à la
+    «~colonne statut des résultats~», au pluriel, parce que l'avertissement
+    vaut pour toutes les étapes du plan, quand la mention d'unité du
+    rapport figé, propre à une section, renvoie à la «~colonne statut du
+    résultat de l'étape~» (différence voulue, avis d'\code{actuary} sur
+    l'issue~\#361). Son
     décompte est le nombre de cellules reçues et conservées par l'étape
     \code{donnees}, avant la somme par clé de l'étape \code{exposition}~: il
     n'est pas le nombre de cellules de la table d'exposition (\emph{constat} sur
@@ -10389,7 +10405,7 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{SUJETS\_LIGNES\_EXTRAITES} & constante & --- & sujet du message de refus de la fonction suivante, une entrée par étape appelante (clé~: nom de l'étape, module du refus), deux clés~: \code{donnees} («~Les lignes conservées~», issue~\#322) et \code{importance\_exclusions} (lignes relues par cette étape, issue~\#320~; section~\ref{sec:importance-exclusions})~; texte du moteur \\
 \catalogue{fonctions-donnees}{controler\_lignes\_extraites()} & interne & données, lignes extraites par l'appelant, numéros des lignes demandées, rôles, étape (\code{donnees} par défaut) & postcondition d'une extraction de lignes par la méthode \code{[} de la classe des données~: contrôles~(0) à~(3), sans dispatch, rien du résultat n'étant lu avant le contrôle~(0), le nombre de colonnes du contrôle~(1~bis) lu sur la liste (\code{length(unclass())}, par \code{colonnes\_lues()}~; issue~\#344) et comparé au nombre des noms et à celui de l'entrée avant toute lecture des colonnes, une liste incohérente recevant le seul constat de \code{constat\_colonnes\_lues()} (issue~\#345), le contrôle~(3) en deux temps, bonne forme de chaque facteur extrait par \code{facteur\_bien\_forme()}, toutes les colonnes en défaut citées, puis, à défaut d'écart, identité des colonnes de rôle (issue~\#357), refus \code{donnees\_mal\_formees} du module de l'étape, message citant la classe des colonnes en cause sous une entrée de classe exactement \code{data.frame}, \code{details} à huit champs~; étape hors des clés de la constante précédente~: erreur de programmation (\code{stop()}), avant tout contrôle~; numéros non contrôlés~; rend \code{TRUE}, invisible~; appelée sous les étapes \code{donnees} et \code{importance\_exclusions} (section~\ref{sec:controles-donnees}, «~Extraction des lignes conservées et son contrôle~»~; issues~\#319, \#322, \#320, \#345 et~\#357) \\
 \catalogue{fonctions-donnees}{preparer\_donnees()} & interne & données, rôles, valeurs validées \code{p}, segmentation, exclusions, recette validée & fonction d'étape \code{donnees}~: paramètres effectifs, résultat, diagnostics, avertissements~; nombre de lignes des données lu sans dispatch (\code{.row\_names\_info()}~; issue~\#354)~; évaluation des motifs, observations et relevés selon la recette (\code{evaluer\_motifs()} et \code{construire\_observations()} sous \code{lignes\_dates\_completes}, \code{evaluer\_motifs\_agregats()} et \code{observations\_agregats()} sous \code{agregats}, \code{evaluer\_motifs\_stocks()} et \code{observations\_stocks()} sous \code{stocks\_successifs}), squelette commun, qui exclut aussi les lignes de propagation (\code{NULL} hors stocks)~; colonnes de rôle lues par \code{lire\_champ()} (issue~\#140)~; sous une exclusion, lignes conservées extraites par la méthode \code{[} de la classe de l'entrée, puis contrôlées sans dispatch par la fonction précédente (forme, nombre de lignes, colonnes, décompte de chaque colonne, bonne forme de chaque facteur extrait, identité des colonnes de rôle), refus \code{donnees\_mal\_formees} sinon (section~\ref{sec:controles-donnees}~; issues~\#319, \#322 et~\#357)~; ne contrôle ni les paramètres ni les rôles, contrôlés par \code{construire\_table()} (issues~\#22 et~\#82) \\
-\catalogue{fonctions-donnees}{UNITE\_AGREGAT} & constante & --- & textes de l'avertissement \code{unite\_agregat} (recette \code{agregats}, unité non déterminée), par porteur de la transition (tête, contrat) \\
+\catalogue{fonctions-donnees}{UNITE\_AGREGAT} & constante & --- & textes de l'avertissement \code{unite\_agregat} (recette \code{agregats}, unité non déterminée), par porteur de la transition (tête, contrat)~; fin révisée par l'issue~\#361 (erreur de sens propre à chaque grandeur, réserve asymptotique~; section~\ref{sec:unite-observation}) \\
 \catalogue{fonctions-donnees}{avertir\_releves\_agregats()} & interne & avertissements, relevés & avertissements des relevés de la recette \code{agregats}, quand les deux expositions sont déclarées~: $E^i < E^c$ (\code{exposition\_initiale\_}\allowbreak\code{inferieure\_centrale}), $E^i - E^c > D$ (\code{complement\_superieur\_}\allowbreak\code{aux\_evenements}), au-delà de la tolérance relative \code{TOLERANCE\_}\allowbreak\code{RELEVES\_AGREGATS}, que le texte de l'avertissement mentionne~; jamais un refus \\
 \catalogue{fonctions-donnees}{avertir\_releves\_stocks()} & interne & avertissements, relevés & avertissements des relevés de la recette \code{stocks\_successifs}~: \code{entrees\_entre\_inventaires} (unités E), \code{evenements\_hors\_fenetre} (unités HF)~; le relevé des unités ES est averti par l'étape \code{exposition}~; jamais un refus \\
 \catalogue{fonctions-donnees}{avertir\_releves\_lignes()} & interne & avertissements, relevés, unité d'observation & avertissements des relevés de la recette \code{lignes\_dates\_completes} (fusion par tête, fenêtres vides, observations après décès hors période)~; extraite de \code{preparer\_donnees()} à résultats identiques \\
@@ -14922,10 +14938,24 @@ d'observation indépendantes~: en unité contrat, sans identifiant de tête,
 une tête qui porte $k$ contrats compte $k$ décès, et la variance des décès
 est sur-dispersée d'un facteur $\varphi = \sum k^2 E / \sum k E \ge 1$,
 $E$ étant l'exposition d'une tête dont les $k$ contrats couvrent la même
-période (exact sous le modèle de Poisson par tête dans ce cas), ce qui rend les tests
-\textbf{anti-conservateurs} (p-valeurs trop petites, intervalles trop
-étroits)~; $\varphi$ n'est pas mesurable sans identifiant de tête, et le
-rapport figé le mentionne (section~\ref{sec:rapport-fige}). Ce sens de
+période (exact sous le modèle de Poisson par tête dans ce cas)~; dès
+que $\varphi > 1$, les p-valeurs, intervalles et variances calculés sous
+$H_0$~(i) sont faussés, dans un sens propre à chaque grandeur (colonne
+\code{statut} de \code{etapes/validation/resultat/statistiques})~: à
+attendus grands, les tests fondés sur la loi de Poisson sont
+\textbf{anti-conservateurs} (p-valeurs trop petites) et les intervalles
+trop étroits~; $\varphi$ n'est pas mesurable sans identifiant de tête, et le
+rapport figé le mentionne (section~\ref{sec:rapport-fige}). Le texte de
+l'hypothèse nulle restitué dans les paramètres
+(\code{HYPOTHESE\_VALIDATION}, et de même
+\code{HYPOTHESE\_VALIDATION\_POSITIONNEE} sous \code{positionnee})
+renvoie à ces statuts sans conclure au sens~: «~unités d'observation
+indépendantes (sous l'unité contrat, les décès sont sur-dispersés~: sens
+de l'erreur propre à chaque grandeur, colonne statut de
+etapes/validation/resultat/statistiques)~»~; jusqu'à l'issue~\#361, il
+disait «~(l'unité contrat rend les tests anti-conservateurs)~», ce qui
+est faux à petits attendus et pour les tests de nature \code{niveau}
+(ci-dessous). Ce sens de
 l'erreur des tests, et celui de l'écart de couverture des intervalles, sont
 des énoncés \emph{asymptotiques} (attendus grands, à $\varphi > 1$
 fixé)~: à petits attendus, un test peut être conservateur et un intervalle
@@ -21288,12 +21318,27 @@ de X² et G², ni les p-valeurs asymptotiques et exactes des signes, des
 suites et de Wilcoxon, calculées sous leurs hypothèses propres (colonne
 statut)~; aucune p-valeur de Monte-Carlo n'est produite.~»~; si \code{fiche/avertissement\_unite} est
 présent, la mention d'unité (\code{mention\_unite()})~: sous l'unité
-contrat sans identifiant de tête, la sur-dispersion
-$\varphi \ge 1$ qui rend les tests anti-conservateurs (mention
-\code{validation\_unite\_contrat})~; sous l'unité non déterminée des
-agrégats, la même sur-dispersion, d'un facteur au plus $\varphi$, si les
-effectifs comptent des contrats (mention
-\code{validation\_unite\_non\_determinee})~; si l'appariement est
+contrat sans identifiant de tête, la sur-dispersion d'un facteur
+$\varphi \ge 1$ (mention \code{validation\_unite\_contrat})~; sous
+l'unité non déterminée des agrégats, la même sur-dispersion, d'un facteur
+au plus $\varphi$, si les effectifs comptent des contrats (mention
+\code{validation\_unite\_non\_determinee})~; l'une et l'autre disent,
+depuis l'issue~\#361, que les p-valeurs, intervalles et variances calculés
+sous l'hypothèse d'unités d'observation indépendantes sont faussés dès que
+la variance est sur-dispersée, le sens de l'erreur étant propre à chaque
+grandeur «~(colonne statut du résultat de l'étape)~»~: les tests fondés sur
+la loi de Poisson anti-conservateurs (p-valeurs trop petites) et les
+intervalles trop étroits à attendus grands (résultat asymptotique), ce
+sens n'étant pas établi en général à petits attendus, «~ni, à tout
+attendu, pour les tests des signes, des suites et de Wilcoxon~» (nature
+\code{niveau}, section~\ref{sec:validation-statistiques})~; avant
+l'issue~\#361, elles disaient les tests «~anti-conservateurs (p-valeurs
+trop petites, intervalles trop étroits)~» sans réserve. Le texte est
+générique~: \code{mention\_unite()} le reprend tel quel dans les sections
+\emph{étape positionnement}, \emph{étape homogeneite} et \emph{étape
+importance\_exclusions}, où les tests des signes, des suites et de
+Wilcoxon n'existent pas~; il ne les y cite que par négation et y reste
+donc juste (avis d'\code{actuary} sur l'issue~\#361)~; si l'appariement est
 \code{ensemble\_par\_sexe}, la table \code{ensemble} appliquée à chaque
 sexe~; sous \code{independante}, \code{positionnee} et \code{lissee}, l'absence de correction de
 multiplicité, puis, hors de \code{lissee}, la formule des p-valeurs de Monte-Carlo, le chemin du
