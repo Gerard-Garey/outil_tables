@@ -12,6 +12,8 @@
 #    nulle) ou levait une erreur de R avant #360 (mesuré sur 9d5d22a) ;
 #  - constat d'exécution : bornes 0,5e100 et 2e-100 (sorties finies, ou NA
 #    à état nommé, aucun avertissement de R), juste hors plage refusé ;
+#    comparateur 2 non calculable (attendus_hors_plage, décision du
+#    mainteneur D-a (a) du 25/11/2026) et précédence de ses états ;
 #    gardes G1 et G2 par appel direct.
 #  Constantes non ASCII des messages attendus écrites en \uXXXX. Graine du
 #  plan 360 (inférieure à 1000, exemptée, tests/controles/graines.R).
@@ -189,7 +191,8 @@ verifier("attendus_cellules() : clé NULL (relation lissee, table construite) ->
 # le 1949-01-01, décès le 2015-02-01) : seule cellule exposée à 66 ans, des
 # lignes exclues seulement ; table à q~_66 = 1e-320 (0,01 ailleurs).
 # L'étape validation aboutit (E^c = 0 à 66 ans parmi les conservées) ;
-# avant #360, le comparateur 2 sommait un attendu de 8,5e-322 (mesuré).
+# avant #360, le comparateur 2 sommait un attendu de 8,5e-322 (mesuré) ;
+# depuis D-a (a), la cellule rend l'étape non calculable, sans refus.
 T1Z <- data.frame(
   id_contrat = paste0("C", 1:9), id_tete = c("C", "D", "E", "G", "A", "B", "C", "H", "Z"),
   sexe = c("H", "F", "H", "F", NA, NA, NA, "H", NA), date_naissance = D(c(rep("1950-01-01", 8L), "1949-01-01")),
@@ -213,19 +216,53 @@ plan_z <- function(importance) {
   if (importance) p$etapes$importance_exclusions <- list(niveau = 0.95)
   p
 }
-verifier("comparateur 2 : cellule à q~ = 1e-320 exposée des seules lignes exclues -> refus validation / attendus_hors_plage depuis importance_exclusions ; sans importance_exclusions, la construction aboutit", {
+verifier("comparateur 2 : cellule à q~ = 1e-320 exposée des seules lignes exclues -> construction aboutie, état attendus_hors_plage aux niveaux A et B (O, A, SMR et bornes NA, cellules_attendus_hors_plage = 1) ; étape validation identique à la construction sans importance_exclusions (décision D-a (a) du 25/11/2026)", {
   t66 <- table_reference(data.frame(age = 0:120, sexe = "ensemble", qx = ifelse(0:120 == 66, 1e-320, 0.01)), "q66",
                          "importee", "test")
-  sans <- erreur_de(construire_table(T1Z, ROLES_Z, plan_z(FALSE), tables_reference = list(tq = t66)))
-  r <- refus_de(construire_table(T1Z, ROLES_Z, plan_z(TRUE), tables_reference = list(tq = t66)))
-  tous(validation_seule = if (is.null(sans) || !inherits(sans, "error")) TRUE else conditionMessage(sans),
-       refus = controle(r, "validation", "attendus_hors_plage"),
-       details = if (identical(r$details$cle, "tq") && identical(r$details$cellules, 1L)) TRUE else "details")
+  resultat_de <- function(expr) tryCatch(expr, refus_tablexp = function(r) r, error = function(e) e)
+  sans <- resultat_de(construire_table(T1Z, ROLES_Z, plan_z(FALSE), tables_reference = list(tq = t66)))
+  r <- resultat_de(construire_table(T1Z, ROLES_Z, plan_z(TRUE), tables_reference = list(tq = t66)))
+  if (inherits(sans, "error") || inherits(r, "error"))
+    return(conditionMessage(if (inherits(r, "error")) r else sans))
+  # Lignes des ensembles qui contiennent Z (sexe_manquant et total) ;
+  # entree_manquante : aucune_ligne_mesurable.
+  s2 <- r$etapes$importance_exclusions$resultat$smr_comparateur_2
+  s2 <- s2[s2$ensemble %in% c("sexe_manquant", "total"), ]
+  na <- c("observes", "attendus", "smr", "borne_inf_exacte", "borne_sup_exacte", "borne_inf_asymptotique",
+          "borne_sup_asymptotique")
+  tous(lignes = if (nrow(s2) == 4L) TRUE else sprintf("%d lignes", nrow(s2)),
+       niveaux = if (setequal(s2$niveau, c("A", "B"))) TRUE else paste(s2$niveau, collapse = ", "),
+       etat = if (all(s2$etat == "attendus_hors_plage")) TRUE else paste(s2$etat, collapse = ", "),
+       na = if (all(vapply(s2[na], function(v) all(is.na(v)), NA))) TRUE else "O, A, SMR ou bornes non NA",
+       cellules = if (all(s2$cellules_attendus_hors_plage %in% 1L)) TRUE else "cellules",
+       validation = if (identical(r$etapes$validation, sans$etapes$validation)) TRUE else "validation différente")
+})
+verifier("comparateur 2, appel direct : précédence cellule_sans_valeur_table, puis taux_table_egal_un, puis attendus_hors_plage, puis produite (table H seule, q~66 = 1e-320, q~68 = 1, 0,01 ailleurs) ; cellules_attendus_hors_plage restitué dans les trois cas non calculables", {
+  th <- table_reference(data.frame(age = 0:120, sexe = "H",
+                                   qx = ifelse(0:120 == 66, 1e-320, ifelse(0:120 == 68, 1, 0.01))), "qH", "importee",
+                        "test")
+  ret <- data.frame(sexe = c("H", "F", "H", "H"), age = c(66L, 65L, 67L, 68L), evenements_retires = c(1L, 1L, 0L, 1L),
+                    exposition_centrale_retiree = c(0.5, 0.5, 0.25, 0.1), stringsAsFactors = FALSE)
+  c2 <- function(k) tablexp:::smr_comparateur_2(ret[k, ], "sexe", FALSE, th, c(60, 70), "qH", "independante", 0.95)
+  cas <- function(k, etat, hp) {
+    v <- c2(k)
+    if (!identical(v$etat, etat)) return(paste("état", v$etat))
+    if (!identical(v$cellules_attendus_hors_plage, hp)) return("cellules_attendus_hors_plage")
+    if (!identical(etat, "produite") && !all(is.na(c(v$observes, v$attendus, v$smr)))) return("O, A ou SMR non NA")
+    TRUE
+  }
+  p <- c2(3L)
+  tous(sans_valeur = cas(1:4, "cellule_sans_valeur_table", 1L),
+       egal_un = cas(c(1L, 3L, 4L), "taux_table_egal_un", 1L),
+       hors_plage = cas(c(1L, 3L), "attendus_hors_plage", 1L),
+       produite = cas(3L, "produite", 0L),
+       # A = 0,25 mu~(0,01) = 0,002512584 (même calcul que le moteur).
+       A = if (identical(p$attendus, 0.25 * -log1p(-0.01))) TRUE else format(p$attendus, digits = 17))
 })
 
 # --- F. Gardes G1 et G2 (constat d'exécution, appel direct) -------------------------------
 
-verifier("G1 smr_comparateur_1() : attendus infinis, ou rapport de variance infini à attendus finis -> erreur de programmation (pas un refus) ; cas fini inchangé", {
+verifier("G1 smr_comparateur_1() : attendus infinis ou NaN, ou rapport de variance infini à attendus finis -> erreur de programmation (pas un refus) ; cas fini inchangé", {
   c1 <- function(ec_ret, ec_cons) tablexp:::smr_comparateur_1(
     data.frame(age = 60L, evenements_retires = 1L, exposition_jours_retiree = 365, exposition_centrale_retiree = ec_ret),
     data.frame(age = 60L, evenements = 1L, exposition_jours = 365, exposition_centrale = ec_cons),
@@ -236,6 +273,7 @@ verifier("G1 smr_comparateur_1() : attendus infinis, ou rapport de variance infi
                       TRUE else if (is.null(e)) "aucune erreur" else conditionMessage(e)
   ok <- c1(2, 1)$ligne
   tous(A_infini = g1(erreur_de(c1(1e300, 1e-300))),
+       A_nan = g1(erreur_de(c1(NaN, 1))),
        rv_infini = g1(erreur_de(c1(1e300, 1))),
        fini = if (identical(ok$attendus, 2) && identical(ok$rapport_variance, 2)) TRUE else "cas fini")
 })

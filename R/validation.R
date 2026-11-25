@@ -3325,13 +3325,14 @@ ETATS_IMPORTANCE <- texte_moteur(data.frame(
   etat = c("produite", "non_demandee_par_le_plan", "non_produite_par_cette_version", "aucune_ligne_mesurable",
            "cle_segmentation_manquante", "tete_indeterminee_apres_reintegration", "aucun_attendu",
            "observe_sans_attendu", "sans_exposition_retenue", "cellule_sans_valeur_table", "taux_table_egal_un",
-           "contrat_duplique_unite_contrat", "ddl_non_etabli"),
+           "attendus_hors_plage", "contrat_duplique_unite_contrat", "ddl_non_etabli"),
   libelle = c("produite", "non demandée par le plan", "non produite par cette version",
               "non calculable : aucune_ligne_mesurable", "non calculable : cle_segmentation_manquante",
               "non calculable : tete_indeterminee_apres_reintegration", "non calculable : aucun_attendu",
               "non calculable : observe_sans_attendu", "non calculable : sans_exposition_retenue",
               "non calculable : cellule_sans_valeur_table", "non calculable : taux_table_egal_un",
-              "non calculable : contrat_duplique_unite_contrat", "non calculable : ddl_non_etabli"),
+              "non calculable : attendus_hors_plage", "non calculable : contrat_duplique_unite_contrat",
+              "non calculable : ddl_non_etabli"),
   stringsAsFactors = FALSE))
 # Statuts (E2.20) des grandeurs de l'étape, par table du résultat.
 # Mention d'indépendance des unités (#159) sur les seules lignes de loi
@@ -3386,9 +3387,12 @@ STATUTS_IMPORTANCE <- local({
       paste("D_e / A, A = somme E^c_e mu~, mu~ = -ln(1 - q~) de la table de l'étape validation, sur sa plage_ages,",
             "appariement de l'étape validation, cellules à A > 0 ; O et A excluent les cellules hors plage",
             "(événements et E^c comptés à part) ; non calculable dès qu'une cellule retirée est sans valeur de table",
-            "(cellule_sans_valeur_table, prioritaire) ou à q~ = 1 avec E^c > 0 (taux_table_egal_un) : aucun agrégat",
-            "partiel, ces cellules et leurs événements restitués à part ; table par sexe au niveau A : contrefactuel",
-            "propre sans les lignes sexe_manquant et sexe_hors_modalites (non calculables)")),
+            "(cellule_sans_valeur_table), à q~ = 1 avec E^c > 0 (taux_table_egal_un) ou à q~ > 0 et E^c > 0",
+            "d'attendu hors de la plage de calcul du moteur",
+            sprintf("[%g, %g]", PLAGE_ATTENDUS[1L], PLAGE_ATTENDUS[2L]),
+            "(attendus_hors_plage), priorité dans cet ordre ; aucun agrégat partiel, ces cellules et leurs",
+            "événements restitués à part ; table par sexe au niveau A : contrefactuel propre sans les lignes",
+            "sexe_manquant et sexe_hors_modalites (non calculables)")),
     c("smr_comparateur_2", "bornes",
       paste("relation independante : bornes exactes, exact sous D_e ~ Poisson(theta A), A connu (table, E^c",
             "tenue pour fixe), qgamma, approximation numérique ; bornes asymptotiques, asymptotique (normal sur",
@@ -3611,7 +3615,7 @@ smr_comparateur_1 <- function(ret, conservees, cles, par_annee, niveau) {
   etat_cel <- rep("sans_exposition_retenue", nrow(ret)); etat_cel[ok] <- "produite"
   ret$etat_cellule <- etat_cel
   O <- sum(as.numeric(ret$evenements_retires[ok])); A <- sum(att[ok])
-  rv <- if (A > 0) sum(ret$exposition_centrale_retiree[ok]^2 * mu[ok] / Er[ok]) / A else NA_real_
+  rv <- if (is.finite(A) && A > 0) sum(ret$exposition_centrale_retiree[ok]^2 * mu[ok] / Er[ok]) / A else NA_real_
   # Garde G1 (#360) : sous la recette en lignes, seule admise ici (dates
   # entières et bornées), E <= 2^52 jours, E^c >= 1/366 par cellule exposée et
   # D <= 2^31 : attendus et rapport de variance finis, le rapport inférieur à
@@ -3643,19 +3647,18 @@ smr_comparateur_1 <- function(ret, conservees, cles, par_annee, niveau) {
 # sans valeur) et mêmes attendus (attendus_cellules()) ; O et A sur les
 # cellules à A > 0 ; cellules hors plage exclues de O et A, restituées à
 # part ; relation ajustee_hors_outil : bornes non produites. Tout ou rien
-# (avis d'actuary, C2) : une cellule retirée sans valeur de table (sexe
-# absent) ou à q~ = 1 avec E^c > 0 rend l'étape non calculable (O, A, SMR
-# et bornes NA, aucun agrégat partiel) ; les cellules à q~ = 1 sont écartées
-# avant attendus_cellules() (aucun refus taux_table_egal_un ici) ; une
-# cellule retirée à q~ > 0 d'attendu hors de PLAGE_ATTENDUS lève le refus
-# attendus_hors_plage, module validation (#360 ; atteint par
-# construire_table() pour une cellule exposée des seules lignes exclues,
-# l'étape validation ayant abouti). Ordre des
-# états : cellule_sans_valeur_table l'emporte sur taux_table_egal_un, qui
-# l'emporte sur les états de taux_poisson(). Les décomptes des deux cas sont
-# toujours restitués.
+# (avis d'actuary, C2 ; étendu à attendus_hors_plage par l'avis
+# d'actuary-approfondi de la revue finale de B37, #360) : une cellule retirée
+# sans valeur de table (sexe absent), à q~ = 1 avec E^c > 0, ou exposée à
+# q~ > 0 d'attendu E^c mu~ hors de PLAGE_ATTENDUS rend l'étape non calculable
+# (O, A, SMR et bornes NA, aucun agrégat partiel) ; ces cellules sont écartées
+# avant attendus_cellules(), qui ne lève ici ni taux_table_egal_un ni
+# attendus_hors_plage. Ordre des états : cellule_sans_valeur_table, puis
+# taux_table_egal_un, puis attendus_hors_plage, puis les états de
+# taux_poisson(). Les décomptes des trois cas sont toujours restitués.
 smr_comparateur_2 <- function(ret, cles, par_annee, table, plage_ages, cle_table, relation_table, niveau) {
-  sans_valeur <- un <- 0L; ev_sans_valeur <- ev_un <- ev_sans_attendu <- ev_hors <- e_hors <- 0
+  sans_valeur <- un <- hors_att <- 0L
+  ev_sans_valeur <- ev_un <- ev_hors_att <- ev_sans_attendu <- ev_hors <- e_hors <- 0
   O <- 0; A <- 0
   if (nrow(ret)) {
     ex <- ret[c(cles, "age", if (isTRUE(par_annee)) "annee")]
@@ -3668,7 +3671,11 @@ smr_comparateur_2 <- function(ret, cles, par_annee, table, plage_ages, cle_table
     sans_valeur <- sum(sv & rempli); ev_sans_valeur <- sum(as.numeric(c_$evenements[sv]))
     q1 <- !sv & c_$qx_table == 1 & c_$exposition_centrale > 0
     un <- sum(q1); ev_un <- sum(as.numeric(c_$evenements[q1]))
-    g <- !sv & !q1
+    s <- !sv & !q1
+    hp <- logical(nrow(c_))
+    hp[s] <- hors_plage_attendus(c_$exposition_centrale[s], c_$qx_table[s])
+    hors_att <- sum(hp); ev_hors_att <- sum(as.numeric(c_$evenements[hp]))
+    g <- s & !hp
     at <- attendus_cellules(c_$exposition_centrale[g], c_$evenements[g], c_$qx_table[g], cle_table, "validation")
     r <- at$etat == "retenue"
     O <- sum(as.numeric(c_$evenements[g][r])); A <- sum(at$attendus[r])
@@ -3683,9 +3690,10 @@ smr_comparateur_2 <- function(ret, cles, par_annee, table, plage_ages, cle_table
                 stop("smr_comparateur_2() : relation sans comparateur 2 (erreur de programmation).", call. = FALSE))
   etat <- if (sans_valeur > 0L) "cellule_sans_valeur_table"
           else if (un > 0L) "taux_table_egal_un"
+          else if (hors_att > 0L) "attendus_hors_plage"
           else switch(tp$etat, defini = "produite", exposition_nulle = "aucun_attendu",
                       evenement_sans_exposition = "observe_sans_attendu")
-  nc <- etat %in% c("cellule_sans_valeur_table", "taux_table_egal_un")
+  nc <- etat %in% c("cellule_sans_valeur_table", "taux_table_egal_un", "attendus_hors_plage")
   b <- function(v) if (ind && !nc) v else NA_real_
   # Sommes d'événements rangées en integer (#199) : gardes défensives ; sous la
   # forme fenêtres, seule admise ici, le total est majoré par le nombre de lignes
@@ -3698,6 +3706,8 @@ smr_comparateur_2 <- function(ret, cles, par_annee, table, plage_ages, cle_table
        cellules_sans_valeur_table = sans_valeur,
        evenements_sans_valeur_table = ent(ev_sans_valeur, "evenements_sans_valeur_table"),
        cellules_taux_table_egal_un = un, evenements_taux_table_egal_un = ent(ev_un, "evenements_taux_table_egal_un"),
+       cellules_attendus_hors_plage = hors_att,
+       evenements_attendus_hors_plage = ent(ev_hors_att, "evenements_attendus_hors_plage"),
        evenements_sans_attendu = ent(ev_sans_attendu, "evenements_sans_attendu"),
        evenements_hors_plage = ent(ev_hors, "evenements_hors_plage"),
        exposition_centrale_hors_plage = e_hors, etat = etat,
@@ -3957,6 +3967,7 @@ calculer_importance_exclusions <- function(donnees, roles, etape_donnees, etape_
                   borne_sup_exacte = NA_real_, borne_inf_asymptotique = NA_real_, borne_sup_asymptotique = NA_real_,
                   cellules_sans_valeur_table = NA_integer_, evenements_sans_valeur_table = NA_integer_,
                   cellules_taux_table_egal_un = NA_integer_, evenements_taux_table_egal_un = NA_integer_,
+                  cellules_attendus_hors_plage = NA_integer_, evenements_attendus_hors_plage = NA_integer_,
                   evenements_sans_attendu = NA_integer_, evenements_hors_plage = NA_integer_,
                   exposition_centrale_hors_plage = NA_real_, etat = etat, etat_intervalle = etat)
       ligne_resultat(ens[i], nv, c(list(lignes_mesurables = length(S), lignes_non_calculables = n_cle), v,

@@ -488,6 +488,64 @@ TRANSITIONS_EN_COURS <- list()
 # apres_361() et les constantes P_359, B_359, R_359, D_359, TESTS_359,
 # SUBST_359, CHEMINS_359, SUBST_361 et CHEMIN_361 retirées.
 
+# Transition #360 (B37, correction après revue finale ; décision du
+# mainteneur D-a (a) du 25/11/2026 ; spécification d'actuary-approfondi) :
+# état non calculable attendus_hors_plage du comparateur 2 de
+# importance_exclusions, R8, R9 et R10. Changements : parametres/etats
+# (état et libellé insérés après taux_table_egal_un, 13 -> 14 lignes) et
+# ligne smr_comparateur_2 / smr de parametres/statuts (texte après tiré du
+# texte avant de la référence par une substitution exacte, SUBST_360B, en
+# échappements \u, sans lire le package) ; sous R8 et R9 seuls (comparateur
+# 2 produit), par ajouts : colonnes cellules_attendus_hors_plage et
+# evenements_attendus_hors_plage de resultat/smr_comparateur_2 (après
+# evenements_taux_table_egal_un, @colonnes 23 -> 25). Aucune valeur
+# existante changée ; valeurs des ajouts lues sur l'objet (0 ou NA, mesuré).
+# À clore par la régénération de B37, avec transition_360b() et les
+# constantes *_360B.
+SUBST_360B <- c(
+  paste("(cellule_sans_valeur_table, prioritaire) ou \u00e0 q~ = 1 avec E^c > 0 (taux_table_egal_un) : aucun agr\u00e9gat",
+        "partiel"),
+  paste("(cellule_sans_valeur_table), \u00e0 q~ = 1 avec E^c > 0 (taux_table_egal_un) ou \u00e0 q~ > 0 et E^c > 0",
+        "d'attendu hors de la plage de calcul du moteur [1e-100, 1e+100] (attendus_hors_plage), priorit\u00e9 dans cet",
+        "ordre ; aucun agr\u00e9gat partiel"))
+# Marquage UTF-8 explicite, octets inchangés (voir le précédent de #218 :
+# sous la locale C, un littéral \u est d'encodage « unknown »).
+Encoding(SUBST_360B) <- "UTF-8"
+transition_360b <- function(id) {
+  ref <- lire_reference(file.path(DOSSIER_REFERENCES, paste0(id, ".tsv")))$valeurs
+  b <- "etapes/importance_exclusions/"
+  et <- paste0(b, "parametres/etats/"); st <- paste0(b, "parametres/statuts/")
+  etats <- ref[[paste0(et, "etat")]]; libelles <- ref[[paste0(et, "libelle")]]
+  if (length(etats) != 13L || "attendus_hors_plage" %in% etats)
+    stop("transition_360b() : 13 \u00e9tats sans attendus_hors_plage attendus dans la r\u00e9f\u00e9rence (r\u00e9f\u00e9rence d\u00e9j\u00e0 r\u00e9g\u00e9n\u00e9r\u00e9e ? retirer transition_360b() et les constantes *_360B)")
+  k <- which(ref[[paste0(st, "table")]] == "smr_comparateur_2" & ref[[paste0(st, "grandeur")]] == "smr")
+  avant <- ref[[paste0(st, "statut")]][k]
+  if (length(k) != 1L || !grepl(SUBST_360B[1L], avant, fixed = TRUE))
+    stop("transition_360b() : ligne smr_comparateur_2 / smr de la r\u00e9f\u00e9rence introuvable ou d\u00e9j\u00e0 modifi\u00e9e")
+  apres <- sub(SUBST_360B[1L], SUBST_360B[2L], avant, fixed = TRUE)
+  ch <- list(
+    list(chemin = paste0(et, "@lignes"), nature = "valeur", valeurs = 14),
+    list(chemin = paste0(et, "etat"), nature = "valeur de chaîne",
+         valeurs = append(etats, "attendus_hors_plage", match("taux_table_egal_un", etats))),
+    list(chemin = paste0(et, "libelle"), nature = "valeur de chaîne",
+         valeurs = append(libelles, "non calculable : attendus_hors_plage",
+                          match("non calculable : taux_table_egal_un", libelles))),
+    list(chemin = paste0(st, "statut"), nature = "valeur de chaîne", valeurs = apres, positions = k))
+  c2 <- paste0(b, "resultat/smr_comparateur_2/")
+  if (!is.null(ref[[paste0(c2, "@colonnes")]])) {
+    col <- ref[[paste0(c2, "@colonnes")]]
+    n <- ref[[paste0(c2, "@lignes")]]
+    ch <- c(ch, list(
+      list(chemin = paste0(c2, "@colonnes"), nature = "valeur de chaîne",
+           valeurs = append(col, c("cellules_attendus_hors_plage", "evenements_attendus_hors_plage"),
+                            match("evenements_taux_table_egal_un", col))),
+      list(chemin = paste0(c2, "cellules_attendus_hors_plage"), nature = "ajout", type = "integer", longueur = n),
+      list(chemin = paste0(c2, "evenements_attendus_hors_plage"), nature = "ajout", type = "integer", longueur = n)))
+  }
+  list(issue = "#360", plans = id, changements = ch)
+}
+TRANSITIONS_EN_COURS <- c(TRANSITIONS_EN_COURS, lapply(c("R8", "R9", "R10"), transition_360b))
+
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
 CHAMPS_CHANGEMENT <- list(type = c("de", "vers"), valeur = c("valeurs", "positions"),
                           "valeur de chaîne" = c("valeurs", "positions"),

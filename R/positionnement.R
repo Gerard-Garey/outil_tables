@@ -18,7 +18,8 @@
 #  - apparier_table(), attendus_cellules() : grille des cellules de la plage
 #    (grille_plage(), module exposition ; ADR 0017, point 10.1), q~ apparié
 #    par clé exacte (sexe, âge), A = E^c mu~, mu~ = -log1p(-q~), état de
-#    chaque cellule ; PLAGE_ATTENDUS, plage de calcul des attendus (#360) ;
+#    chaque cellule ; PLAGE_ATTENDUS, plage de calcul des attendus, et
+#    hors_plage_attendus(), cellules qui en sortent (#360) ;
 #  - smr_poisson() : SMR et inférence de Poisson exacte et asymptotique ;
 #  - controler_parametres_positionnement() : paramètres de l'étape ; appelée
 #    par valider_plan() seule (#82) ;
@@ -195,6 +196,17 @@ apparier_table <- function(exposition, segmentation, par_annee, table, plage_age
 # attendus_hors_plage (attendus_cellules()).
 PLAGE_ATTENDUS <- c(1e-100, 1e100)
 
+# Cellules exposées (E^c > 0) à q_x > 0 dont l'attendu A = E^c (-ln(1 - q_x))
+# sort de PLAGE_ATTENDUS (#360) ; même calcul, au bit près, que
+# attendus_cellules(), qui l'emploie. q_x = 1 avec E^c > 0 rend TRUE (A
+# infini) : l'appelant écarte ces cellules avant (taux_table_egal_un).
+hors_plage_attendus <- function(Ec, qx) {
+  A <- numeric(length(Ec))
+  e <- Ec > 0
+  A[e] <- Ec[e] * -log1p(-qx[e])
+  e & qx > 0 & !(A >= PLAGE_ATTENDUS[1L] & A <= PLAGE_ATTENDUS[2L])
+}
+
 # Attendus et états (M253, point 1) : mu~ = -log1p(-q~) ; A = E^c mu~, A = 0
 # si E^c = 0 (pas de 0 x Inf) ; refus taux_table_egal_un si q~ = 1 et E^c > 0,
 # puis attendus_hors_plage si une cellule à E^c > 0 et q~ > 0 a un attendu
@@ -217,7 +229,7 @@ attendus_cellules <- function(Ec, D, qx, cle, etape) {
   A <- numeric(length(Ec))
   e <- Ec > 0
   A[e] <- Ec[e] * mu[e]
-  hors <- e & qx > 0 & !(A >= PLAGE_ATTENDUS[1L] & A <= PLAGE_ATTENDUS[2L])
+  hors <- hors_plage_attendus(Ec, qx)
   if (any(hors))
     refuser(etape, "attendus_hors_plage",
             if (is.null(cle))
