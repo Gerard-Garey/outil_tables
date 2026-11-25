@@ -32,13 +32,17 @@ egal <- function(obtenu, attendu)
 
 Z_TEXTE <- "z = qnorm(alpha/2, lower.tail = FALSE)"
 # Mention d'indépendance des unités en fin de statut des lignes de loi (#159 ;
-# spécification d'actuary-approfondi, #159, commentaire 7012174895).
+# spécification d'actuary-approfondi, #159, commentaire 7012174895 ; textes
+# qualifiés de #359, commentaire 7137095929, natures brut_intervalle et
+# intervalle).
 M_BRUT_INTERVALLE <- paste(
   "unités d'observation indépendantes ; sous l'unité contrat, les contrats d'une même tête sont supposés",
-  "indépendants (une dépendance positive rend l'intervalle trop étroit ; relevé tetes_multi_contrats de",
-  "l'étape donnees)")
+  "indépendants (une dépendance positive rend l'intervalle trop étroit à grand nombre attendu d'événements",
+  "(résultat asymptotique), l'écart de couverture étant de sens non établi en général à petit nombre attendu ;",
+  "relevé tetes_multi_contrats de l'étape donnees)")
 M_INTERVALLE <- paste("unités d'observation indépendantes ; sous l'unité contrat, les décès sont sur-dispersés et",
-                      "l'intervalle est trop étroit")
+                      "l'intervalle est trop étroit à attendus grands (résultat asymptotique), l'écart de couverture",
+                      "étant de sens non établi en général à petits attendus")
 verifier("STATUTS_BRUT (littéral de la spécification) : statut du binomial exact (ligne 8), condition « cellule observée entière »", {
   l <- ligne_brut("binomial", "taux", "exact")
   if (!identical(rownames(l), "8")) "ligne 8 absente" else

@@ -123,23 +123,76 @@ PORTEE_PROBABILITE <- c(
   age_atteint_annee = "Unité l'année civile : probabilité sur l'année civile de la cellule.",
   par_annee = "Cellule âge x année : q_x de l'année t à force mu_(x,t).")
 
+# Mention d'indépendance des unités d'observation (#159), source unique de
+# la conséquence par nature de grandeur (#330, F330 ; #359, F359, D3 (a) ;
+# spécifications d'actuary-approfondi, commentaire 7102990712 de #330 et
+# commentaire 7137095929 de #359) : préfixe commun (marqueur et cause), puis
+# la conséquence de la nature. Natures brut_* (STATUTS_BRUT) : contrats d'une
+# même tête supposés indépendants, relevé tetes_multi_contrats ; autres
+# natures : décès sur-dispersés. tests : p-valeur ou statistique de test ;
+# intervalle ; tests, intervalle et brut_intervalle : sens de l'erreur établi
+# à attendus grands seulement (résultat asymptotique, Q-A (a)) ; credibilite :
+# intervalle bayésien de Laplace (bornes de wh_poisson), plus étroit à
+# ajustement donné que sous quasi-Poisson, sans conséquence établie sur la
+# couverture (#359, décision du mainteneur D-b (a) du 25/11/2026) ; variance :
+# variance sous-évaluée, objet exigé (ex. « Var(X2) »), seule nature qui en
+# prend un ; valeur_h0 : espérance ou variance sous H0 (i) dont le sens de
+# l'écart n'est pas établi ; niveau : test dont le sens de l'erreur n'est pas
+# établi ; ecart_minimal : theta_80 de l'homogénéité ; brut_variance :
+# variance de Kaplan-Meier ; contraste_segments : z de l'homogénéité par
+# segment, sans objet, sens de l'erreur sur V_ss selon que les contrats d'une
+# même tête sont ou non dans un même segment (#359, décision du mainteneur du
+# 25/11/2026, avis d'actuary à l'étape (9)). Définie dans le module brut, premier de ses
+# appelants (ORDRE_MODULES), appelée à l'installation par les tables de
+# statuts de brut, lissage, positionnement et validation ; chaîne non
+# marquée, comme les littéraux auxquels elle est collée (le texte_moteur() de
+# chaque table la marque).
+mention_independance <- function(nature, objet = NULL) {
+  natures <- c("tests", "intervalle", "credibilite", "variance", "valeur_h0", "niveau", "ecart_minimal",
+               "brut_intervalle", "brut_variance", "contraste_segments")
+  if (!is.character(nature) || length(nature) != 1L || !nature %in% natures)
+    stop("mention_independance() : nature inconnue (erreur de programmation).", call. = FALSE)
+  if (if (identical(nature, "variance")) !(is.character(objet) && length(objet) == 1L && !is.na(objet) && nzchar(objet))
+      else !is.null(objet))
+    stop("mention_independance() : objet exigé pour la nature variance, et pour elle seule (erreur de programmation).",
+         call. = FALSE)
+  consequence <- switch(nature,
+    tests = paste("les tests sont anti-conservateurs à attendus grands (résultat asymptotique), l'erreur de niveau",
+                  "étant de sens non établi en général à petits attendus"),
+    intervalle = paste("l'intervalle est trop étroit à attendus grands (résultat asymptotique), l'écart de",
+                       "couverture étant de sens non établi en général à petits attendus"),
+    credibilite = paste("l'intervalle, à ajustement donné, est plus étroit que sous un modèle de quasi-Poisson",
+                        "(demi-largeur sur l'échelle de theta divisée par la racine du facteur de sur-dispersion), sans",
+                        "conséquence établie sur la couverture"),
+    variance = paste(objet, "est sous-estimée"),
+    valeur_h0 = "la valeur sous H0 (i) diffère de celle de la loi réelle, dans un sens non établi en général",
+    niveau = "le niveau n'est plus garanti",
+    ecart_minimal = "theta_80 est trop proche de 1 (écart minimal détectable sous-estimé)",
+    brut_intervalle = paste("l'intervalle trop étroit à grand nombre attendu d'événements (résultat asymptotique),",
+                            "l'écart de couverture étant de sens non établi en général à petit nombre attendu"),
+    brut_variance = "la variance trop faible",
+    contraste_segments = paste("V_ss sous-estime la variance de O_s - A_s à attendus grands si les contrats d'une",
+                               "même tête sont dans un même segment (résultat asymptotique), dans un sens non",
+                               "établi en général à petits attendus, et peut la surestimer si des contrats d'une",
+                               "même tête sont dans des segments différents"))
+  prefixe <- "unités d'observation indépendantes ; sous l'unité contrat,"
+  if (startsWith(nature, "brut_"))
+    paste(prefixe, "les contrats d'une même tête sont supposés indépendants (une dépendance positive rend",
+          consequence, "; relevé tetes_multi_contrats de l'étape donnees)")
+  else paste(prefixe, "les décès sont sur-dispersés et", consequence)
+}
+
 # Statut de chaque grandeur restituée (A.1, A.3 ; E2.14, E2.20), une ligne par
 # (estimateur, grandeur, intervalle) ; « E^c fixe » et « E^i fixe » réservés
 # aux intervalles exacts (avis d'actuary sur la reprise de #14). Mention
 # d'indépendance des unités (#159) en fin de statut des seules lignes qui
 # affirment une loi (intervalles, variance ; marqueur commun « unités
 # d'observation indépendantes »), jamais sur une estimation ponctuelle ; la
-# ligne d'intervalle de Kaplan-Meier, qui l'écrit « indépendance des unités
-# d'observation », est inchangée ; loi_supposee n'en porte pas.
+# ligne d'intervalle de Kaplan-Meier porte la même mention (nature
+# brut_intervalle ; avis d'actuary sur #359, Q1) ; loi_supposee n'en porte pas.
 STATUTS_BRUT <- local({
-  indep_int <- paste(
-    "unités d'observation indépendantes ; sous l'unité contrat, les contrats d'une même tête sont",
-    "supposés indépendants (une dépendance positive rend l'intervalle trop étroit ; relevé",
-    "tetes_multi_contrats de l'étape donnees)")
-  indep_var <- paste(
-    "unités d'observation indépendantes ; sous l'unité contrat, les contrats d'une même tête sont",
-    "supposés indépendants (une dépendance positive rend la variance trop faible ; relevé",
-    "tetes_multi_contrats de l'étape donnees)")
+  indep_int <- mention_independance("brut_intervalle")
+  indep_var <- mention_independance("brut_variance")
   data.frame(
     estimateur = c(rep("poisson", 6L), rep("binomial", 3L), rep("kaplan_meier", 4L)),
     grandeur = c(rep("taux", 3L), rep("probabilite", 3L), rep("taux", 3L), "taux", "variance", "taux", "taux"),
@@ -171,10 +224,7 @@ STATUTS_BRUT <- local({
             "d'événement) ; non sans biais à effectif fini"),
       paste("asymptotique (méthode delta sur log P, ensemble à risque -> infini sur toute la cellule) ;",
             "non définie à q = 0 et q = 1 ;", indep_var),
-      paste("asymptotique (ensemble à risque -> infini sur toute la cellule), sous indépendance des",
-            "unités d'observation ; non défini à q = 0 et q = 1 ; sous l'unité contrat, les contrats",
-            "d'une même tête sont supposés indépendants (une dépendance positive rend l'intervalle trop",
-            "étroit ; relevé tetes_multi_contrats de l'étape donnees)"),
+      paste("asymptotique (ensemble à risque -> infini sur toute la cellule) ; non défini à q = 0 et q = 1 ;", indep_int),
       paste("aucun : non restitué (sous troncature et censure, D ne suit aucune loi binomiale)")),
     loi_supposee = c(
       rep(c("force constante dans la cellule (vraisemblance de survie, proportionnelle à celle de Poisson)",

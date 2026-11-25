@@ -334,7 +334,7 @@ local({
   for (c_ in cas) {
     r <- refus_de(ecrire_plan(c_[[3L]]))
     verifier(sprintf("ecrire_plan, refus : %s -> %s", c_[[1L]], c_[[2L]]),
-             if (is.null(r)) "aucun refus" else identical(r$motif, c_[[2L]]) || sprintf("motif %s", r$motif))
+             if (is.null(r)) "aucun refus" else if (identical(r$motif, c_[[2L]])) TRUE else sprintf("motif %s", r$motif))
   }
   verifier("ecrire_fiche, refus : objet construction entier (au lieu de x$fiche) -> serialisation_impossible",
            identical(refus_de(ecrire_fiche(structure(list(fiche = list()), class = "construction")))$motif,
@@ -392,8 +392,8 @@ local({
     en_memoire <- refus_de(valider_plan(mauvais[[n]]))
     importe <- refus_de(valider_plan(aller_retour_plan(mauvais[[n]])))
     verifier(sprintf("plan importé, %s : même refus que le plan en mémoire (motif et module)", n),
-             !is.null(en_memoire) && !is.null(importe) && identical(importe$motif, en_memoire$motif) &&
-               identical(importe$module, en_memoire$module) || sprintf("%s / %s", en_memoire$motif, importe$motif))
+             if (!is.null(en_memoire) && !is.null(importe) && identical(importe$motif, en_memoire$motif) &&
+                 identical(importe$module, en_memoire$module)) TRUE else sprintf("%s / %s", en_memoire$motif, importe$motif))
   }
   r <- refus_de(construire_table(BASE, ROLES, aller_retour_plan(mauvais$convention)))
   verifier("plan importé invalide : construire_table() le refuse comme en mémoire (valider_plan à l'entrée)",
@@ -452,7 +452,7 @@ local({
                        0:(length(corps) - 1L))
     verifier(sprintf("C1 : chacun des %d préfixes stricts du corps (%s), coupé à une frontière de ligne, refusé",
                      length(corps), nom),
-             !length(acceptes) || sprintf("préfixe(s) accepté(s) : %s lignes", paste(acceptes, collapse = ", ")))
+             if (!length(acceptes)) TRUE else sprintf("préfixe(s) accepté(s) : %s lignes", paste(acceptes, collapse = ", ")))
   }
   y <- list(a = list(list(), list(1, list(2, list())), list()), b = list(), c = list(list(list())))
   verifier("C1 : objet adverse (listes sans noms imbriquées, vides, en fin d'objet) : aller-retour identical()",
@@ -506,8 +506,8 @@ local({
   for (d in c(33L, 1000L)) {
     r <- tryCatch({ lire_plan(texte(d)); NULL }, refus_tablexp = function(e) e, error = function(e) e)
     verifier(sprintf("C3 : texte écrit à la main de profondeur %d -> texte_profondeur_excessive en ligne 35, sans erreur de pile", d),
-             inherits(r, "refus_tablexp") && identical(r$motif, "texte_profondeur_excessive") && identical(r$details$ligne, 35L) ||
-               if (is.null(r)) "aucun refus" else conditionMessage(r))
+             if (inherits(r, "refus_tablexp") && identical(r$motif, "texte_profondeur_excessive") && identical(r$details$ligne, 35L)) TRUE
+             else if (is.null(r)) "aucun refus" else conditionMessage(r))
   }
 })
 
@@ -645,8 +645,8 @@ local({
   }
   x <- construire_table(BASE, ROLES, plan_complet())
   verifier(sprintf("#50 : toutes les chaînes non ASCII de la fiche marquées UTF-8 (locale %s)", Sys.getlocale("LC_CTYPE")),
-           !length(non_ascii_non_utf8(x$fiche)) || sprintf("non marquées : %s", paste(utils::head(non_ascii_non_utf8(x$fiche), 3L),
-                                                                                       collapse = " | ")))
+           if (!length(non_ascii_non_utf8(x$fiche))) TRUE else sprintf("non marquées : %s", paste(utils::head(non_ascii_non_utf8(x$fiche), 3L),
+                                                                                                      collapse = " | ")))
   verifier("#50 : la fiche compte des chaînes non ASCII (témoin : le contrôle ci-dessus porte)",
            any(grepl("[^\001-\177]", chaines(x$fiche), useBytes = TRUE)))
   verifier("#50 : CONVENTIONS_TEXTE et BLOCS_LECTURE_FICHE (valeurs et noms) marqués UTF-8",
@@ -657,15 +657,15 @@ local({
              a <- NULL
              o <- withCallingHandlers(ecrire_fiche(xc$fiche), warning = function(w) { a <<- c(a, conditionMessage(w))
                                                                                       invokeRestart("muffleWarning") })
-             !length(non_ascii_non_utf8(xc$fiche)) && is.null(a) && identical(lire_fiche(o), xc$fiche) &&
-               identical(o, ecrire_fiche(x$fiche)) || if (length(a)) a[1L] else "fiche non marquée ou texte différent"
+             if (!length(non_ascii_non_utf8(xc$fiche)) && is.null(a) && identical(lire_fiche(o), xc$fiche) &&
+                 identical(o, ecrire_fiche(x$fiche))) TRUE else if (length(a)) a[1L] else "fiche non marquée ou texte différent"
            }))
   verifier("#50 : sous la locale C, ecrire_plan() sans avertissement (en-tête marqué UTF-8), mêmes octets",
            sous_locale_c({
              a <- NULL
              o <- withCallingHandlers(ecrire_plan(plan_complet()), warning = function(w) { a <<- c(a, conditionMessage(w))
                                                                                           invokeRestart("muffleWarning") })
-             is.null(a) && identical(o, ecrire_plan(plan_complet())) || if (length(a)) a[1L] else "octets différents"
+             if (is.null(a) && identical(o, ecrire_plan(plan_complet()))) TRUE else if (length(a)) a[1L] else "octets différents"
            }))
   # Données de l'utilisateur : refus inchangé (texte_moteur() ne les touche pas).
   inconnue <- rawToChar(as.raw(c(0x61, 0xc3, 0xa9)))
@@ -718,9 +718,9 @@ local({
     g1 <- gc()
     pic <- sum(g1[, match("max used", colnames(g1)) + 1L])
     verifier(sprintf("R1 d'audit : @longueur %s -> texte_longueur_incoherente en ligne 2, en moins d'1 s, pic gc sous 200 Mo", c_[[1L]]),
-             inherits(r, "refus_tablexp") && identical(r$motif, "texte_longueur_incoherente") &&
-               identical(r$details$ligne, 2L) && duree < 1 && pic < 200 ||
-               sprintf("%s ; %.2f s ; pic %.1f Mo", if (is.null(r)) "aucun refus" else conditionMessage(r), duree, pic))
+             if (inherits(r, "refus_tablexp") && identical(r$motif, "texte_longueur_incoherente") &&
+                 identical(r$details$ligne, 2L) && duree < 1 && pic < 200) TRUE
+             else sprintf("%s ; %.2f s ; pic %.1f Mo", if (is.null(r)) "aucun refus" else conditionMessage(r), duree, pic))
   }
   verifier("R1 d'audit : @longueur égal au reste du texte (2 éléments, 2 lignes) lu",
            identical(lire_plan(texte("2", 2L)), list(1, 1)))

@@ -136,19 +136,19 @@ verifier("A réponse de travail theta - 1 aux cellules exposées sans décès (r
   r <- lp(DS, E, 1e-6, 4, X, ldp(N, 4))
   ch <- tablexp:::choisir_lambda_poisson(DS, E, 4, X, c(1e-6, 1e8), ldp(N, 4))
   d <- numeric(N); d[20] <- 10
-  tous(list(identical(r$statut, "produite") || sprintf("statut %s", r$statut),
-            (is.null(ch$echec) && is.na(ch$borne)) || "lambda^ non intérieur ou échec",
-            isTRUE(proche(ch$ajustement$lambda, 371297.92, rel = 1e-6, abs = 0)) ||
-              sprintf("lambda^ = %.17g", ch$ajustement$lambda),
-            identical(lp(d, E, 1e3, 3, X, ldp(N, 3))$statut, "non_convergent") || "z = 3 : statut produit"))
+  tous(list(if (identical(r$statut, "produite")) TRUE else sprintf("statut %s", r$statut),
+            if (is.null(ch$echec) && is.na(ch$borne)) TRUE else "lambda^ non intérieur ou échec",
+            if (isTRUE(proche(ch$ajustement$lambda, 371297.92, rel = 1e-6, abs = 0))) TRUE
+            else sprintf("lambda^ = %.17g", ch$ajustement$lambda),
+            if (identical(lp(d, E, 1e3, 3, X, ldp(N, 3))$statut, "non_convergent")) TRUE else "z = 3 : statut produit"))
 })
 verifier("A lambda_a_la_borne (règle Q1 d'actuary) : lambda retenu = la borne déclarée elle-même, identical(), sans recherche de Brent ; borne inférieure : z = 1, [1e3, 1e12] ; borne supérieure : z = 2, [1e-6, 1e12] (point de Brent 969 106 641 493,46 retenu avant la règle) (identité exacte sur la règle)", {
   bas <- tablexp:::choisir_lambda_poisson(D, E, 1, X, c(1e3, 1e12), ldp(N, 1))
   haut <- tablexp:::choisir_lambda_poisson(D, E, 2, X, c(1e-6, 1e12), ldp(N, 2))
-  tous(list(identical(bas$borne, "inferieure") || sprintf("borne %s", bas$borne),
-            identical(bas$ajustement$lambda, 1e3) || sprintf("lambda = %.17g", bas$ajustement$lambda),
-            identical(haut$borne, "superieure") || sprintf("borne %s", haut$borne),
-            identical(haut$ajustement$lambda, 1e12) || sprintf("lambda = %.17g", haut$ajustement$lambda)))
+  tous(list(if (identical(bas$borne, "inferieure")) TRUE else sprintf("borne %s", bas$borne),
+            if (identical(bas$ajustement$lambda, 1e3)) TRUE else sprintf("lambda = %.17g", bas$ajustement$lambda),
+            if (identical(haut$borne, "superieure")) TRUE else sprintf("borne %s", haut$borne),
+            if (identical(haut$ajustement$lambda, 1e12)) TRUE else sprintf("lambda = %.17g", haut$ajustement$lambda)))
 })
 verifier("A exactement z cellules exposées, toutes à décès > 0 : statut produite, interpolation (leviers des cellules exposées à 1 à 1e-10 près), z = 1 à 4", {
   ok <- vapply(1:4, function(z) {
@@ -370,7 +370,7 @@ verifier("F lissage_systeme_rang_deficient sous wh_poisson : lambda = 1e20, z = 
 
 X1 <- construire_table(jeu(), ROLES, plan_l())
 L1 <- X1$etapes$lissage
-verifier("G etapes$lissage$parametres sous declare : paramètres du plan dans l'ordre du catalogue, puis convention, estimateur_brut (poisson), echelle_penalite (ln_mu), regle_force, hypothese, reference_methode, constantes (4 lignes), statuts (sans segments/parametre_lissage ; bornes de crédibilité sans constat de couverture versé, #246, suivi de la mention d'indépendance, nature intervalle, #329)", {
+verifier("G etapes$lissage$parametres sous declare : paramètres du plan dans l'ordre du catalogue, puis convention, estimateur_brut (poisson), echelle_penalite (ln_mu), regle_force, hypothese, reference_methode, constantes (4 lignes), statuts (sans segments/parametre_lissage ; bornes de crédibilité sans constat de couverture versé, #246, suivi de la mention d'indépendance, #329, nature credibilite, #359, D-b (a))", {
   p <- L1$parametres
   identical(names(p), c("methode", "plage_ages", "ordre_difference", "critere_lissage", "niveau", "parametre_lissage",
                         "convention", "estimateur_brut", "echelle_penalite", "regle_force", "hypothese",
@@ -384,8 +384,10 @@ verifier("G etapes$lissage$parametres sous declare : paramètres du plan dans l'
     all(endsWith(p$statuts$statut[p$statuts$grandeur %in% c("table_lissee/borne_inf_credibilite",
                                                              "table_lissee/borne_sup_credibilite")],
                  paste("couverture fréquentiste non établie (aucun constat de simulation versé) ; unités d'observation",
-                       "indépendantes ; sous l'unité contrat, les décès sont sur-dispersés et l'intervalle est trop",
-                       "étroit"))) &&
+                       "indépendantes ; sous l'unité contrat, les décès sont sur-dispersés et l'intervalle, à",
+                       "ajustement donné, est plus étroit que sous un modèle de quasi-Poisson (demi-largeur sur",
+                       "l'échelle de theta divisée par la racine du facteur de sur-dispersion), sans conséquence",
+                       "établie sur la couverture"))) &&
     !any(grepl("documenté", p$statuts$statut, fixed = TRUE))
 })
 XL <- construire_table(jeu(), ROLES, plan_l(lissage = LAML))

@@ -968,11 +968,12 @@ verifier("rapport (valeur calculée à la main) : section etape_importance_exclu
              function(m) grepl(m, h, fixed = TRUE), NA)) &&
     !grepl("Unité d'observation contrat, sans identifiant de tête", h, fixed = TRUE)
 })
-verifier("rapport (valeur calculée à la main) : unité contrat -> mention d'anti-conservatisme reprise (Q-c) ; plan sans l'étape -> « non demandée par le plan »", {
+verifier("rapport (valeur calculée à la main) : unité contrat -> mention validation_unite_contrat reprise en entier (Q-c ; sens de l'erreur propre à chaque grandeur, #361) ; plan sans l'étape -> « non demandée par le plan »", {
   h2 <- texte_rapport(X2)
   h0 <- texte_rapport(construire_table(T1, ROLES_SIM, local({ p <- plan_ie(); p$etapes$importance_exclusions <- NULL; p })))
   s <- regmatches(h2, regexpr("<section id=\"etape_importance_exclusions\">.*?</section>", h2))
-  length(s) == 1L && grepl("Unité d'observation contrat, sans identifiant de tête", s, fixed = TRUE) &&
+  m <- tablexp:::echapper_html(tablexp:::MENTIONS_RAPPORT[["validation_unite_contrat"]])
+  length(s) == 1L && grepl(paste0("<p>", m, "</p>"), s, fixed = TRUE) &&
     grepl("<p>Étape « importance_exclusions » : non demandée par le plan (chemin etapes/importance_exclusions absent de l'objet).</p>",
           h0, fixed = TRUE)
 })

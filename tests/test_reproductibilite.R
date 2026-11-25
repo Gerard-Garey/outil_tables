@@ -480,6 +480,28 @@ TRANSITIONS_EN_COURS <- list()
 # (exécution 45258747737, sur cac4b84) : transition_330(), apres_330(),
 # transition_329() et les constantes M_330, CONSEQUENCES_330,
 # NATURES_STATISTIQUES_330 et GRANDEURS_329 retirées.
+# Transitions #359 (mention d'indépendance qualifiée, résultat asymptotique, et
+# source unique mention_independance() : textes de statut de R1 à R17, 278
+# chaînes) et #361 (mention d'unité de l'hypothèse nulle de la validation,
+# R8, R9 et R10) closes par la régénération (R) de B37 (exécution
+# 45496372907, sur 8bc0117) : transition_359(), apres_359(), transition_361(),
+# apres_361() et les constantes P_359, B_359, R_359, D_359, TESTS_359,
+# SUBST_359, CHEMINS_359, SUBST_361 et CHEMIN_361 retirées.
+# Transitions #360 (état non calculable attendus_hors_plage du comparateur 2 de
+# importance_exclusions, R8, R9 et R10), #359 (conséquence de la mention
+# d'indépendance des deux bornes de crédibilité de wh_poisson, nature
+# credibilite, R16 et R17) et #361 (fin de l'avertissement unite_agregat alignée
+# sur la qualification de la mention d'indépendance, R13 et R17) de la revue
+# finale de B37 closes par la régénération (R′) de B37 (exécution 45591042044,
+# sur 2158990) : transition_360b(), transition_359b(), transition_361b() et les
+# constantes SUBST_360B, SUBST_359B, GRANDEURS_359B, SUBST_361B et CHEMINS_361B
+# retirées.
+
+# Transition #359 (nature contraste_segments de la mention d'indépendance de
+# segments/z de l'homogénéité, R11 et R12 ; validation de la documentation de
+# B37, étape (9), décision du mainteneur du 25/11/2026) close par la
+# régénération (R″) de B37 (exécution 45607820898, sur 8094e39) :
+# transition_359c() et la constante SUBST_359C retirées.
 
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
 CHAMPS_CHANGEMENT <- list(type = c("de", "vers"), valeur = c("valeurs", "positions"),
@@ -2973,7 +2995,7 @@ local({
                                                       refus_tablexp = function(e) e), "refus_tablexp"),
                        0:(length(corps) - 1L))
     verifier(sprintf("R1 : chacun des %d préfixes stricts du corps de la fiche écrite refusé par lire_fiche()", length(corps)),
-             !length(acceptes) || sprintf("préfixe(s) accepté(s) : %s lignes", paste(acceptes, collapse = ", ")))
+             if (!length(acceptes)) TRUE else sprintf("préfixe(s) accepté(s) : %s lignes", paste(acceptes, collapse = ", ")))
     b <- unlist(tablexp:::BLOCS_LECTURE_FICHE)
     # hypotheses_recette : champ conditionnel, absent sous la recette des
     # lignes (ADR 0016, point 8.1 ; #169).

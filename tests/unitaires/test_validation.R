@@ -702,11 +702,35 @@ verifier("rapport : plan sans validation -> « Étape « validation » : non dem
   h <- rawToChar(ecrire_rapport(x)); Encoding(h) <- "UTF-8"
   grepl("<p>Étape « validation » : non demandée par le plan (chemin etapes/validation absent de l'objet).</p>", h, fixed = TRUE)
 })
-verifier("rapport : unité contrat (sans id_tete) -> mention d'anti-conservatisme", {
+verifier("rapport : unité contrat (sans id_tete) -> mention validation_unite_contrat (sens de l'erreur propre à chaque grandeur, #361), en entier ; hypothèse nulle de l'objet égale à HYPOTHESE_VALIDATION", {
   x <- construire_table(JEU, ROLES[names(ROLES) != "id_tete"], plan_v(brut = FALSE), tables_reference = list(tv = T_HF))
   h <- rawToChar(ecrire_rapport(x)); Encoding(h) <- "UTF-8"
-  grepl("Unité d'observation contrat, sans identifiant de tête", h, fixed = TRUE)
+  m <- tablexp:::echapper_html(tablexp:::MENTIONS_RAPPORT[["validation_unite_contrat"]])
+  grepl(paste0("<p>", m, "</p>"), h, fixed = TRUE) &&
+    identical(x$etapes$validation$parametres$hypothese_nulle, tablexp:::HYPOTHESE_VALIDATION)
 })
+# Textes de #361 (spécification d'actuary-approfondi, commentaire 7137100694 ;
+# Q-A (a) : qualification asymptotique), mot pour mot.
+verifier("#361 HYPOTHESE_VALIDATION (littéral de la spécification) : mention d'unité renvoyant au sens de l'erreur propre à chaque grandeur, sans « anti-conservateurs » ni le préfixe de C1 (#359) ; marquée UTF-8",
+         identical(tablexp:::HYPOTHESE_VALIDATION, paste(
+           "H0 (i) : D_c ~ Poisson(A_c) indépendants, A_c = E^c_c mu~_c, mu~_c = -ln(1 - q~_c) ; exacte avec E^c tenue",
+           "pour fixe, asymptotique sous le modèle de survie (E^c aléatoire) ; unités d'observation indépendantes",
+           "(sous l'unité contrat, les décès sont sur-dispersés : sens de l'erreur propre à chaque grandeur, colonne",
+           "statut de etapes/validation/resultat/statistiques) ; cellule [x, x+1) de la convention",
+           "dernier_anniversaire.")) &&
+           !grepl("anti-conservat", tablexp:::HYPOTHESE_VALIDATION, fixed = TRUE) &&
+           !grepl("indépendantes ; sous l'unité contrat", tablexp:::HYPOTHESE_VALIDATION, fixed = TRUE) &&
+           identical(Encoding(tablexp:::HYPOTHESE_VALIDATION), "UTF-8"))
+verifier("#361 validation_unite_contrat (littéral de la spécification) : sur-dispersion phi, grandeurs faussées dès phi > 1, anti-conservatisme à attendus grands seulement (résultat asymptotique), sens non établi à petits attendus et pour les signes, les suites et Wilcoxon",
+         identical(unname(tablexp:::MENTIONS_RAPPORT[["validation_unite_contrat"]]), paste(
+           "Unité d'observation contrat, sans identifiant de tête (fiche/avertissement_unite) : la variance des décès",
+           "est sur-dispersée d'un facteur phi = somme k^2 E / somme k E >= 1 (k nombre de contrats d'une tête) ; dès",
+           "que phi > 1, les p-valeurs, intervalles et variances calculés sous l'hypothèse d'unités d'observation",
+           "indépendantes sont faussés. Le sens de l'erreur est propre à chaque grandeur (colonne statut du résultat de",
+           "l'étape) : à attendus grands (résultat asymptotique), les tests fondés sur la loi de Poisson des décès sont",
+           "anti-conservateurs (p-valeurs trop petites) et les intervalles trop étroits ; à petits attendus, ce sens",
+           "n'est pas établi en général, ni, à tout attendu, pour les tests des signes, des suites et de Wilcoxon. phi",
+           "n'est pas mesurable sans identifiant de tête.")))
 
 # --- période sans exposition, vide partiel et sous-groupes vides (#210, M399) -------
 

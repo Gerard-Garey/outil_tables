@@ -2088,7 +2088,7 @@ LOCALE_UTF8_131 <- locale_utf8_disponible()
 arbre_sous_locale <- function(racine, locale)
   executer_rscript(file.path(CONTROLES, COMMITS), c("arbre", "--racine", shQuote(racine)), env = paste0("LC_ALL=", locale))
 verifier("#131 : une locale UTF-8 est disponible pour les témoins (sinon la moitié des témoins ne porte pas)",
-         nzchar(LOCALE_UTF8_131) || "aucune locale de LOCALES_UTF8 acceptée par Sys.setlocale")
+         if (nzchar(LOCALE_UTF8_131)) TRUE else "aucune locale de LOCALES_UTF8 acceptée par Sys.setlocale")
 d_131 <- tempfile("racine_commits_131_")
 ATTENDU_131 <- temoin_131(d_131)
 if (!is.na(ATTENDU_131)) {

@@ -2451,17 +2451,22 @@ preparer_donnees <- function(donnees, roles, p, segmentation, exclusions, recett
 
 # Textes de l'avertissement unite_agregat (agrégats, Q4), par porteur de la
 # transition (TRANSITIONS$etat_de) ; textes visés par actuary (avis du
-# 08/11/2026 sur #169, point 3).
+# 08/11/2026 sur #169, point 3) ; fin révisée par #361 (décision du
+# mainteneur D-b (a) du 25/11/2026, avis d'actuary-approfondi).
 UNITE_AGREGAT <- c(
   tete = paste("Unité d'observation : non déterminée (agrégats : rien n'indique si les effectifs comptent des",
                "têtes ou des contrats) ; si l'agrégat compte des contrats, une tête titulaire de plusieurs",
                "contrats est comptée plusieurs fois, ce qui surestime l'exposition et peut compter plusieurs fois",
-               "un même décès ; les intervalles et les tests supposent des unités indépendantes et sont trop",
-               "étroits en cas de dépendance positive."),
+               "un même décès ; les intervalles et les tests supposent des unités indépendantes : en cas de",
+               "dépendance positive, ils sont faussés, dans un sens propre à chaque grandeur (colonne statut des",
+               "résultats ; à attendus grands, résultat asymptotique, intervalles de confiance trop étroits et tests",
+               "fondés sur la loi de Poisson anti-conservateurs)."),
   contrat = paste("Unité d'observation : non déterminée (agrégats : rien n'indique si les effectifs comptent des",
                   "contrats ou des têtes) ; la transition porte sur le contrat, des effectifs comptés en têtes ne",
-                  "lui conviennent pas ; les intervalles et les tests supposent des unités indépendantes et sont",
-                  "trop étroits en cas de dépendance positive entre contrats d'une même tête."))
+                  "lui conviennent pas ; les intervalles et les tests supposent des unités indépendantes : en cas",
+                  "de dépendance positive entre contrats d'une même tête, ils sont faussés, dans un sens propre à",
+                  "chaque grandeur (colonne statut des résultats ; à attendus grands, résultat asymptotique,",
+                  "intervalles de confiance trop étroits et tests fondés sur la loi de Poisson anti-conservateurs)."))
 
 # Avertissements des relevés de la recette `agregats` (§ 2 et § 6.3), sur les
 # cellules conservées, quand les deux expositions sont déclarées : E^i < E^c,

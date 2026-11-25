@@ -188,14 +188,18 @@ verifier("rapport figé sous les agrégats : mention d'unité non déterminée (
   n_nd == 3L && !grepl(esc(m[["validation_unite_contrat"]]), h, fixed = TRUE) &&
     grepl("fiche/hypotheses_recette", h, fixed = TRUE)
 })
-verifier("rapport figé : texte de validation_unite_non_determinee visé par actuary (événements, et non décès, sous toute transition)",
+verifier("rapport figé : texte de validation_unite_non_determinee visé par actuary (événements, et non décès, sous toute transition ; #361 : sens de l'erreur propre à chaque grandeur, anti-conservatisme à attendus grands seulement, résultat asymptotique)",
          identical(unname(tablexp:::MENTIONS_RAPPORT[["validation_unite_non_determinee"]]), paste(
            "Unité d'observation non déterminée (agrégats ; fiche/avertissement_unite) : si les effectifs comptent des",
            "contrats, les événements des contrats d'une même tête ne sont pas indépendants ; la variance des événements",
            "est sur-dispersée d'un facteur au plus phi = somme k^2 E / somme k E >= 1 (k nombre de contrats d'une tête),",
            "atteint quand les événements d'une tête sont simultanés, comme un décès compté sur chacun de ses contrats ;",
-           "les tests sont alors anti-conservateurs (p-valeurs trop petites, intervalles trop étroits) ; phi n'est pas",
-           "mesurable sur des agrégats.")))
+           "dès que la variance est sur-dispersée, les p-valeurs, intervalles et variances calculés sous l'hypothèse",
+           "d'unités d'observation indépendantes sont faussés. Le sens de l'erreur est propre à chaque grandeur (colonne",
+           "statut du résultat de l'étape) : à attendus grands (résultat asymptotique), les tests fondés sur la loi de",
+           "Poisson des événements sont anti-conservateurs (p-valeurs trop petites) et les intervalles trop étroits ; à",
+           "petits attendus, ce sens n'est pas établi en général, ni, à tout attendu, pour les tests des signes, des",
+           "suites et de Wilcoxon. phi n'est pas mesurable sur des agrégats.")))
 verifier("rapport figé : mention_unite() rend la mention contrat sous l'unité contrat, la mention non déterminée sous non_determinee, rien sous l'unité tête ou sans avertissement d'unité", {
   mu <- tablexp:::mention_unite
   m <- tablexp:::MENTIONS_RAPPORT
@@ -480,6 +484,25 @@ verifier("C4 unite_agregat sous une transition portée par le contrat : texte pr
   a <- x$avertissements
   identical(a$message[a$code == "unite_agregat"], tablexp:::UNITE_AGREGAT[["contrat"]]) &&
     grepl("la transition porte sur le contrat", tablexp:::UNITE_AGREGAT[["contrat"]], fixed = TRUE)
+})
+verifier("C4 unite_agregat, fin des deux textes (valeur écrite à la main ; #361, décision D-b (a) du 25/11/2026) : tests faussés dans un sens propre à chaque grandeur, renvoi à la colonne statut", {
+  # Échappements \u : octets UTF-8 sous toute locale.
+  q <- paste("(colonne statut des r\u00e9sultats ; \u00e0 attendus grands, r\u00e9sultat asymptotique, intervalles",
+             "de confiance trop \u00e9troits et tests fond\u00e9s sur la loi de Poisson anti-conservateurs).")
+  fins <- c(tete = paste("un m\u00eame d\u00e9c\u00e8s ; les intervalles et les tests supposent des unit\u00e9s",
+                         "ind\u00e9pendantes : en cas de d\u00e9pendance positive, ils sont fauss\u00e9s, dans un sens",
+                         "propre \u00e0 chaque grandeur", q),
+            contrat = paste("ne lui conviennent pas ; les intervalles et les tests supposent des unit\u00e9s",
+                            "ind\u00e9pendantes : en cas de d\u00e9pendance positive entre contrats d'une m\u00eame",
+                            "t\u00eate, ils sont fauss\u00e9s, dans un sens propre \u00e0 chaque grandeur", q))
+  # Comparaison en octets : sous la locale C, la constante peut être
+  # d'encodage « unknown » (octets UTF-8), qu'enc2utf8() ne traduit pas.
+  u <- tablexp:::UNITE_AGREGAT[c("tete", "contrat")]
+  ok <- vapply(names(fins), function(k) {
+    a <- charToRaw(u[[k]]); b <- charToRaw(fins[[k]])
+    length(a) >= length(b) && identical(a[(length(a) - length(b) + 1L):length(a)], b)
+  }, NA)
+  if (all(ok)) TRUE else paste("fin différente :", paste(names(fins)[!ok], collapse = ", "))
 })
 verifier("C4 ages_manquants sous par_annee (spécification, § 6.3, révisée par actuary) : trous de la plage d'âges de chaque (segment, année) ; une année absente n'est pas un trou", {
   d <- data.frame(age = c(60, 62, 60, 61, 65), annee = c(2016, 2016, 2017, 2017, 2019), ec = 1, d = 0)

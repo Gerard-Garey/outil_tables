@@ -18,7 +18,8 @@
 #  - apparier_table(), attendus_cellules() : grille des cellules de la plage
 #    (grille_plage(), module exposition ; ADR 0017, point 10.1), q~ apparié
 #    par clé exacte (sexe, âge), A = E^c mu~, mu~ = -log1p(-q~), état de
-#    chaque cellule ;
+#    chaque cellule ; PLAGE_ATTENDUS, plage de calcul des attendus, et
+#    hors_plage_attendus(), cellules qui en sortent (#360) ;
 #  - smr_poisson() : SMR et inférence de Poisson exacte et asymptotique ;
 #  - controler_parametres_positionnement() : paramètres de l'étape ; appelée
 #    par valider_plan() seule (#82) ;
@@ -185,9 +186,35 @@ apparier_table <- function(exposition, segmentation, par_annee, table, plage_age
                           else if (ensemble) "ensemble_par_sexe" else "par_sexe")
 }
 
+# Plage de calcul des attendus d'une cellule exposée à q~ > 0 (#360 ;
+# spécification d'actuary-approfondi, décision du mainteneur P1 (a) du
+# 24/11/2026) : [1e-100, 1e100]. Convention de plateforme, sans source
+# chiffrée, justifiée par majoration en double précision, pour D <= 2^31
+# (dénombrements rangés en integer) : (D - A)^2 < 1e201 ; D^2 / A < 5e118 ;
+# sous la relation positionnee, Ar = theta^ A > 4e-210, nombre normal ;
+# sommes finies sur moins de 2^31 cellules. Hors de la plage : refus
+# attendus_hors_plage (attendus_cellules()).
+PLAGE_ATTENDUS <- c(1e-100, 1e100)
+
+# Cellules exposées (E^c > 0) à q_x > 0 dont l'attendu A = E^c (-ln(1 - q_x))
+# sort de PLAGE_ATTENDUS (#360) ; même calcul, au bit près, que
+# attendus_cellules(), qui l'emploie. q_x = 1 avec E^c > 0 rend TRUE (A
+# infini) : l'appelant écarte ces cellules avant (taux_table_egal_un).
+hors_plage_attendus <- function(Ec, qx) {
+  A <- numeric(length(Ec))
+  e <- Ec > 0
+  A[e] <- Ec[e] * -log1p(-qx[e])
+  e & qx > 0 & !(A >= PLAGE_ATTENDUS[1L] & A <= PLAGE_ATTENDUS[2L])
+}
+
 # Attendus et états (M253, point 1) : mu~ = -log1p(-q~) ; A = E^c mu~, A = 0
 # si E^c = 0 (pas de 0 x Inf) ; refus taux_table_egal_un si q~ = 1 et E^c > 0,
-# sous le module de l'étape appelante `etape` (F2).
+# puis attendus_hors_plage si une cellule à E^c > 0 et q~ > 0 a un attendu
+# hors de PLAGE_ATTENDUS (#360 ; produit infini ou nul en double compris),
+# sous le module de l'étape appelante `etape` (F2). Après ces refus, A = 0
+# avec E^c > 0 n'a lieu qu'à q~ = 0 (taux_table_nul,
+# evenement_sous_taux_nul). Clé `cle` NULL (relation lissee : table
+# construite, aucune table lue) : le message nomme la table construite.
 # Rend list(taux_table, attendus, etat).
 attendus_cellules <- function(Ec, D, qx, cle, etape) {
   if (!(etape %in% ETAPES_TABLE)) stop("attendus_cellules() : étape inconnue (erreur de programmation).", call. = FALSE)
@@ -202,6 +229,23 @@ attendus_cellules <- function(Ec, D, qx, cle, etape) {
   A <- numeric(length(Ec))
   e <- Ec > 0
   A[e] <- Ec[e] * mu[e]
+  hors <- hors_plage_attendus(Ec, qx)
+  if (any(hors))
+    refuser(etape, "attendus_hors_plage",
+            if (is.null(cle))
+              formuler(paste("%s : %d cellule(s) exposée(s) dont l'attendu A = E^c (-ln(1 - q_x)) (table construite)",
+                             "sort de la plage de calcul du moteur [%g, %g] ; vérifier la colonne de l'exposition",
+                             "centrale et la table ; la construction est refusée."),
+                       if (identical(etape, "validation")) "Validation" else "Positionnement", sum(hors),
+                       PLAGE_ATTENDUS[1L], PLAGE_ATTENDUS[2L])
+            else
+              formuler(paste("%s : %d cellule(s) exposée(s) dont l'attendu A = E^c (-ln(1 - q_x)) (table de clé",
+                             "« %s ») sort de la plage de calcul du moteur [%g, %g] ; vérifier la colonne de",
+                             "l'exposition centrale et la table ; la construction est refusée."),
+                       if (identical(etape, "validation")) "Validation" else "Positionnement", sum(hors), citer(cle),
+                       PLAGE_ATTENDUS[1L], PLAGE_ATTENDUS[2L]),
+            list(cle = cle, cellules = sum(hors), limite_inferieure = PLAGE_ATTENDUS[1L],
+                 limite_superieure = PLAGE_ATTENDUS[2L]))
   etat <- rep("retenue", length(Ec))
   etat[!e & D == 0L] <- "sans_exposition"
   etat[!e & D > 0L] <- "evenement_sans_exposition"
@@ -262,7 +306,9 @@ PARAMETRES_ESTIMES_POSITIONNEMENT <- 1L
 ETATS_TABLE_POSITIONNEE <- c("produite", "taux_table_nul", "taux_table_egal_un", "qx_arrondi_un")
 # États d'une cellule, rendus par attendus_cellules() (M253, point 1 ; mêmes
 # valeurs, dans le même ordre, que ETATS_CELLULE_VALIDATION, module
-# validation, que ce module ne lit pas : graphe d'appels).
+# validation, que ce module ne lit pas : graphe d'appels) ; taux_table_nul et
+# evenement_sous_taux_nul : q~ = 0 avec E^c > 0 seulement (un produit E^c mu~
+# nul en double à q~ > 0 est refusé, attendus_hors_plage, #360).
 ETATS_CELLULE_POSITIONNEMENT <- c("retenue", "sans_exposition", "taux_table_nul", "evenement_sans_exposition",
                                   "evenement_sous_taux_nul")
 # Identité de la note de méthode (M244 ; spécification, § 7), dans
@@ -277,8 +323,7 @@ REFERENCE_METHODE_POSITIONNEMENT <- texte_moteur(paste(
 # colonnes ; chaque statut qui porte sur une loi se termine par la mention
 # d'indépendance des unités (M278, #159). Formules sans attribution (M200).
 STATUTS_POSITIONNEMENT <- local({
-  indep <- paste("unités d'observation indépendantes ; sous l'unité contrat, les décès sont sur-dispersés et",
-                 "l'intervalle est trop étroit")
+  indep <- mention_independance("intervalle")
   exact <- paste("exact sous la loi supposée (O ~ Poisson(theta A), A fixe), couverture >= niveau (intervalle exact",
                  "conservatif) ; asymptotique sous le modèle de survie ; qgamma, approximation numérique ;")
   asym <- paste("asymptotique (O -> infini) : ln theta^ de loi normale, de variance 1/O (inverse de l'information de",
@@ -352,9 +397,9 @@ controler_parametres_positionnement <- function(methode, table_reference, plage_
 # (valider_plan()), la table (contrôle 1.3) et les entrées
 # (controler_entrees_validation(), étape positionnement) une fois, dans
 # controler_entrees(). Refus en cours d'étape, dans l'ordre :
-# cellule_sans_valeur_table, taux_table_egal_un (apparier_table(),
-# attendus_cellules()) ; positionnement_sans_attendu (A_s = 0 : aucune
-# cellule retenue), puis positionnement_sans_deces (O_s = 0 : theta = 0
+# cellule_sans_valeur_table, taux_table_egal_un, attendus_hors_plage (#360)
+# (apparier_table(), attendus_cellules()) ; positionnement_sans_attendu
+# (A_s = 0 : aucune cellule retenue), puis positionnement_sans_deces (O_s = 0 : theta = 0
 # donnerait une table à mortalité nulle) (M289, Q2), chacun citant tous les
 # segments en défaut. Rend list(parametres, resultat (cellules, smr,
 # table_positionnee), diagnostics, avertissements). Aucune copie de la table

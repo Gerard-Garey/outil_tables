@@ -163,7 +163,8 @@ REFERENCE_METHODE_VALIDATION <- texte_moteur(paste(
 HYPOTHESE_VALIDATION <- texte_moteur(paste(
   "H0 (i) : D_c ~ Poisson(A_c) indépendants, A_c = E^c_c mu~_c, mu~_c = -ln(1 - q~_c) ; exacte avec E^c tenue",
   "pour fixe, asymptotique sous le modèle de survie (E^c aléatoire) ; unités d'observation indépendantes",
-  "(l'unité contrat rend les tests anti-conservateurs) ; cellule [x, x+1) de la convention",
+  "(sous l'unité contrat, les décès sont sur-dispersés : sens de l'erreur propre à chaque grandeur, colonne",
+  "statut de etapes/validation/resultat/statistiques) ; cellule [x, x+1) de la convention",
   "dernier_anniversaire."))
 # Hypothèse nulle sous la relation positionnee (spécification de #167, § 8).
 HYPOTHESE_VALIDATION_POSITIONNEE <- texte_moteur(paste(
@@ -171,8 +172,9 @@ HYPOTHESE_VALIDATION_POSITIONNEE <- texte_moteur(paste(
   "un par segment, estimé par theta^_s = O_s / A~_s (étape positionnement) ; attendus de la table positionnée",
   "A_c = theta^_s A~_c ; conditionnellement à O_s, statistique exhaustive de theta_s, (D_c) suit la loi",
   "multinomiale (O_s ; pi_c), pi_c = A~_c / A~_s (= A_c / A_s), libre de theta_s ; exacte avec E^c tenue pour fixe,",
-  "asymptotique sous le modèle de survie (E^c aléatoire) ; unités d'observation indépendantes (l'unité contrat",
-  "rend les tests anti-conservateurs) ; cellule [x, x+1) de la convention dernier_anniversaire."))
+  "asymptotique sous le modèle de survie (E^c aléatoire) ; unités d'observation indépendantes (sous l'unité contrat,",
+  "les décès sont sur-dispersés : sens de l'erreur propre à chaque grandeur, colonne statut de",
+  "etapes/validation/resultat/statistiques) ; cellule [x, x+1) de la convention dernier_anniversaire."))
 # Hypothèse nulle sous la relation lissee (#224, spécification de forme,
 # § 2) : aucune loi exacte.
 HYPOTHESE_VALIDATION_LISSEE <- texte_moteur(paste(
@@ -186,8 +188,9 @@ HYPOTHESE_VALIDATION_LISSEE <- texte_moteur(paste(
 # États d'une cellule (M253, point 1) : retenue (A > 0, dans C+) ;
 # sans_exposition (E^c = 0, D = 0) ; taux_table_nul (A = 0 avec E^c > 0, D =
 # 0) ; evenement_sans_exposition (E^c = 0, D > 0) ; evenement_sous_taux_nul
-# (A = 0 avec E^c > 0, D > 0). A = 0 avec E^c > 0 : q~ = 0, ou produit
-# E^c mu~ nul en double.
+# (A = 0 avec E^c > 0, D > 0). A = 0 avec E^c > 0 : q~ = 0 seulement ; un
+# produit E^c mu~ nul (ou infini) en double à q~ > 0 sort de PLAGE_ATTENDUS
+# et est refusé (attendus_hors_plage, attendus_cellules(), #360).
 ETATS_CELLULE_VALIDATION <- c("retenue", "sans_exposition", "taux_table_nul", "evenement_sans_exposition",
                               "evenement_sous_taux_nul")
 # États d'une grandeur (valeur NA hors `produite`).
@@ -237,34 +240,6 @@ PHRASES_ATTENDUS_FAIBLES <- list(
              "supérieure à 1 au-delà (maximum voisin de 1,16), par sommation des probabilités (approximation",
              "numérique) : la p asymptotique est trop grande ou trop petite selon la répartition des A_c ; seule",
              "p_monte_carlo a un niveau garanti sous H0 (i)"))
-
-# Mention d'indépendance des unités d'observation (#159), source unique de
-# la conséquence par nature de grandeur (#330, F330 ; spécification
-# d'actuary-approfondi, commentaire 7102990712 de #330) : préfixe commun
-# (marqueur et cause), puis la conséquence de la nature. tests : p-valeur ou
-# statistique de test ; intervalle ; variance : variance sous-évaluée, objet
-# exigé (ex. « Var(X2) »), seule nature qui en prend un ; valeur_h0 :
-# espérance ou variance sous H0 (i) dont le sens de l'écart n'est pas établi ;
-# niveau : test dont le sens de l'erreur n'est pas établi. Appelée par
-# STATUTS_VALIDATION, STATUTS_VALIDATION_POSITIONNEE et STATUTS_IMPORTANCE à
-# l'installation ; chaîne non marquée, comme les littéraux auxquels elle est
-# collée (le texte_moteur() de chaque table la marque).
-mention_independance <- function(nature, objet = NULL) {
-  natures <- c("tests", "intervalle", "variance", "valeur_h0", "niveau")
-  if (!is.character(nature) || length(nature) != 1L || !nature %in% natures)
-    stop("mention_independance() : nature inconnue (erreur de programmation).", call. = FALSE)
-  if (if (identical(nature, "variance")) !(is.character(objet) && length(objet) == 1L && !is.na(objet) && nzchar(objet))
-      else !is.null(objet))
-    stop("mention_independance() : objet exigé pour la nature variance, et pour elle seule (erreur de programmation).",
-         call. = FALSE)
-  consequence <- switch(nature,
-    tests = "les tests sont anti-conservateurs",
-    intervalle = "l'intervalle est trop étroit",
-    variance = paste(objet, "est sous-estimée"),
-    valeur_h0 = "la valeur sous H0 (i) diffère de celle de la loi réelle, dans un sens non établi en général",
-    niveau = "le niveau n'est plus garanti")
-  paste("unités d'observation indépendantes ; sous l'unité contrat, les décès sont sur-dispersés et", consequence)
-}
 
 # Statuts (E2.20) des grandeurs de resultat$statistiques, une ligne par
 # (statistique, grandeur), dans l'ordre du tableau ; sous_h0 : grandeur
@@ -971,10 +946,14 @@ replications_poisson <- function(A, B, graine, statistiques, elements_bloc = ELE
 # de programmation (#353) pour les appelants de l'homogénéité, qui tirent
 # sur des expositions dont le total est gardé à l'étape exposition
 # (LIMITE_SOMMES_DOUBLE, M579). L'appelant positionnee de
-# statistiques_validation() est hors de cette garde : il tire sur les
-# attendus Ar = theta^ E^c mu~, produits que LIMITE_SOMMES_DOUBLE ne couvre
-# pas (#360) ; sur ce chemin, l'erreur « poids ou effectifs invalides » peut
-# venir d'une entrée.
+# statistiques_validation() tire sur les attendus Ar = theta^ A, que
+# LIMITE_SOMMES_DOUBLE ne couvre pas : ils sont gardés par le refus
+# attendus_hors_plage (attendus_cellules(), #360). Chaque A retenu est dans
+# PLAGE_ATTENDUS = [1e-100, 1e100], theta^ = O_s / A_s avec O_s > 0
+# (positionnement_sans_deces) et A_s <= n 1e100 (n cellules) : Ar est
+# compris entre O_s 1e-100 / (n 1e100) et O_s, fini et positif. Sur ce chemin
+# aussi, l'erreur « poids ou effectifs invalides » est une erreur de
+# programmation.
 replications_multinomiales <- function(poids, groupe, effectifs, B, graine, statistiques,
                                        elements_bloc = ELEMENTS_BLOC_REPLICATIONS) {
   n <- length(poids)
@@ -1962,17 +1941,15 @@ ETATS_P_EXACTE_HOMOGENEITE <- c("produite", "plus_de_deux_groupes", "convolution
 # d'exposition infimes) ; z et theta_80 non définis ; aucun signal ; spécification
 # d'actuary-approfondi de #336, D8, et de #333, Q4, § 1) ; produite.
 ETATS_SEGMENTS_HOMOGENEITE <- c("produite", "segment_sans_exposition", "evenement_sans_exposition", "variance_nulle")
-# Mention d'indépendance des unités (M278, #159), en fin de chaque statut
-# d'une loi.
-INDEPENDANCE_HOMOGENEITE <- paste("unités d'observation indépendantes ; sous l'unité contrat, les décès sont",
-                                  "sur-dispersés et le test est anti-conservateur (p-valeurs trop petites)")
-# Hypothèse nulle (spécification de #168, § 1), dans les paramètres de l'étape.
+# Hypothèse nulle (spécification de #168, § 1), dans les paramètres de l'étape ;
+# mention d'indépendance des unités (M278, #159) de nature tests, comme en fin
+# de chaque statut d'une loi de STATUTS_HOMOGENEITE (#359, F359).
 HYPOTHESE_HOMOGENEITE <- texte_moteur(paste(
   "H0 : D_sc ~ Poisson(E_sc mu_c) indépendants, mu_c commun à tous les segments s dans chaque cellule c de la",
   "plage (âge, et année civile si par_annee), force constante sur la cellule, exposition centrale E tenue pour",
   "fixe ; conditionnellement à D_.c, (D_1c, ..., D_Sc) suit la loi multinomiale (D_.c ; pi_c), pi_sc =",
   "E_sc / E_.c, libre de mu_c ; test par variable : mêmes lois, strates cellule x modalité de l'autre variable,",
-  "groupes modalités de la variable testée ;", INDEPENDANCE_HOMOGENEITE))
+  "groupes modalités de la variable testée ;", mention_independance("tests")))
 # Référence de méthode (forme M209, E2.12) : source relue sur l'image le
 # 07/11/2026 (M290, M305) ; URL, SHA-256 des fichiers lus et pages
 # consignés, écarts de l'outil à la source nommés.
@@ -2073,15 +2050,14 @@ statut_ecart_minimal <- function(superieur) {
         "précision à cette tolérance, qu'elle soit ou non représentable (pivot de l'élimination non fini ou non",
         "positif, limite indéterminée (dont une part d'exposition arrondie à 0 dans une strate où le segment et un",
         "autre segment sont exposés), résolution non convergée, ou postcondition |lambda_s(theta_80) / lambda_80 -",
-        "1| <= 1e-8 non tenue) ; unités d'observation indépendantes ; sous l'unité contrat, les décès sont",
-        "sur-dispersés et theta_80 est trop proche de 1 (écart minimal détectable sous-estimé)")
+        "1| <= 1e-8 non tenue) ;", mention_independance("ecart_minimal"))
 }
 
 # Statuts (E2.20) des grandeurs de l'étape, par table du résultat (tests,
 # segments, ecart_minimal) ; spécification de #168, § 4 ; deux lignes de
 # ecart_minimal en fin (#218, spécification, § 7).
 STATUTS_HOMOGENEITE <- local({
-  ind <- INDEPENDANCE_HOMOGENEITE
+  ind <- mention_independance("tests")
   l <- list(
     c("tests", "strates_informatives",
       paste("décompte exact : strates (cellules ; cellule x modalité de l'autre variable pour un test par",
@@ -2141,7 +2117,8 @@ STATUTS_HOMOGENEITE <- local({
             "H0 (V_ss -> infini, même régime que p_asymptotique), E tenue pour fixe ; V_ss = somme des w_sk (k",
             "différent de s), sans soustraction ; U du groupe de référence de sa composante pris égal à moins la",
             "somme des U des autres groupes (identité exacte) ; aucune p-valeur produite ; calcul en arithmétique",
-            "flottante, approximation numérique ; aucune correction de multiplicité ;", ind)),
+            "flottante, approximation numérique ; aucune correction de multiplicité ;",
+            mention_independance("contraste_segments"))),
     c("ecart_minimal", "theta_80_superieur", statut_ecart_minimal(TRUE)),
     c("ecart_minimal", "theta_80_inferieur", statut_ecart_minimal(FALSE)))
   texte_moteur(data.frame(table = vapply(l, `[`, "", 1L), grandeur = vapply(l, `[`, "", 2L),
@@ -3348,13 +3325,14 @@ ETATS_IMPORTANCE <- texte_moteur(data.frame(
   etat = c("produite", "non_demandee_par_le_plan", "non_produite_par_cette_version", "aucune_ligne_mesurable",
            "cle_segmentation_manquante", "tete_indeterminee_apres_reintegration", "aucun_attendu",
            "observe_sans_attendu", "sans_exposition_retenue", "cellule_sans_valeur_table", "taux_table_egal_un",
-           "contrat_duplique_unite_contrat", "ddl_non_etabli"),
+           "attendus_hors_plage", "contrat_duplique_unite_contrat", "ddl_non_etabli"),
   libelle = c("produite", "non demandée par le plan", "non produite par cette version",
               "non calculable : aucune_ligne_mesurable", "non calculable : cle_segmentation_manquante",
               "non calculable : tete_indeterminee_apres_reintegration", "non calculable : aucun_attendu",
               "non calculable : observe_sans_attendu", "non calculable : sans_exposition_retenue",
               "non calculable : cellule_sans_valeur_table", "non calculable : taux_table_egal_un",
-              "non calculable : contrat_duplique_unite_contrat", "non calculable : ddl_non_etabli"),
+              "non calculable : attendus_hors_plage", "non calculable : contrat_duplique_unite_contrat",
+              "non calculable : ddl_non_etabli"),
   stringsAsFactors = FALSE))
 # Statuts (E2.20) des grandeurs de l'étape, par table du résultat.
 # Mention d'indépendance des unités (#159) sur les seules lignes de loi
@@ -3409,9 +3387,12 @@ STATUTS_IMPORTANCE <- local({
       paste("D_e / A, A = somme E^c_e mu~, mu~ = -ln(1 - q~) de la table de l'étape validation, sur sa plage_ages,",
             "appariement de l'étape validation, cellules à A > 0 ; O et A excluent les cellules hors plage",
             "(événements et E^c comptés à part) ; non calculable dès qu'une cellule retirée est sans valeur de table",
-            "(cellule_sans_valeur_table, prioritaire) ou à q~ = 1 avec E^c > 0 (taux_table_egal_un) : aucun agrégat",
-            "partiel, ces cellules et leurs événements restitués à part ; table par sexe au niveau A : contrefactuel",
-            "propre sans les lignes sexe_manquant et sexe_hors_modalites (non calculables)")),
+            "(cellule_sans_valeur_table), à q~ = 1 avec E^c > 0 (taux_table_egal_un) ou à q~ > 0 et E^c > 0",
+            "d'attendu hors de la plage de calcul du moteur",
+            sprintf("[%g, %g]", PLAGE_ATTENDUS[1L], PLAGE_ATTENDUS[2L]),
+            "(attendus_hors_plage), priorité dans cet ordre ; aucun agrégat partiel, ces cellules et leurs",
+            "événements restitués à part ; table par sexe au niveau A : contrefactuel propre sans les lignes",
+            "sexe_manquant et sexe_hors_modalites (non calculables)")),
     c("smr_comparateur_2", "bornes",
       paste("relation independante : bornes exactes, exact sous D_e ~ Poisson(theta A), A connu (table, E^c",
             "tenue pour fixe), qgamma, approximation numérique ; bornes asymptotiques, asymptotique (normal sur",
@@ -3571,6 +3552,13 @@ retrait_contrefactuel <- function(S, cles, ctx) {
   if (any(De < 0L) || any(Je < 0))
     stop("retrait_contrefactuel() : événements ou jours retirés négatifs (erreur de programmation).", call. = FALSE)
   Ee[Je == 0] <- 0
+  # Garde G2 (#360) : sous la recette en lignes, seule admise ici, les dates
+  # sont entières et bornées, le total de l'exposition centrale retirée est
+  # fini et majoré par LIMITE_SOMMES_DOUBLE (isTRUE() : une somme NaN lève
+  # aussi cette erreur, et non « missing value where TRUE/FALSE needed »).
+  if (!isTRUE(sum(Ee) <= LIMITE_SOMMES_DOUBLE))
+    stop("retrait_contrefactuel() : exposition centrale retirée hors de la plage de calcul (erreur de programmation).",
+         call. = FALSE)
   if (any(Je > 0 & !(Ee > 0)))
     stop("retrait_contrefactuel() : exposition centrale retirée non positive avec des jours retirés (erreur de programmation).",
          call. = FALSE)
@@ -3627,6 +3615,13 @@ smr_comparateur_1 <- function(ret, conservees, cles, par_annee, niveau) {
   etat_cel <- rep("sans_exposition_retenue", nrow(ret)); etat_cel[ok] <- "produite"
   ret$etat_cellule <- etat_cel
   O <- sum(as.numeric(ret$evenements_retires[ok])); A <- sum(att[ok])
+  rv <- if (is.finite(A) && A > 0) sum(ret$exposition_centrale_retiree[ok]^2 * mu[ok] / Er[ok]) / A else NA_real_
+  # Garde G1 (#360) : sous la recette en lignes, seule admise ici (dates
+  # entières et bornées), E <= 2^52 jours, E^c >= 1/366 par cellule exposée et
+  # D <= 2^31 : attendus et rapport de variance finis, le rapport inférieur à
+  # 4e79 (majoration exacte ; spécification d'actuary-approfondi de #360).
+  if (!is.finite(A) || (A > 0 && !is.finite(rv)))
+    stop("smr_comparateur_1() : attendus ou rapport de variance non finis (erreur de programmation).", call. = FALSE)
   tp <- taux_poisson(O, A, niveau)
   # Sommes d'événements rangées en integer (#199) : gardes défensives ; sous la
   # forme fenêtres, seule admise ici, le total est majoré par le nombre de lignes
@@ -3636,8 +3631,7 @@ smr_comparateur_1 <- function(ret, conservees, cles, par_annee, niveau) {
                     attendus = A, smr = tp$taux, borne_inf_exacte = tp$borne_inf_exacte,
                     borne_sup_exacte = tp$borne_sup_exacte, borne_inf_asymptotique = tp$borne_inf_asymptotique,
                     borne_sup_asymptotique = tp$borne_sup_asymptotique,
-                    rapport_variance = if (A > 0) sum(ret$exposition_centrale_retiree[ok]^2 * mu[ok] / Er[ok]) / A
-                                       else NA_real_,
+                    rapport_variance = rv,
                     cellules_sans_exposition_retenue = sum(!ok),
                     evenements_sans_exposition_retenue = denombrement_entier(
                       sum(as.numeric(ret$evenements_retires[!ok])), "importance_exclusions",
@@ -3653,15 +3647,18 @@ smr_comparateur_1 <- function(ret, conservees, cles, par_annee, niveau) {
 # sans valeur) et mêmes attendus (attendus_cellules()) ; O et A sur les
 # cellules à A > 0 ; cellules hors plage exclues de O et A, restituées à
 # part ; relation ajustee_hors_outil : bornes non produites. Tout ou rien
-# (avis d'actuary, C2) : une cellule retirée sans valeur de table (sexe
-# absent) ou à q~ = 1 avec E^c > 0 rend l'étape non calculable (O, A, SMR
-# et bornes NA, aucun agrégat partiel) ; les cellules à q~ = 1 sont écartées
-# avant attendus_cellules() (aucun refus taux_table_egal_un ici). Ordre des
-# états : cellule_sans_valeur_table l'emporte sur taux_table_egal_un, qui
-# l'emporte sur les états de taux_poisson(). Les décomptes des deux cas sont
-# toujours restitués.
+# (avis d'actuary, C2 ; étendu à attendus_hors_plage par l'avis
+# d'actuary-approfondi de la revue finale de B37, #360) : une cellule retirée
+# sans valeur de table (sexe absent), à q~ = 1 avec E^c > 0, ou exposée à
+# q~ > 0 d'attendu E^c mu~ hors de PLAGE_ATTENDUS rend l'étape non calculable
+# (O, A, SMR et bornes NA, aucun agrégat partiel) ; ces cellules sont écartées
+# avant attendus_cellules(), qui ne lève ici ni taux_table_egal_un ni
+# attendus_hors_plage. Ordre des états : cellule_sans_valeur_table, puis
+# taux_table_egal_un, puis attendus_hors_plage, puis les états de
+# taux_poisson(). Les décomptes des trois cas sont toujours restitués.
 smr_comparateur_2 <- function(ret, cles, par_annee, table, plage_ages, cle_table, relation_table, niveau) {
-  sans_valeur <- un <- 0L; ev_sans_valeur <- ev_un <- ev_sans_attendu <- ev_hors <- e_hors <- 0
+  sans_valeur <- un <- hors_att <- 0L
+  ev_sans_valeur <- ev_un <- ev_hors_att <- ev_sans_attendu <- ev_hors <- e_hors <- 0
   O <- 0; A <- 0
   if (nrow(ret)) {
     ex <- ret[c(cles, "age", if (isTRUE(par_annee)) "annee")]
@@ -3674,7 +3671,11 @@ smr_comparateur_2 <- function(ret, cles, par_annee, table, plage_ages, cle_table
     sans_valeur <- sum(sv & rempli); ev_sans_valeur <- sum(as.numeric(c_$evenements[sv]))
     q1 <- !sv & c_$qx_table == 1 & c_$exposition_centrale > 0
     un <- sum(q1); ev_un <- sum(as.numeric(c_$evenements[q1]))
-    g <- !sv & !q1
+    s <- !sv & !q1
+    hp <- logical(nrow(c_))
+    hp[s] <- hors_plage_attendus(c_$exposition_centrale[s], c_$qx_table[s])
+    hors_att <- sum(hp); ev_hors_att <- sum(as.numeric(c_$evenements[hp]))
+    g <- s & !hp
     at <- attendus_cellules(c_$exposition_centrale[g], c_$evenements[g], c_$qx_table[g], cle_table, "validation")
     r <- at$etat == "retenue"
     O <- sum(as.numeric(c_$evenements[g][r])); A <- sum(at$attendus[r])
@@ -3689,9 +3690,10 @@ smr_comparateur_2 <- function(ret, cles, par_annee, table, plage_ages, cle_table
                 stop("smr_comparateur_2() : relation sans comparateur 2 (erreur de programmation).", call. = FALSE))
   etat <- if (sans_valeur > 0L) "cellule_sans_valeur_table"
           else if (un > 0L) "taux_table_egal_un"
+          else if (hors_att > 0L) "attendus_hors_plage"
           else switch(tp$etat, defini = "produite", exposition_nulle = "aucun_attendu",
                       evenement_sans_exposition = "observe_sans_attendu")
-  nc <- etat %in% c("cellule_sans_valeur_table", "taux_table_egal_un")
+  nc <- etat %in% c("cellule_sans_valeur_table", "taux_table_egal_un", "attendus_hors_plage")
   b <- function(v) if (ind && !nc) v else NA_real_
   # Sommes d'événements rangées en integer (#199) : gardes défensives ; sous la
   # forme fenêtres, seule admise ici, le total est majoré par le nombre de lignes
@@ -3704,6 +3706,8 @@ smr_comparateur_2 <- function(ret, cles, par_annee, table, plage_ages, cle_table
        cellules_sans_valeur_table = sans_valeur,
        evenements_sans_valeur_table = ent(ev_sans_valeur, "evenements_sans_valeur_table"),
        cellules_taux_table_egal_un = un, evenements_taux_table_egal_un = ent(ev_un, "evenements_taux_table_egal_un"),
+       cellules_attendus_hors_plage = hors_att,
+       evenements_attendus_hors_plage = ent(ev_hors_att, "evenements_attendus_hors_plage"),
        evenements_sans_attendu = ent(ev_sans_attendu, "evenements_sans_attendu"),
        evenements_hors_plage = ent(ev_hors, "evenements_hors_plage"),
        exposition_centrale_hors_plage = e_hors, etat = etat,
@@ -3963,6 +3967,7 @@ calculer_importance_exclusions <- function(donnees, roles, etape_donnees, etape_
                   borne_sup_exacte = NA_real_, borne_inf_asymptotique = NA_real_, borne_sup_asymptotique = NA_real_,
                   cellules_sans_valeur_table = NA_integer_, evenements_sans_valeur_table = NA_integer_,
                   cellules_taux_table_egal_un = NA_integer_, evenements_taux_table_egal_un = NA_integer_,
+                  cellules_attendus_hors_plage = NA_integer_, evenements_attendus_hors_plage = NA_integer_,
                   evenements_sans_attendu = NA_integer_, evenements_hors_plage = NA_integer_,
                   exposition_centrale_hors_plage = NA_real_, etat = etat, etat_intervalle = etat)
       ligne_resultat(ens[i], nv, c(list(lignes_mesurables = length(S), lignes_non_calculables = n_cle), v,

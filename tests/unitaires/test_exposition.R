@@ -645,7 +645,7 @@ sous_ctype <- function(locale, expr) {
 }
 LOCALE_UTF8 <- locale_utf8_disponible()
 verifier("#106 : une locale UTF-8 est disponible pour les témoins (sinon la moitié des témoins ne porte pas)",
-         nzchar(LOCALE_UTF8) || "aucune locale de LOCALES_UTF8 acceptée par Sys.setlocale")
+         if (nzchar(LOCALE_UTF8)) TRUE else "aucune locale de LOCALES_UTF8 acceptée par Sys.setlocale")
 natif <- function(...) rawToChar(as.raw(c(...)))   # octets tels quels, encodage `unknown`
 SEG_NATIFS <- c(natif(0xc3, 0xa9), "b", natif(0xc2, 0xb0), "Z", natif(0xe2, 0x82, 0xac), natif(0xc3, 0xbf), "a")
 SEG_UTF8 <- SEG_NATIFS; Encoding(SEG_UTF8) <- "UTF-8"
