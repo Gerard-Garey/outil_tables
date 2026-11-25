@@ -580,6 +580,40 @@ transition_359b <- function(id) {
 }
 TRANSITIONS_EN_COURS <- c(TRANSITIONS_EN_COURS, lapply(c("R16", "R17"), transition_359b))
 
+# Transition #361 (B37, correction après revue finale ; décision du
+# mainteneur D-b (a) du 25/11/2026 ; spécification d'actuary-approfondi) :
+# fin de l'avertissement unite_agregat (UNITE_AGREGAT, porteur tête) alignée
+# sur la qualification de la mention d'indépendance, R13 et R17. Changement :
+# le texte de l'avertissement sur trois chemins, avertissements/message,
+# fiche/avertissement_unite et fiche/avertissements/message (texte après tiré
+# du texte avant de la référence par une substitution exacte, SUBST_361B, en
+# échappements \u, sans lire le package). Chemins disjoints de ceux de
+# transition_359b() (R17). Aucune autre chaîne ni valeur changée. À clore par
+# la régénération de B37, avec transition_361b() et les constantes *_361B.
+SUBST_361B <- c(
+  paste("les intervalles et les tests supposent des unit\u00e9s ind\u00e9pendantes et sont trop \u00e9troits en cas",
+        "de d\u00e9pendance positive."),
+  paste("les intervalles et les tests supposent des unit\u00e9s ind\u00e9pendantes : en cas de d\u00e9pendance",
+        "positive, ils sont fauss\u00e9s, dans un sens propre \u00e0 chaque grandeur (colonne statut des r\u00e9sultats ;",
+        "\u00e0 attendus grands, r\u00e9sultat asymptotique, intervalles de confiance trop \u00e9troits et tests fond\u00e9s",
+        "sur la loi de Poisson anti-conservateurs)."))
+# Marquage UTF-8 explicite, octets inchangés (voir SUBST_360B).
+Encoding(SUBST_361B) <- "UTF-8"
+CHEMINS_361B <- c("avertissements/message", "fiche/avertissement_unite", "fiche/avertissements/message")
+transition_361b <- function(id) {
+  ref <- lire_reference(file.path(DOSSIER_REFERENCES, paste0(id, ".tsv")))$valeurs
+  ch <- lapply(CHEMINS_361B, function(c_) {
+    v <- ref[[c_]]
+    k <- which(endsWith(v, SUBST_361B[1L]))
+    if (length(k) != 1L)
+      stop(sprintf("transition_361b() : %s, avertissement unite_agregat de la r\u00e9f\u00e9rence introuvable ou d\u00e9j\u00e0 modifi\u00e9 (r\u00e9f\u00e9rence d\u00e9j\u00e0 r\u00e9g\u00e9n\u00e9r\u00e9e ? retirer transition_361b() et les constantes *_361B)", c_))
+    list(chemin = c_, nature = "valeur de chaîne", valeurs = sub(SUBST_361B[1L], SUBST_361B[2L], v[k], fixed = TRUE),
+         positions = k)
+  })
+  list(issue = "#361", plans = id, changements = ch)
+}
+TRANSITIONS_EN_COURS <- c(TRANSITIONS_EN_COURS, lapply(c("R13", "R17"), transition_361b))
+
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
 CHAMPS_CHANGEMENT <- list(type = c("de", "vers"), valeur = c("valeurs", "positions"),
                           "valeur de chaîne" = c("valeurs", "positions"),
