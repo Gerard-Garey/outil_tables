@@ -1,4 +1,2 @@
 type,nom,issue,motif
-entree,fonctions-simulation:attribut_defauts,#238,assistant interne ajouté par #238 ; entrée de catalogue écrite par docwriter en fin de branche (règle 9)
-entree,fonctions-simulation:ligne_defauts,#238,assistant interne ajouté par #238 ; entrée de catalogue écrite par docwriter en fin de branche (règle 9)
 entree,fonctions-simulation:causes_nulles,#149,fonction interne ajoutée par #149 ; entrée de catalogue écrite par docwriter en fin de branche (règle 9)
