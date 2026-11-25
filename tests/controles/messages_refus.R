@@ -183,7 +183,7 @@ EXCEPTIONS <- exception_lignes(
   c("simulation.R", "controler_couverture", "cause", "cause du catalogue (names(CAUSES_SIMULEES))"),
   c("simulation.R", "controler_couverture", "s", "sexe du catalogue (MODALITES_SEXE)"),
   c("simulation.R", "controler_defauts", "paste(unique(vides[vide]), collapse = \" ; \")",
-    "raisons des conditions vides, formées par formuler() dans conditions_vides() (mode cité par citer() ; #112)")
+    "raisons des conditions vides, formées par formuler() dans conditions_vides() (mode cité par citer() ; #112 ; longueur de loi_contrats en %d et premier terme p_1 en %.17g, nombres du portefeuille validé ; #148)")
 )
 
 # Conversions d'un gabarit sprintf() (%% écarté) : vecteur des lettres de

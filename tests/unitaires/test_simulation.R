@@ -1611,6 +1611,60 @@ verifier("défauts : type de tête sur un seul contrat par tête, raison citée 
     grepl("aucune unité éligible par construction (un seul contrat par tête : mode « uniforme_multi », loi_contrats de longueur 1), quel que soit le tirage.",
           m_multi, fixed = TRUE)
 })
+# loi_contrats de longueur >= 2 dont la loi tirée donne K = 1 pour toute tête
+# (#148 ; ADR 0007, annotation du 25/11/2026, (c) 1 ; critère A1, M602 : m =
+# 1 ou p_1 >= 1, comparaison exacte en double). Valeur calculée à la main : K
+# = 1 si et seulement si u < F_1 = p_1 et runif() < 1. Critère (i) de la
+# spécification d'actuary-approfondi : 3 lois x 2 modes multi x 3 types de
+# tête x 3 valeurs (taux 0,5, nombre 0, nombre 1) -> refus defauts_invalides
+# avant tout tirage, sous graine du jeu NA (graine_invalide non atteint) et
+# sous graine valide, détails, raison exacte (p_1 en %.17g), aléa de
+# l'appelant inchangé. Avant #148 (e15d2a9) : jeu rendu à 0 éligible
+# (taux, nombre 0) ou refus defauts_ineligibles après tirage (nombre 1).
+LOIS_P1 <- list(list(c(1, 1e-13), "2", "1"), list(c(1, 0, 1e-13), "3", "1"),
+                list(c(1 + 5e-13, 1e-13), "2", "1.0000000000005"))
+PF_MULTI_148 <- list(uniforme_multi = PF_M_1E3, age_exact_multi = c(modifyList(PF_X, list(mode = "age_exact_multi")),
+                                                                    list(loi_contrats = c(0.6, 0.4))))
+raison_p1 <- function(mo, m, p1)
+  sprintf(paste("un seul contrat par tête : mode « %s », loi_contrats de longueur %s de premier terme",
+                "p_1 = %s, au moins égal à 1 (K = 1 pour toute tête)"), mo, m, p1)
+for (lp in LOIS_P1) for (mo in names(PF_MULTI_148)) for (ty in TYPES_TETE)
+  for (va in list(list(taux = 0.5), list(nombre = 0), list(nombre = 1))) {
+  set.seed(23L); avant <- globalenv()$.Random.seed
+  pf <- PF_MULTI_148[[mo]]; pf$loi_contrats <- lp[[1L]]
+  d_p1 <- list(graine = GRAINE_DEF, declarations = list(c(list(type = ty), va)))
+  e <- lapply(list(NA_integer_, GRAINE), function(g)
+    tryCatch(simuler(loi(), pf, PER, g, defauts = d_p1), refus_tablexp = function(r) r))
+  attendu <- sprintf("déclaration 1 : type %s : aucune unité éligible par construction (%s), quel que soit le tirage.",
+                     ty, raison_p1(mo, lp[[2L]], lp[[3L]]))
+  verifier(sprintf("défauts (#148) : %s, %s = %s, mode %s, loi_contrats = (%s) (p_1 >= 1, K = 1 pour toute tête) -> refus defauts_invalides avant tout tirage (graine du jeu NA non atteinte), détails, raison exacte, aléa de l'appelant inchangé",
+                   ty, names(va), format(va[[1L]]), mo, paste(vapply(lp[[1L]], format, "", digits = 17L), collapse = " ; ")),
+           all(vapply(e, function(r) inherits(r, "refus_tablexp") && identical(r$module, "simulation") &&
+             identical(r$motif, "defauts_invalides") &&
+             identical(r$details, list(parametre = "defauts$declarations", declaration = 1L)) &&
+             grepl(attendu, conditionMessage(r), fixed = TRUE), logical(1L))) &&
+             identical(globalenv()$.Random.seed, avant))
+}
+# Critère (ii) : cas limites admis. c(0, 1) : K = 2 pour toute tête. c(1 -
+# 1e-13, 1e-13) : p_1 < 1, non déclaré vide (limite A1, M602) ; sous la
+# résolution 2^-32 de runif(), K = 1 pour toute tête (constat), d'où un jeu
+# rendu à 0 éligible en taux et un refus defauts_ineligibles (après le
+# tirage du jeu propre) en nombre 1 : vide qui dépend du tirage.
+verifier("défauts (#148) : type de tête, loi_contrats = (0 ; 1) et (1 - 1e-13 ; 1e-13), deux modes multi -> admis avant tirage ; (0 ; 1) unités éligibles ; (1 - 1e-13 ; 1e-13) : taux 0,5 -> jeu à 0 éligible, nombre 1 -> defauts_ineligibles (limite A1 figée)", {
+  ok <- vapply(names(PF_MULTI_148), function(mo) {
+    pf0 <- PF_MULTI_148[[mo]]; pf0$loi_contrats <- c(0, 1)
+    pfl <- PF_MULTI_148[[mo]]; pfl$loi_contrats <- c(1 - 1e-13, 1e-13)
+    d <- function(va) list(graine = GRAINE_DEF, declarations = list(c(list(type = "tete_sexe_incoherent"), va)))
+    r0 <- simuler(loi(), pf0, PER, GRAINE, defauts = d(list(taux = 0.5)))
+    rl <- simuler(loi(), pfl, PER, GRAINE, defauts = d(list(taux = 0.5)))
+    el <- tryCatch(simuler(loi(), pfl, PER, GRAINE, defauts = d(list(nombre = 1))), refus_tablexp = function(r) r)
+    length(tablexp:::conditions_vides(mo, pf0, PER)) == 0L && length(tablexp:::conditions_vides(mo, pfl, PER)) == 0L &&
+      attr(r0, "defauts")$decomptes$declarations$eligibles > 0L &&
+      identical(attr(rl, "defauts")$decomptes$declarations$eligibles, 0L) &&
+      inherits(el, "refus_tablexp") && identical(el$motif, "defauts_ineligibles")
+  }, logical(1L))
+  all(ok)
+})
 verifier("défauts : controler_defauts() appelé à deux arguments (vides par défaut : aucune condition vide), déclaration de tête valide -> admise", {
   r <- tablexp:::controler_defauts(list(graine = 1L, declarations = list(list(type = "tete_sexe_incoherent", taux = 0.1))), 2L)
   identical(r$declarations[[1L]]$type, "tete_sexe_incoherent") && identical(r$declarations[[1L]]$taux, 0.1)
@@ -1681,6 +1735,141 @@ verifier("défauts : conditions_vides(), date_entree égale à la fin en mode ag
     identical(unname(v_fin[["entree_avant_fin"]]),
               "aucune entrée avant la fin de la période : date_entree « 2024-12-31 » égale à la fin « 2024-12-31 »")
 })
+# Table figée de conditions_vides() (#148, C5 du plan de B38 ; table de la
+# spécification d'actuary-approfondi sur #148 ; ADR 0007, annotation du
+# 25/11/2026, (d)) : appel direct, portefeuille validé par
+# controler_portefeuille() et forme validée par controler_forme(), comme dans
+# simuler_portefeuille() ; valeur exacte rendue (noms dans l'ordre, raisons).
+# Valeurs calculées à la main d'après la règle (c) de l'annotation. Chaque
+# cas : forme (lignes, agregats, stocks_successifs), libellé, mode,
+# portefeuille, période, forme brute (NULL : lignes), vecteur attendu. Les
+# cas « loi nulle » (#149) s'ajoutent à CAS_CV ; leurs conditions ou
+# exigences vidables, à VIDABLES_CV.
+PER_CV <- list(debut = D("2015-01-01"), fin = D("2017-12-31"))
+FIN_CV <- PER_CV$fin
+PER_CV_FIN <- list(debut = FIN_CV, fin = FIN_CV)
+PER_CV_VEILLE <- list(debut = FIN_CV - 1, fin = FIN_CV)
+PU_CV <- list(mode = "uniforme", n = 1000, proportion_hommes = 0.5, age_min = 30, age_max = 60, origine = D("2010-01-01"))
+PX_CV <- list(mode = "age_exact", n = 1000, proportion_hommes = 0.5, age = 60, date_entree = D("2012-03-01"))
+pf_cv <- function(base, mode, lc = NULL, ...) {
+  p <- modifyList(base, c(list(mode = mode), list(...)))
+  if (!is.null(lc)) p$loi_contrats <- lc
+  p
+}
+VIDE_CV <- stats::setNames(character(0), character(0))
+MODE_CV <- tablexp:::MODE_BASE
+tete_cv <- function(r) c(tete_multi = r, tete_multi_deces = r)
+r_base_cv <- function(mo) sprintf("un seul contrat par tête : mode « %s »", mo)
+r_long1_cv <- function(mo) sprintf("%s, loi_contrats de longueur 1", r_base_cv(mo))
+r_p1_cv <- function(mo, m, p1)
+  sprintf("%s, loi_contrats de longueur %d de premier terme p_1 = %s, au moins égal à 1 (K = 1 pour toute tête)",
+          r_base_cv(mo), m, p1)
+r_fin_cv <- function(champ) sprintf("aucune entrée avant la fin de la période : %s « 2017-12-31 » égale à la fin « 2017-12-31 »", champ)
+R_ANNEE_CV <- "aucune colonne annee dans les agrégats : par_annee = FALSE"
+r_grille_cv <- function(k) sprintf("grille de %d dates d'inventaire, moins de trois", k)
+FA_CV <- function(pa, unite = NULL) {
+  f <- list(nom = "agregats", transition = list(depart = "vivant", arrivee = "deces"), convention = "dernier_anniversaire",
+            par_annee = pa)
+  if (!is.null(unite)) f$unite_observation <- unite
+  f
+}
+fs_cv <- function(dates) list(nom = "stocks_successifs", inventaires = D(dates))
+G_CV <- list(`2` = c("2014-12-31", "2017-12-31"), `3` = c("2014-12-31", "2016-06-30", "2017-12-31"),
+             `4` = c("2014-12-31", "2015-12-31", "2016-12-31", "2017-12-31"))
+cas_cv <- function(forme_cas, libelle, mode, pf, per, forme, attendu)
+  list(forme_cas = forme_cas, libelle = libelle, mode = mode, pf = pf, per = per, forme = forme, attendu = attendu)
+CAS_CV <- c(
+  # Lignes, modes simples : un seul contrat par tête ; entrée = fin ; veille.
+  lapply(c("uniforme", "age_exact"), function(mo)
+    cas_cv("lignes", "ordinaire", mo, pf_cv(if (mo == "uniforme") PU_CV else PX_CV, mo), PER_CV, NULL,
+           tete_cv(r_base_cv(mo)))),
+  list(cas_cv("lignes", "origine = fin", "uniforme", pf_cv(PU_CV, "uniforme", origine = FIN_CV), PER_CV_FIN, NULL,
+              c(tete_cv(r_base_cv("uniforme")), entree_avant_fin = r_fin_cv("origine"))),
+       cas_cv("lignes", "date_entree = fin", "age_exact", pf_cv(PX_CV, "age_exact", date_entree = FIN_CV), PER_CV, NULL,
+              c(tete_cv(r_base_cv("age_exact")), entree_avant_fin = r_fin_cv("date_entree")))),
+  lapply(c("uniforme", "age_exact", "uniforme_multi", "age_exact_multi"), function(mo) {
+    unif <- MODE_CV[[mo]] == "uniforme"
+    pf <- if (unif) pf_cv(PU_CV, mo, if (mo != "uniforme") c(0.6, 0.4), origine = FIN_CV - 1)
+          else pf_cv(PX_CV, mo, if (mo != "age_exact") c(0.6, 0.4), date_entree = FIN_CV - 1)
+    cas_cv("lignes", "entrée = fin - 1", mo, pf, if (unif) PER_CV_VEILLE else PER_CV, NULL,
+           if (mo %in% c("uniforme", "age_exact")) tete_cv(r_base_cv(mo)) else VIDE_CV)
+  }),
+  # Lignes, modes multi.
+  unlist(lapply(c("uniforme_multi", "age_exact_multi"), function(mo) {
+    base <- if (MODE_CV[[mo]] == "uniforme") PU_CV else PX_CV
+    champ <- if (MODE_CV[[mo]] == "uniforme") "origine" else "date_entree"
+    per_fin <- if (MODE_CV[[mo]] == "uniforme") PER_CV_FIN else PER_CV
+    pf_fin <- pf_cv(base, mo, 1); pf_fin[[champ]] <- FIN_CV
+    list(cas_cv("lignes", "(0,6 ; 0,4)", mo, pf_cv(base, mo, c(0.6, 0.4)), PER_CV, NULL, VIDE_CV),
+         cas_cv("lignes", "1", mo, pf_cv(base, mo, 1), PER_CV, NULL, tete_cv(r_long1_cv(mo))),
+         cas_cv("lignes", "1 - 5e-13 (m = 1)", mo, pf_cv(base, mo, 1 - 5e-13), PER_CV, NULL, tete_cv(r_long1_cv(mo))),
+         cas_cv("lignes", "1 et entrée = fin", mo, pf_fin, per_fin, NULL,
+                c(tete_cv(r_long1_cv(mo)), entree_avant_fin = r_fin_cv(champ))),
+         cas_cv("lignes", "(0 ; 1)", mo, pf_cv(base, mo, c(0, 1)), PER_CV, NULL, VIDE_CV),
+         cas_cv("lignes", "(0,5 ; 0,5 ; 1e-13), p_3 tiré nul", mo, pf_cv(base, mo, c(0.5, 0.5, 1e-13)), PER_CV, NULL,
+                VIDE_CV),
+         cas_cv("lignes", "(1 ; 1e-13)", mo, pf_cv(base, mo, c(1, 1e-13)), PER_CV, NULL, tete_cv(r_p1_cv(mo, 2L, "1"))),
+         cas_cv("lignes", "(1 ; 0 ; 1e-13)", mo, pf_cv(base, mo, c(1, 0, 1e-13)), PER_CV, NULL,
+                tete_cv(r_p1_cv(mo, 3L, "1"))),
+         cas_cv("lignes", "(1 + 5e-13 ; 1e-13)", mo, pf_cv(base, mo, c(1 + 5e-13, 1e-13)), PER_CV, NULL,
+                tete_cv(r_p1_cv(mo, 2L, "1.0000000000005"))),
+         cas_cv("lignes", "(1 - 1e-13 ; 1e-13), limite A1", mo, pf_cv(base, mo, c(1 - 1e-13, 1e-13)), PER_CV, NULL,
+                VIDE_CV))
+  }), recursive = FALSE),
+  # Agrégats : la forme masque les conditions des lignes (un seul contrat par
+  # tête, entrée = fin).
+  list(cas_cv("agregats", "par_annee = FALSE", "uniforme", pf_cv(PU_CV, "uniforme"), PER_CV, FA_CV(FALSE),
+              c(annee = R_ANNEE_CV)),
+       cas_cv("agregats", "par_annee = TRUE", "uniforme", pf_cv(PU_CV, "uniforme"), PER_CV, FA_CV(TRUE), VIDE_CV),
+       cas_cv("agregats", "par_annee = TRUE, date_entree = fin", "age_exact", pf_cv(PX_CV, "age_exact", date_entree = FIN_CV),
+              PER_CV, FA_CV(TRUE), VIDE_CV),
+       cas_cv("agregats", "par_annee = FALSE", "uniforme_multi", pf_cv(PU_CV, "uniforme_multi", c(0.6, 0.4)), PER_CV,
+              FA_CV(FALSE, "contrat"), c(annee = R_ANNEE_CV)),
+       cas_cv("agregats", "par_annee = TRUE, loi_contrats = 1", "age_exact_multi", pf_cv(PX_CV, "age_exact_multi", 1),
+              PER_CV, FA_CV(TRUE, "tete"), VIDE_CV),
+       cas_cv("agregats", "par_annee = TRUE, (1 ; 1e-13)", "uniforme_multi", pf_cv(PU_CV, "uniforme_multi", c(1, 1e-13)),
+              PER_CV, FA_CV(TRUE, "contrat"), VIDE_CV)),
+  # Stocks successifs (modes simples) : grille de 2, 3, 4 dates.
+  lapply(names(G_CV), function(k)
+    cas_cv("stocks_successifs", sprintf("grille de %s dates", k), "uniforme", pf_cv(PU_CV, "uniforme"), PER_CV,
+           fs_cv(G_CV[[k]]), if (k == "2") c(grille_trois_dates = r_grille_cv(2L)) else VIDE_CV)),
+  list(cas_cv("stocks_successifs", "grille de 4 dates, date_entree = fin", "age_exact",
+              pf_cv(PX_CV, "age_exact", date_entree = FIN_CV), PER_CV, fs_cv(G_CV[["4"]]), VIDE_CV))
+)
+RENDUS_CV <- lapply(CAS_CV, function(k) {
+  p <- tablexp:::controler_portefeuille(k$pf, k$per)
+  f <- if (is.null(k$forme)) NULL else tablexp:::controler_forme(k$forme, p$mode, k$per$debut, k$per$fin)
+  if (is.null(f)) tablexp:::conditions_vides(p$mode, k$pf, k$per) else tablexp:::conditions_vides(p$mode, k$pf, k$per, f)
+})
+for (i in seq_along(CAS_CV)) {
+  k <- CAS_CV[[i]]
+  verifier(sprintf("conditions_vides() figée (#148) : forme %s, mode %s, %s -> %s", k$forme_cas, k$mode, k$libelle,
+                   if (length(k$attendu)) paste(names(k$attendu), collapse = ", ") else "aucune"),
+           identical(RENDUS_CV[[i]], k$attendu))
+}
+# Garde de couverture : conditions (et, après #149, exigences) que
+# conditions_vides() peut déclarer vides, par forme, lues dans le catalogue de
+# la forme (colonne condition, valeurs non vides) ; chacune a au moins un cas
+# vide et un cas non vide, et les noms rendus forment exactement cet ensemble.
+VIDABLES_CV <- lapply(tablexp:::DEFAUTS_FORMES, function(r) unique(r$catalogue$condition[nzchar(r$catalogue$condition)]))
+verifier("conditions_vides() figée (#148) : garde de couverture, ensembles des conditions par forme (lignes : entree_avant_fin, tete_multi, tete_multi_deces ; agrégats : annee ; stocks : grille_trois_dates)",
+         identical(lapply(VIDABLES_CV, sort),
+                   list(lignes = c("entree_avant_fin", "tete_multi", "tete_multi_deces"), agregats = "annee",
+                        stocks_successifs = "grille_trois_dates")))
+for (fo in names(VIDABLES_CV)) {
+  i_fo <- which(vapply(CAS_CV, function(k) k$forme_cas == fo, logical(1L)))
+  noms <- lapply(RENDUS_CV[i_fo], names)
+  verifier(sprintf("conditions_vides() figée (#148) : garde de couverture, forme %s : chaque condition a un cas vide et un cas non vide ; noms rendus = ensemble des conditions de la forme",
+                   fo),
+           length(i_fo) > 0L &&
+             all(vapply(VIDABLES_CV[[fo]], function(cd)
+               any(vapply(noms, function(n) cd %in% n, logical(1L))) &&
+                 any(vapply(noms, function(n) !(cd %in% n), logical(1L))), logical(1L))) &&
+             setequal(unlist(noms), VIDABLES_CV[[fo]]))
+}
+verifier("conditions_vides() figée (#148) : aucun nom de condition ne coïncide avec un nom de colonne des catalogues de défauts (ADR 0007, annotation du 25/11/2026, (d))",
+         !length(intersect(unlist(VIDABLES_CV),
+                           unlist(lapply(tablexp:::DEFAUTS_FORMES, function(r) names(r$catalogue))))))
 verifier("défauts : graine des défauts égale à celle du jeu (double puis integer) -> refus defauts_invalides, texte et détails d'actuary", {
   e1 <- tryCatch(simuler(loi(), PF_M_1E3, PER, GRAINE, defauts = list(graine = as.double(GRAINE), declarations = list(D1))),
                  refus_tablexp = function(e) e)
