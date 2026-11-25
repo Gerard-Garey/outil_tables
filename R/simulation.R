@@ -32,7 +32,9 @@
 #    lignes d'inventaire et d'événement sur une grille alignée sur la période,
 #    décomptes de la projection dans l'attribut `simulation`, sans tirage
 #    supplémentaire ni appel à `exposition` ; défauts propres aux stocks
-#    (DEFAUTS_FORMES, injecter_defauts_stocks() ; #191).
+#    (DEFAUTS_FORMES, injecter_defauts_stocks() ; #191) ;
+#  - attribut_defauts(), ligne_defauts() : construction unique de l'attribut
+#    `defauts` et du schéma `lignes` des trois injecteurs de défauts (#238).
 #
 #  Hypothèse de répartition dans l'année (A.2) : force constante par âge
 #  entier, dans l'échelle des années d'âge (A.0, T3 : une année d'âge de
@@ -949,6 +951,77 @@ tirer_defauts <- function(graine, decl, etat, eligibles, marquer) {
   list(eligibles = eligibles_n, retenues = retenues)
 }
 
+# Ligne du schéma `lignes` de l'attribut `defauts`, commun aux trois formes
+# (#238) : une ligne par couple (unité, motif), colonnes ligne (entier),
+# declaration (entier), defaut, unite, role, motif_attendu, refus_attendu et
+# premier_deces (Date, NA hors tete_observee_apres_deces). `cat_` : catalogue
+# de la forme ; motif et refus attendus lus à la ligne de `defaut` ; `unite`
+# et `role` : une valeur ou un vecteur de la longueur de `ligne` ; `premier` :
+# premier décès de la tête, NA par défaut ; `sans_motif` : rôles dont le motif
+# et le refus attendus sont NA (stocks : propagation, amendement A1 de #191 ;
+# aucun par défaut). `role`, `unite`, `defaut` et `premier` ont la longueur 1
+# ou la longueur de `ligne`, sinon erreur de programmation (aucun recyclage
+# silencieux). Appelé avec `ligne` vide et `defaut` vide, rend le schéma vide.
+ligne_defauts <- function(cat_, ligne, k, defaut, unite, role, premier = NULL, sans_motif = character(0)) {
+  n <- length(ligne)
+  longueurs <- c(role = length(role), unite = length(unite), defaut = length(defaut),
+                 premier = if (is.null(premier)) 1L else length(premier))
+  if (any(longueurs != 1L & longueurs != n))
+    stop(sprintf("ligne_defauts() : argument(s) %s de longueur différente de 1 et du nombre de lignes (erreur de programmation).",
+                 paste(names(longueurs)[longueurs != 1L & longueurs != n], collapse = ", ")), call. = FALSE)
+  i <- match(defaut, cat_$defaut)
+  role <- rep_len(role, n)
+  motif <- rep_len(cat_$motif_attendu[i], n); refus <- rep_len(cat_$refus_attendu[i], n)
+  if (length(sans_motif)) {
+    motif[role %in% sans_motif] <- NA_character_; refus[role %in% sans_motif] <- NA_character_
+  }
+  if (is.null(premier)) premier <- rep(NA_real_, n)
+  data.frame(ligne = as.integer(ligne), declaration = rep(as.integer(k), n),
+             defaut = rep_len(defaut, n), unite = rep_len(unite, n), role = role,
+             motif_attendu = motif, refus_attendu = refus,
+             premier_deces = structure(as.numeric(premier), class = "Date"), stringsAsFactors = FALSE)
+}
+
+# Attribut `defauts` d'un jeu altéré, construit une seule fois pour les trois
+# formes (#238 ; injecter_defauts(), injecter_defauts_agregats(),
+# injecter_defauts_stocks()). Champs communs, dans l'ordre : parametre
+# (`defauts` tel que reçu), graine, generateur, ordre_tirages et texte de
+# validité (`regles`, entrée de DEFAUTS_FORMES), validite (roles aux noms des
+# colonnes `roles`, periode, delai_declaration nul, texte, puis `validite`,
+# champs propres à la forme), lignes, decomptes (lignes_jeu_propre = `N`,
+# copies = `copies`, lignes = `n_lignes`, lignes_en_defaut, lignes_alterees,
+# declarations, puis `decomptes`, champs propres à la forme), puis, si
+# `retirees` n'est pas NULL, le champ retirees en fin (stocks successifs).
+# Ce qui reste propre à chaque forme est passé en argument, jamais aligné :
+# `n_lignes` (lignes de la table rendue : N + copies pour les lignes et les
+# agrégats ; lignes gardées + copies pour les stocks) ; `hors_defaut` (rôles
+# de `lignes` qui ne comptent pas dans lignes_en_defaut ; stocks :
+# propagation) ; `roles` (stocks : sans id_tete). `selection` : résultat de
+# tirer_defauts() ; `lignes` : schéma de ligne_defauts() ; ctl$declarations :
+# déclarations contrôlées.
+attribut_defauts <- function(defauts, ctl, regles, periode, roles, lignes, selection, N, copies, n_lignes,
+                             validite = list(), hors_defaut = character(0), decomptes = list(), retirees = NULL) {
+  decl <- ctl$declarations
+  res <- list(
+    parametre = defauts, graine = ctl$graine, generateur = GENERATEUR,
+    ordre_tirages = regles$ordre_tirages,
+    validite = c(list(roles = stats::setNames(roles, roles), periode = periode, delai_declaration = 0,
+                      texte = regles$validite), validite),
+    lignes = lignes,
+    decomptes = c(list(
+      lignes_jeu_propre = N, copies = copies, lignes = n_lignes,
+      lignes_en_defaut = length(unique(lignes$ligne[!(lignes$role %in% hors_defaut)])),
+      lignes_alterees = length(unique(lignes$ligne[lignes$role %in% c("alteree", "copie")])),
+      declarations = data.frame(declaration = seq_along(decl),
+                                defaut = vapply(decl, function(d) paste(d$type, collapse = " + "), character(1L)),
+                                unite = vapply(decl, `[[`, character(1L), "unite"),
+                                eligibles = selection$eligibles, retenues = lengths(selection$retenues),
+                                stringsAsFactors = FALSE)),
+      decomptes))
+  if (!is.null(retirees)) res <- c(res, list(retirees = retirees))
+  res
+}
+
 # Injecte les défauts dans le jeu propre `jeu` (data.frame de
 # simuler_portefeuille(), attribut `simulation`) : sélection sous un seul
 # sous_graine(ctl$graine) (ORDRE_TIRAGES_DEFAUTS), refus defauts_ineligibles
@@ -1006,7 +1079,6 @@ injecter_defauts <- function(jeu, ctl, defauts, periode) {
       if (d$unite == "ligne") alteree[r] <- TRUE else alteree[lignes_de(r)] <- TRUE
       alteree
     })
-  eligibles_n <- selection$eligibles
   retenues <- selection$retenues
 
   # Altérations déterministes, sur les valeurs du jeu propre.
@@ -1014,14 +1086,8 @@ injecter_defauts <- function(jeu, ctl, defauts, periode) {
   nai <- as.numeric(jeu$date_naissance); ent <- entree; sor <- as.numeric(jeu$date_sortie); cs <- cause
   copies <- integer(0)
   morceaux <- vector("list", length(decl))
-  ligne_df <- function(ligne, k, defaut, unite, role, premier = rep(NA_real_, length(ligne))) {
-    i <- match(defaut, cat_$defaut)
-    data.frame(ligne = as.integer(ligne), declaration = rep(as.integer(k), length(ligne)),
-               defaut = rep(defaut, length(ligne)), unite = rep(unite, length(ligne)), role = role,
-               motif_attendu = rep(cat_$motif_attendu[i], length(ligne)),
-               refus_attendu = rep(cat_$refus_attendu[i], length(ligne)),
-               premier_deces = structure(as.numeric(premier), class = "Date"), stringsAsFactors = FALSE)
-  }
+  ligne_df <- function(ligne, k, defaut, unite, role, premier = NULL)
+    ligne_defauts(cat_, ligne, k, defaut, unite, role, premier)
   for (k in seq_along(decl)) {
     d <- decl[[k]]; r <- retenues[[k]]
     if (d$unite == "ligne") {
@@ -1092,22 +1158,8 @@ injecter_defauts <- function(jeu, ctl, defauts, periode) {
                          cause_sortie = c(cs, cause[copies]), stringsAsFactors = FALSE)
   attr(resultat, "simulation") <- attr(jeu, "simulation")
   roles <- names(jeu)
-  attr(resultat, "defauts") <- list(
-    parametre = defauts, graine = ctl$graine, generateur = GENERATEUR,
-    ordre_tirages = regles$ordre_tirages,
-    validite = list(
-      roles = stats::setNames(roles, roles), periode = periode, delai_declaration = 0,
-      texte = regles$validite),
-    lignes = lignes,
-    decomptes = list(
-      lignes_jeu_propre = N, copies = length(copies), lignes = N + length(copies),
-      lignes_en_defaut = length(unique(lignes$ligne)),
-      lignes_alterees = length(unique(lignes$ligne[lignes$role %in% c("alteree", "copie")])),
-      declarations = data.frame(declaration = seq_along(decl),
-                                defaut = vapply(decl, function(d) paste(d$type, collapse = " + "), character(1L)),
-                                unite = vapply(decl, `[[`, character(1L), "unite"),
-                                eligibles = eligibles_n, retenues = lengths(retenues),
-                                stringsAsFactors = FALSE)))
+  attr(resultat, "defauts") <- attribut_defauts(defauts, ctl, regles, periode, roles, lignes, selection,
+                                                 N = N, copies = length(copies), n_lignes = N + length(copies))
   resultat
 }
 
@@ -1159,14 +1211,7 @@ injecter_defauts_agregats <- function(tab, ctl, defauts, periode, forme) {
   row.names(res) <- NULL
   expositions <- intersect(c("exposition_centrale", "exposition_initiale"), names(tab))
   n_annees <- composantes_date(periode$fin)$an - composantes_date(periode$debut)$an + 1L
-  ligne_df <- function(ligne, k, defaut, role) {
-    i <- match(defaut, cat_$defaut)
-    data.frame(ligne = as.integer(ligne), declaration = rep(as.integer(k), length(ligne)),
-               defaut = rep(defaut, length(ligne)), unite = rep("cellule", length(ligne)), role = role,
-               motif_attendu = rep(cat_$motif_attendu[i], length(ligne)),
-               refus_attendu = rep(cat_$refus_attendu[i], length(ligne)),
-               premier_deces = structure(rep(NA_real_, length(ligne)), class = "Date"), stringsAsFactors = FALSE)
-  }
+  ligne_df <- function(ligne, k, defaut, role) ligne_defauts(cat_, ligne, k, defaut, "cellule", role)
   n_copies <- 0L
   morceaux <- vector("list", length(decl))
   for (k in seq_along(decl)) {
@@ -1193,21 +1238,9 @@ injecter_defauts_agregats <- function(tab, ctl, defauts, periode, forme) {
 
   attr(res, "simulation") <- attr(tab, "simulation")
   roles <- names(tab)
-  attr(res, "defauts") <- list(
-    parametre = defauts, graine = ctl$graine, generateur = GENERATEUR,
-    ordre_tirages = regles$ordre_tirages,
-    validite = list(roles = stats::setNames(roles, roles), periode = periode, delai_declaration = 0,
-                    texte = regles$validite, convention = forme$convention, par_annee = forme$par_annee),
-    lignes = lignes,
-    decomptes = list(
-      lignes_jeu_propre = N, copies = length(copies), lignes = N + length(copies),
-      lignes_en_defaut = length(unique(lignes$ligne)),
-      lignes_alterees = length(unique(lignes$ligne[lignes$role %in% c("alteree", "copie")])),
-      declarations = data.frame(declaration = seq_along(decl),
-                                defaut = vapply(decl, function(d) paste(d$type, collapse = " + "), character(1L)),
-                                unite = vapply(decl, `[[`, character(1L), "unite"),
-                                eligibles = selection$eligibles, retenues = lengths(retenues),
-                                stringsAsFactors = FALSE)))
+  attr(res, "defauts") <- attribut_defauts(defauts, ctl, regles, periode, roles, lignes, selection,
+                                            N = N, copies = length(copies), n_lignes = N + length(copies),
+                                            validite = list(convention = forme$convention, par_annee = forme$par_annee))
   res
 }
 
@@ -1287,16 +1320,8 @@ injecter_defauts_stocks <- function(tab, ctl, defauts, periode, forme) {
 
   # Altérations déterministes, numérotation du jeu propre de la forme (copies :
   # N + 1, ..., renumérotées ensuite).
-  ligne_df <- function(ligne, k, defaut, role) {
-    i <- match(defaut, cat_$defaut)
-    role <- rep_len(role, length(ligne))
-    motif <- rep(cat_$motif_attendu[i], length(ligne)); refus <- rep(cat_$refus_attendu[i], length(ligne))
-    motif[role == "propagation"] <- NA_character_; refus[role == "propagation"] <- NA_character_
-    data.frame(ligne = as.integer(ligne), declaration = rep(as.integer(k), length(ligne)),
-               defaut = rep(defaut, length(ligne)), unite = rep(cat_$unite[i], length(ligne)), role = role,
-               motif_attendu = motif, refus_attendu = refus,
-               premier_deces = structure(rep(NA_real_, length(ligne)), class = "Date"), stringsAsFactors = FALSE)
-  }
+  ligne_df <- function(ligne, k, defaut, role)
+    ligne_defauts(cat_, ligne, k, defaut, cat_$unite[match(defaut, cat_$defaut)], role, sans_motif = "propagation")
   retire_df <- function(ligne, k, defaut) {
     i <- match(defaut, cat_$defaut)
     data.frame(ligne = as.integer(ligne), declaration = rep(as.integer(k), length(ligne)),
@@ -1310,7 +1335,7 @@ injecter_defauts_stocks <- function(tab, ctl, defauts, periode, forme) {
   morceaux <- vector("list", length(decl)); retraits <- vector("list", length(decl))
   for (k in seq_along(decl)) {
     t <- decl[[k]]$type; r <- retenues[[k]]
-    lu <- which(u %in% r)
+    lu <- if (t != "inventaire_perdu") which(u %in% r)
     rm <- integer(0); m <- ligne_df(integer(0), k, t, character(0))
     switch(t,
            sortie_non_renseignee = {
@@ -1384,25 +1409,13 @@ injecter_defauts_stocks <- function(tab, ctl, defauts, periode, forme) {
   attr(res, "simulation") <- attr(tab, "simulation")
   roles <- setdiff(names(tab), "id_tete")
   prop <- lignes$role == "propagation"
-  attr(res, "defauts") <- list(
-    parametre = defauts, graine = ctl$graine, generateur = GENERATEUR,
-    ordre_tirages = regles$ordre_tirages,
-    validite = list(roles = stats::setNames(roles, roles), periode = periode, delai_declaration = 0,
-                    texte = regles$validite, inventaires = forme$inventaires),
-    lignes = lignes,
-    decomptes = list(
-      lignes_jeu_propre = N, copies = length(copies), lignes = length(gardees) + length(copies),
-      lignes_en_defaut = length(unique(lignes$ligne[!prop])),
-      lignes_alterees = length(unique(lignes$ligne[lignes$role %in% c("alteree", "copie")])),
-      declarations = data.frame(declaration = seq_along(decl),
-                                defaut = vapply(decl, function(d) paste(d$type, collapse = " + "), character(1L)),
-                                unite = vapply(decl, `[[`, character(1L), "unite"),
-                                eligibles = selection$eligibles, retenues = lengths(retenues),
-                                stringsAsFactors = FALSE),
-      retirees = nrow(retirees),
-      lignes_propagation = sum(prop),
-      unites_propagation = length(unique(res$id_contrat[lignes$ligne[prop]])),
-      presents_sains = data.frame(date_inventaire = forme$inventaires, presents_sains = presents)),
+  attr(res, "defauts") <- attribut_defauts(
+    defauts, ctl, regles, periode, roles, lignes, selection,
+    N = N, copies = length(copies), n_lignes = length(gardees) + length(copies),
+    validite = list(inventaires = forme$inventaires), hors_defaut = "propagation",
+    decomptes = list(retirees = nrow(retirees), lignes_propagation = sum(prop),
+                     unites_propagation = length(unique(res$id_contrat[lignes$ligne[prop]])),
+                     presents_sains = data.frame(date_inventaire = forme$inventaires, presents_sains = presents)),
     retirees = retirees)
   res
 }

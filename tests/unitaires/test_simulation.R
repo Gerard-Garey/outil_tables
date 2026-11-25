@@ -1219,6 +1219,21 @@ verifier("défauts : lignes de l'attribut, colonnes (ligne, declaration, defaut,
            is.integer(lg$ligne) && is.integer(lg$declaration) && identical(class(lg$premier_deces), "Date") &&
            all(lg$role %in% c("alteree", "copie", "original", "tete")) &&
            identical(lg$motif_attendu, CATALOGUE_DEFAUTS$motif_attendu[match(lg$defaut, CATALOGUE_DEFAUTS$defaut)]))
+verifier("défauts (#238) : ligne_defauts() accepte les longueurs 1 et n pour role, unite, defaut, premier ; longueur 2 pour n = 3 : erreur de programmation",
+         {
+  ld <- function(...) tablexp:::ligne_defauts(CATALOGUE_DEFAUTS, 1:3, 1L, ...)
+  err <- function(expr) tryCatch({ force(expr); NA_character_ }, error = function(e) conditionMessage(e))
+  d1 <- ld("sexe_manquant", "ligne", "alteree")
+  dn <- ld(rep("sexe_manquant", 3L), rep("ligne", 3L), c("alteree", "copie", "alteree"), premier = c(1, NA, 3))
+  ko <- c(err(ld("sexe_manquant", "ligne", c("alteree", "copie"))), err(ld("sexe_manquant", c("ligne", "tete"), "alteree")),
+          err(ld(c("sexe_manquant", "sexe_manquant"), "ligne", "alteree")),
+          err(ld("sexe_manquant", "ligne", "alteree", premier = c(1, 2))))
+  nrow(d1) == 3L && identical(d1$role, rep("alteree", 3L)) && nrow(dn) == 3L &&
+    identical(dn$role, c("alteree", "copie", "alteree")) && identical(is.na(dn$premier_deces), c(FALSE, TRUE, FALSE)) &&
+    all(grepl("erreur de programmation", ko, fixed = TRUE)) &&
+    grepl("role", ko[1L], fixed = TRUE) && grepl("unite", ko[2L], fixed = TRUE) &&
+    grepl("defaut", ko[3L], fixed = TRUE) && grepl("premier", ko[4L], fixed = TRUE)
+})
 
 # Ordre des tirages rejoué (identité exacte) : éligibles recalculés d'après
 # le catalogue de la spécification (SPEC_DEFAUTS), disjonction comprise,
