@@ -487,132 +487,15 @@ TRANSITIONS_EN_COURS <- list()
 # 45496372907, sur 8bc0117) : transition_359(), apres_359(), transition_361(),
 # apres_361() et les constantes P_359, B_359, R_359, D_359, TESTS_359,
 # SUBST_359, CHEMINS_359, SUBST_361 et CHEMIN_361 retirées.
-
-# Transition #360 (B37, correction après revue finale ; décision du
-# mainteneur D-a (a) du 25/11/2026 ; spécification d'actuary-approfondi) :
-# état non calculable attendus_hors_plage du comparateur 2 de
-# importance_exclusions, R8, R9 et R10. Changements : parametres/etats
-# (état et libellé insérés après taux_table_egal_un, 13 -> 14 lignes) et
-# ligne smr_comparateur_2 / smr de parametres/statuts (texte après tiré du
-# texte avant de la référence par une substitution exacte, SUBST_360B, en
-# échappements \u, sans lire le package) ; sous R8 et R9 seuls (comparateur
-# 2 produit), par ajouts : colonnes cellules_attendus_hors_plage et
-# evenements_attendus_hors_plage de resultat/smr_comparateur_2 (après
-# evenements_taux_table_egal_un, @colonnes 23 -> 25). Aucune valeur
-# existante changée ; valeurs des ajouts lues sur l'objet (0 ou NA, mesuré).
-# À clore par la régénération de B37, avec transition_360b() et les
-# constantes *_360B.
-SUBST_360B <- c(
-  paste("(cellule_sans_valeur_table, prioritaire) ou \u00e0 q~ = 1 avec E^c > 0 (taux_table_egal_un) : aucun agr\u00e9gat",
-        "partiel"),
-  paste("(cellule_sans_valeur_table), \u00e0 q~ = 1 avec E^c > 0 (taux_table_egal_un) ou \u00e0 q~ > 0 et E^c > 0",
-        "d'attendu hors de la plage de calcul du moteur [1e-100, 1e+100] (attendus_hors_plage), priorit\u00e9 dans cet",
-        "ordre ; aucun agr\u00e9gat partiel"))
-# Marquage UTF-8 explicite, octets inchangés (voir le précédent de #218 :
-# sous la locale C, un littéral \u est d'encodage « unknown »).
-Encoding(SUBST_360B) <- "UTF-8"
-transition_360b <- function(id) {
-  ref <- lire_reference(file.path(DOSSIER_REFERENCES, paste0(id, ".tsv")))$valeurs
-  b <- "etapes/importance_exclusions/"
-  et <- paste0(b, "parametres/etats/"); st <- paste0(b, "parametres/statuts/")
-  etats <- ref[[paste0(et, "etat")]]; libelles <- ref[[paste0(et, "libelle")]]
-  if (length(etats) != 13L || "attendus_hors_plage" %in% etats)
-    stop("transition_360b() : 13 \u00e9tats sans attendus_hors_plage attendus dans la r\u00e9f\u00e9rence (r\u00e9f\u00e9rence d\u00e9j\u00e0 r\u00e9g\u00e9n\u00e9r\u00e9e ? retirer transition_360b() et les constantes *_360B)")
-  k <- which(ref[[paste0(st, "table")]] == "smr_comparateur_2" & ref[[paste0(st, "grandeur")]] == "smr")
-  avant <- ref[[paste0(st, "statut")]][k]
-  if (length(k) != 1L || !grepl(SUBST_360B[1L], avant, fixed = TRUE))
-    stop("transition_360b() : ligne smr_comparateur_2 / smr de la r\u00e9f\u00e9rence introuvable ou d\u00e9j\u00e0 modifi\u00e9e")
-  apres <- sub(SUBST_360B[1L], SUBST_360B[2L], avant, fixed = TRUE)
-  ch <- list(
-    list(chemin = paste0(et, "@lignes"), nature = "valeur", valeurs = 14),
-    list(chemin = paste0(et, "etat"), nature = "valeur de chaîne",
-         valeurs = append(etats, "attendus_hors_plage", match("taux_table_egal_un", etats))),
-    list(chemin = paste0(et, "libelle"), nature = "valeur de chaîne",
-         valeurs = append(libelles, "non calculable : attendus_hors_plage",
-                          match("non calculable : taux_table_egal_un", libelles))),
-    list(chemin = paste0(st, "statut"), nature = "valeur de chaîne", valeurs = apres, positions = k))
-  c2 <- paste0(b, "resultat/smr_comparateur_2/")
-  if (!is.null(ref[[paste0(c2, "@colonnes")]])) {
-    col <- ref[[paste0(c2, "@colonnes")]]
-    n <- ref[[paste0(c2, "@lignes")]]
-    ch <- c(ch, list(
-      list(chemin = paste0(c2, "@colonnes"), nature = "valeur de chaîne",
-           valeurs = append(col, c("cellules_attendus_hors_plage", "evenements_attendus_hors_plage"),
-                            match("evenements_taux_table_egal_un", col))),
-      list(chemin = paste0(c2, "cellules_attendus_hors_plage"), nature = "ajout", type = "integer", longueur = n),
-      list(chemin = paste0(c2, "evenements_attendus_hors_plage"), nature = "ajout", type = "integer", longueur = n)))
-  }
-  list(issue = "#360", plans = id, changements = ch)
-}
-TRANSITIONS_EN_COURS <- c(TRANSITIONS_EN_COURS, lapply(c("R8", "R9", "R10"), transition_360b))
-
-# Transition #359 (B37, correction après revue finale ; décision du
-# mainteneur D-b (a) du 25/11/2026 ; spécification d'actuary-approfondi) :
-# conséquence de la mention d'indépendance des deux bornes de crédibilité de
-# wh_poisson, nature intervalle -> credibilite, R16 et R17. Changement : les
-# deux lignes table_lissee/borne_inf_credibilite et borne_sup_credibilite de
-# etapes/lissage/parametres/statuts/statut (texte après tiré du texte avant
-# de la référence par une substitution exacte, SUBST_359B, en échappements
-# \u, sans lire le package). Aucune autre chaîne ni valeur changée. À clore
-# par la régénération de B37, avec transition_359b() et les constantes
-# *_359B.
-SUBST_359B <- c(
-  paste("les d\u00e9c\u00e8s sont sur-dispers\u00e9s et l'intervalle est trop \u00e9troit \u00e0 attendus grands",
-        "(r\u00e9sultat asymptotique), l'\u00e9cart de couverture \u00e9tant de sens non \u00e9tabli en g\u00e9n\u00e9ral \u00e0",
-        "petits attendus"),
-  paste("les d\u00e9c\u00e8s sont sur-dispers\u00e9s et l'intervalle, \u00e0 ajustement donn\u00e9, est plus \u00e9troit que",
-        "sous un mod\u00e8le de quasi-Poisson (demi-largeur sur l'\u00e9chelle de theta divis\u00e9e par la racine du",
-        "facteur de sur-dispersion), sans cons\u00e9quence \u00e9tablie sur la couverture"))
-# Marquage UTF-8 explicite, octets inchangés (voir SUBST_360B).
-Encoding(SUBST_359B) <- "UTF-8"
-GRANDEURS_359B <- c("table_lissee/borne_inf_credibilite", "table_lissee/borne_sup_credibilite")
-transition_359b <- function(id) {
-  ref <- lire_reference(file.path(DOSSIER_REFERENCES, paste0(id, ".tsv")))$valeurs
-  st <- "etapes/lissage/parametres/statuts/"
-  k <- match(GRANDEURS_359B, ref[[paste0(st, "grandeur")]])
-  avant <- ref[[paste0(st, "statut")]][k]
-  if (anyNA(k) || !all(endsWith(avant, SUBST_359B[1L])))
-    stop("transition_359b() : bornes de cr\u00e9dibilit\u00e9 de la r\u00e9f\u00e9rence introuvables ou d\u00e9j\u00e0 modifi\u00e9es (r\u00e9f\u00e9rence d\u00e9j\u00e0 r\u00e9g\u00e9n\u00e9r\u00e9e ? retirer transition_359b() et les constantes *_359B)")
-  apres <- sub(SUBST_359B[1L], SUBST_359B[2L], avant, fixed = TRUE)
-  list(issue = "#359", plans = id,
-       changements = list(list(chemin = paste0(st, "statut"), nature = "valeur de chaîne", valeurs = apres,
-                               positions = k)))
-}
-TRANSITIONS_EN_COURS <- c(TRANSITIONS_EN_COURS, lapply(c("R16", "R17"), transition_359b))
-
-# Transition #361 (B37, correction après revue finale ; décision du
-# mainteneur D-b (a) du 25/11/2026 ; spécification d'actuary-approfondi) :
-# fin de l'avertissement unite_agregat (UNITE_AGREGAT, porteur tête) alignée
-# sur la qualification de la mention d'indépendance, R13 et R17. Changement :
-# le texte de l'avertissement sur trois chemins, avertissements/message,
-# fiche/avertissement_unite et fiche/avertissements/message (texte après tiré
-# du texte avant de la référence par une substitution exacte, SUBST_361B, en
-# échappements \u, sans lire le package). Chemins disjoints de ceux de
-# transition_359b() (R17). Aucune autre chaîne ni valeur changée. À clore par
-# la régénération de B37, avec transition_361b() et les constantes *_361B.
-SUBST_361B <- c(
-  paste("les intervalles et les tests supposent des unit\u00e9s ind\u00e9pendantes et sont trop \u00e9troits en cas",
-        "de d\u00e9pendance positive."),
-  paste("les intervalles et les tests supposent des unit\u00e9s ind\u00e9pendantes : en cas de d\u00e9pendance",
-        "positive, ils sont fauss\u00e9s, dans un sens propre \u00e0 chaque grandeur (colonne statut des r\u00e9sultats ;",
-        "\u00e0 attendus grands, r\u00e9sultat asymptotique, intervalles de confiance trop \u00e9troits et tests fond\u00e9s",
-        "sur la loi de Poisson anti-conservateurs)."))
-# Marquage UTF-8 explicite, octets inchangés (voir SUBST_360B).
-Encoding(SUBST_361B) <- "UTF-8"
-CHEMINS_361B <- c("avertissements/message", "fiche/avertissement_unite", "fiche/avertissements/message")
-transition_361b <- function(id) {
-  ref <- lire_reference(file.path(DOSSIER_REFERENCES, paste0(id, ".tsv")))$valeurs
-  ch <- lapply(CHEMINS_361B, function(c_) {
-    v <- ref[[c_]]
-    k <- which(endsWith(v, SUBST_361B[1L]))
-    if (length(k) != 1L)
-      stop(sprintf("transition_361b() : %s, avertissement unite_agregat de la r\u00e9f\u00e9rence introuvable ou d\u00e9j\u00e0 modifi\u00e9 (r\u00e9f\u00e9rence d\u00e9j\u00e0 r\u00e9g\u00e9n\u00e9r\u00e9e ? retirer transition_361b() et les constantes *_361B)", c_))
-    list(chemin = c_, nature = "valeur de chaîne", valeurs = sub(SUBST_361B[1L], SUBST_361B[2L], v[k], fixed = TRUE),
-         positions = k)
-  })
-  list(issue = "#361", plans = id, changements = ch)
-}
-TRANSITIONS_EN_COURS <- c(TRANSITIONS_EN_COURS, lapply(c("R13", "R17"), transition_361b))
+# Transitions #360 (état non calculable attendus_hors_plage du comparateur 2 de
+# importance_exclusions, R8, R9 et R10), #359 (conséquence de la mention
+# d'indépendance des deux bornes de crédibilité de wh_poisson, nature
+# credibilite, R16 et R17) et #361 (fin de l'avertissement unite_agregat alignée
+# sur la qualification de la mention d'indépendance, R13 et R17) de la revue
+# finale de B37 closes par la régénération (R′) de B37 (exécution 45591042044,
+# sur 2158990) : transition_360b(), transition_359b(), transition_361b() et les
+# constantes SUBST_360B, SUBST_359B, GRANDEURS_359B, SUBST_361B et CHEMINS_361B
+# retirées.
 
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
 CHAMPS_CHANGEMENT <- list(type = c("de", "vers"), valeur = c("valeurs", "positions"),

@@ -11,29 +11,29 @@
 # plateforme : OPENBLAS_NUM_THREADS      : 1
 # plateforme : OMP_NUM_THREADS           : 1
 # plateforme consignée : Système                      : Ubuntu 22.04.5 LTS
-# plateforme consignée : Processeur                    : Intel(R) Xeon(R) 6975P-C
-# plateforme consignée : Drapeaux fma / avx2 / avx512f : fma : oui ; avx2 : oui ; avx512f : oui
+# plateforme consignée : Processeur                    : AMD EPYC 7763 64-Core Processor
+# plateforme consignée : Drapeaux fma / avx2 / avx512f : fma : oui ; avx2 : oui ; avx512f : non
 # plateforme consignée : glibc (libm)                  : glibc 2.35
 # plateforme consignée : ImageOS / ImageVersion (hôte): (non définie) / (non définie)
 # plateforme consignée : LC_COLLATE                    : en_US.UTF-8
 # plateforme consignée : Fuseau horaire                : Etc/UTC
 # plateforme consignée : java                          : absent
-# plateforme consignée : GITHUB_SHA                    : 8bc0117c9fb849357abbab0337a1409406c8fcf1
+# plateforme consignée : GITHUB_SHA                    : 21589901b056d542a2d917b576e05ee74a8308f8
 # fiche$versions/tablexp : 0.0.0.9000
 # fiche$versions/R : R version 4.3.3 (2024-02-29)
 # fiche$plateforme/sysname : Linux
-# fiche$plateforme/release : 7.0.0-1014-aws
+# fiche$plateforme/release : 7.0.0-1017-azure
 # fiche$plateforme/machine : x86_64
 # fiche$plateforme/blas : /usr/lib/x86_64-linux-gnu/blas/libblas.so.3.10.0
 # fiche$plateforme/lapack : /usr/lib/x86_64-linux-gnu/lapack/liblapack.so.3.10.0
 # fiche$plateforme/bibliotheque_c : glibc 2.35
-# fiche$empreintes/resultat : 93b9e140b5e7b46e487685537f07caac
-# fiche$empreintes/code : e9e5be2eff26139b4c39a37d38f59de3
-# commit : 8bc0117c9fb849357abbab0337a1409406c8fcf1
-# execution : 45496372907
-# adresse : https://github.com/Gerard-Garey/outil_tables/actions/runs/45496372907
+# fiche$empreintes/resultat : d2b5edc483ed5118b00841df7a5d7f3b
+# fiche$empreintes/code : b48c4f312dc9a903865e058b2fd5d3bd
+# commit : 21589901b056d542a2d917b576e05ee74a8308f8
+# execution : 45591042044
+# adresse : https://github.com/Gerard-Garey/outil_tables/actions/runs/45591042044
 # mode : regeneration
-# date : 2026-11-24 21:58:59 UTC
+# date : 2026-11-25 10:02:30 UTC
 # empreinte des données : 503cd121f13f6e73f86bf4841e8527e0
 @classe	character	1	"construction"
 @noms	character	4	"table"	"etapes"	"avertissements"	"fiche"
@@ -203,7 +203,7 @@ etapes/lissage/parametres/constantes/origine	character	4	"non tirée de la sourc
 etapes/lissage/parametres/statuts/@colonnes	character	2	"grandeur"	"statut"
 etapes/lissage/parametres/statuts/@lignes	integer	1	11
 etapes/lissage/parametres/statuts/grandeur	character	11	"table_lissee/qx"	"table_lissee/levier"	"table_lissee/borne_inf_credibilite"	"table_lissee/borne_sup_credibilite"	"regle_force"	"segments/ddl_effectifs"	"segments/regularite"	"segments/laml"	"segments/deviance_penalisee"	"segments/residu_conservation_0"	"segments/residu_conservation_1"
-etapes/lissage/parametres/statuts/statut	character	11	"-expm1(-exp(theta^)), theta^ maximum de la vraisemblance de Poisson pénalisée (mode a posteriori), caractérisation exacte ; valeur calculée par l'algorithme itératif arrêté sur la déviance pénalisée, approximation numérique ; aucune propriété fréquentiste revendiquée"	"approximation numérique : élément diagonal de la matrice de lissage à la convergence, m^_i V_ii, V = (W + lambda K'K)^-1, W = Diag(m^) au maximum (résolution QR, R base) ; dans [0, 1] en arithmétique exacte, égal à 1 seulement dans un segment qui compte exactement z cellules exposées ; 0 exactement sur une cellule sans exposition ; somme sur le segment = ddl_effectifs"	"intervalles bayésiens asymptotiques (approximation de Laplace), conditionnels au paramètre de lissage retenu : theta^ ± z_alpha sqrt(diag((W + P)^-1)), z_alpha quantile d'ordre (1 + niveau) / 2 de la loi normale, image par q = 1 - exp(-exp(theta)) ; ce ne sont pas des intervalles de confiance ; couverture fréquentiste non établie (aucun constat de simulation versé) ; unités d'observation indépendantes ; sous l'unité contrat, les décès sont sur-dispersés et l'intervalle est trop étroit à attendus grands (résultat asymptotique), l'écart de couverture étant de sens non établi en général à petits attendus"	"intervalles bayésiens asymptotiques (approximation de Laplace), conditionnels au paramètre de lissage retenu : theta^ ± z_alpha sqrt(diag((W + P)^-1)), z_alpha quantile d'ordre (1 + niveau) / 2 de la loi normale, image par q = 1 - exp(-exp(theta)) ; ce ne sont pas des intervalles de confiance ; couverture fréquentiste non établie (aucun constat de simulation versé) ; unités d'observation indépendantes ; sous l'unité contrat, les décès sont sur-dispersés et l'intervalle est trop étroit à attendus grands (résultat asymptotique), l'écart de couverture étant de sens non établi en général à petits attendus"	"transformation exacte sous la force constante par âge entier, qui est l'hypothèse de l'estimateur poisson d'entrée ; q = -expm1(-mu^), mu^ relu par -log1p(-q) à quelques unités de dernier rang près (sauf q arrondi à 1, état qx_arrondi_un)"	"trace de (W + P)^-1 W, W à la convergence ; définition du cas normal transposée ; approximation numérique"	"descriptif, arithmétique flottante : somme des (Delta^z theta^)^2, échelle ln mu"	"approximation de Laplace de la vraisemblance marginale (Biessy, § 5.4, p. 19), exacte dans le seul cas normal ; valeur calculée au maximum approché, approximation numérique ; log-vraisemblance de la source (§ 4.1), sans le terme - somme des ln D! (constant en lambda)"	"valeur de la déviance pénalisée en theta^ calculé (minimum approché), approximation numérique"	"nuls à la convergence près : somme de (m^ - D) par l'équation du score (P 1 = 0) ; somme de x (m^ - D) pour z >= 2"	"nuls à la convergence près : somme de (m^ - D) par l'équation du score (P 1 = 0) ; somme de x (m^ - D) pour z >= 2"
+etapes/lissage/parametres/statuts/statut	character	11	"-expm1(-exp(theta^)), theta^ maximum de la vraisemblance de Poisson pénalisée (mode a posteriori), caractérisation exacte ; valeur calculée par l'algorithme itératif arrêté sur la déviance pénalisée, approximation numérique ; aucune propriété fréquentiste revendiquée"	"approximation numérique : élément diagonal de la matrice de lissage à la convergence, m^_i V_ii, V = (W + lambda K'K)^-1, W = Diag(m^) au maximum (résolution QR, R base) ; dans [0, 1] en arithmétique exacte, égal à 1 seulement dans un segment qui compte exactement z cellules exposées ; 0 exactement sur une cellule sans exposition ; somme sur le segment = ddl_effectifs"	"intervalles bayésiens asymptotiques (approximation de Laplace), conditionnels au paramètre de lissage retenu : theta^ ± z_alpha sqrt(diag((W + P)^-1)), z_alpha quantile d'ordre (1 + niveau) / 2 de la loi normale, image par q = 1 - exp(-exp(theta)) ; ce ne sont pas des intervalles de confiance ; couverture fréquentiste non établie (aucun constat de simulation versé) ; unités d'observation indépendantes ; sous l'unité contrat, les décès sont sur-dispersés et l'intervalle, à ajustement donné, est plus étroit que sous un modèle de quasi-Poisson (demi-largeur sur l'échelle de theta divisée par la racine du facteur de sur-dispersion), sans conséquence établie sur la couverture"	"intervalles bayésiens asymptotiques (approximation de Laplace), conditionnels au paramètre de lissage retenu : theta^ ± z_alpha sqrt(diag((W + P)^-1)), z_alpha quantile d'ordre (1 + niveau) / 2 de la loi normale, image par q = 1 - exp(-exp(theta)) ; ce ne sont pas des intervalles de confiance ; couverture fréquentiste non établie (aucun constat de simulation versé) ; unités d'observation indépendantes ; sous l'unité contrat, les décès sont sur-dispersés et l'intervalle, à ajustement donné, est plus étroit que sous un modèle de quasi-Poisson (demi-largeur sur l'échelle de theta divisée par la racine du facteur de sur-dispersion), sans conséquence établie sur la couverture"	"transformation exacte sous la force constante par âge entier, qui est l'hypothèse de l'estimateur poisson d'entrée ; q = -expm1(-mu^), mu^ relu par -log1p(-q) à quelques unités de dernier rang près (sauf q arrondi à 1, état qx_arrondi_un)"	"trace de (W + P)^-1 W, W à la convergence ; définition du cas normal transposée ; approximation numérique"	"descriptif, arithmétique flottante : somme des (Delta^z theta^)^2, échelle ln mu"	"approximation de Laplace de la vraisemblance marginale (Biessy, § 5.4, p. 19), exacte dans le seul cas normal ; valeur calculée au maximum approché, approximation numérique ; log-vraisemblance de la source (§ 4.1), sans le terme - somme des ln D! (constant en lambda)"	"valeur de la déviance pénalisée en theta^ calculé (minimum approché), approximation numérique"	"nuls à la convergence près : somme de (m^ - D) par l'équation du score (P 1 = 0) ; somme de x (m^ - D) pour z >= 2"	"nuls à la convergence près : somme de (m^ - D) par l'équation du score (P 1 = 0) ; somme de x (m^ - D) pour z >= 2"
 etapes/lissage/resultat/@noms	character	2	"table_lissee"	"segments"
 etapes/lissage/resultat/table_lissee/@colonnes	character	7	"sexe"	"age"	"qx"	"etat"	"levier"	"borne_inf_credibilite"	"borne_sup_credibilite"
 etapes/lissage/resultat/table_lissee/@lignes	integer	1	142
@@ -336,7 +336,7 @@ avertissements/@colonnes	character	4	"etape"	"code"	"message"	"nombre"
 avertissements/@lignes	integer	1	2
 avertissements/etape	character	2	"donnees"	"exposition"
 avertissements/code	character	2	"unite_agregat"	"convention_declaree"
-avertissements/message	character	2	"Unité d'observation : non déterminée (agrégats : rien n'indique si les effectifs comptent des têtes ou des contrats) ; si l'agrégat compte des contrats, une tête titulaire de plusieurs contrats est comptée plusieurs fois, ce qui surestime l'exposition et peut compter plusieurs fois un même décès ; les intervalles et les tests supposent des unités indépendantes et sont trop étroits en cas de dépendance positive."	"Convention d'âge déclarée « dernier_anniversaire », non vérifiable sur des agrégats."
+avertissements/message	character	2	"Unité d'observation : non déterminée (agrégats : rien n'indique si les effectifs comptent des têtes ou des contrats) ; si l'agrégat compte des contrats, une tête titulaire de plusieurs contrats est comptée plusieurs fois, ce qui surestime l'exposition et peut compter plusieurs fois un même décès ; les intervalles et les tests supposent des unités indépendantes : en cas de dépendance positive, ils sont faussés, dans un sens propre à chaque grandeur (colonne statut des résultats ; à attendus grands, résultat asymptotique, intervalles de confiance trop étroits et tests fondés sur la loi de Poisson anti-conservateurs)."	"Convention d'âge déclarée « dernier_anniversaire », non vérifiable sur des agrégats."
 avertissements/nombre	integer	2	149	1
 fiche/@noms	character	24	"version_fiche"	"roles"	"provenance"	"provenance_mention"	"empreintes"	"tables_reference"	"plan"	"transition_code"	"fin_effective"	"unite_observation"	"recette"	"convention"	"unite_exposition"	"par_annee"	"exclusions"	"nombre_lignes_exclues"	"avertissement_unite"	"hypothese_censure"	"hypotheses_recette"	"hypotheses_brut"	"graine"	"graine_mention"	"generateur"	"avertissements"
 fiche/version_fiche	integer	1	6
@@ -403,7 +403,7 @@ fiche/exclusions/@lignes	integer	1	0
 fiche/exclusions/motif	character	0
 fiche/exclusions/nombre	integer	0
 fiche/nombre_lignes_exclues	integer	1	0
-fiche/avertissement_unite	character	1	"Unité d'observation : non déterminée (agrégats : rien n'indique si les effectifs comptent des têtes ou des contrats) ; si l'agrégat compte des contrats, une tête titulaire de plusieurs contrats est comptée plusieurs fois, ce qui surestime l'exposition et peut compter plusieurs fois un même décès ; les intervalles et les tests supposent des unités indépendantes et sont trop étroits en cas de dépendance positive."
+fiche/avertissement_unite	character	1	"Unité d'observation : non déterminée (agrégats : rien n'indique si les effectifs comptent des têtes ou des contrats) ; si l'agrégat compte des contrats, une tête titulaire de plusieurs contrats est comptée plusieurs fois, ce qui surestime l'exposition et peut compter plusieurs fois un même décès ; les intervalles et les tests supposent des unités indépendantes : en cas de dépendance positive, ils sont faussés, dans un sens propre à chaque grandeur (colonne statut des résultats ; à attendus grands, résultat asymptotique, intervalles de confiance trop étroits et tests fondés sur la loi de Poisson anti-conservateurs)."
 fiche/hypothese_censure	character	1	"traitement des sorties concurrentes fait par le producteur, non vérifiable"
 fiche/hypotheses_recette/@colonnes	character	4	"code"	"enonce"	"nature"	"statut"
 fiche/hypotheses_recette/@lignes	integer	1	8
@@ -436,5 +436,5 @@ fiche/avertissements/@colonnes	character	4	"etape"	"code"	"message"	"nombre"
 fiche/avertissements/@lignes	integer	1	2
 fiche/avertissements/etape	character	2	"donnees"	"exposition"
 fiche/avertissements/code	character	2	"unite_agregat"	"convention_declaree"
-fiche/avertissements/message	character	2	"Unité d'observation : non déterminée (agrégats : rien n'indique si les effectifs comptent des têtes ou des contrats) ; si l'agrégat compte des contrats, une tête titulaire de plusieurs contrats est comptée plusieurs fois, ce qui surestime l'exposition et peut compter plusieurs fois un même décès ; les intervalles et les tests supposent des unités indépendantes et sont trop étroits en cas de dépendance positive."	"Convention d'âge déclarée « dernier_anniversaire », non vérifiable sur des agrégats."
+fiche/avertissements/message	character	2	"Unité d'observation : non déterminée (agrégats : rien n'indique si les effectifs comptent des têtes ou des contrats) ; si l'agrégat compte des contrats, une tête titulaire de plusieurs contrats est comptée plusieurs fois, ce qui surestime l'exposition et peut compter plusieurs fois un même décès ; les intervalles et les tests supposent des unités indépendantes : en cas de dépendance positive, ils sont faussés, dans un sens propre à chaque grandeur (colonne statut des résultats ; à attendus grands, résultat asymptotique, intervalles de confiance trop étroits et tests fondés sur la loi de Poisson anti-conservateurs)."	"Convention d'âge déclarée « dernier_anniversaire », non vérifiable sur des agrégats."
 fiche/avertissements/nombre	integer	2	149	1
