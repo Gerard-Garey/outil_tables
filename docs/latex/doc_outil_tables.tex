@@ -3010,7 +3010,7 @@ en conséquence, celle du code aussi~; aucune grandeur numérique, aucune
 structure ne change~; R1 à R7 et R11 à R15 restent identiques, en
 comparaison réussie, sur la plateforme de référence (processeur Intel
 Xeon 6975P-C, consigné sans contrôle), sans table finale, verdict ni
-valeur de table homologuée changés. Deux régénérations ont suivi sur la
+valeur de table homologuée changés. Trois régénérations ont suivi sur la
 branche \code{claude/independance-suites}, pour les seuls changements de
 texte et de structure annoncés en transition, sans aucun écart
 numérique~: R1 à R17 le 24/11/2026 (exécution 45496372907, calcul sur
@@ -3026,7 +3026,14 @@ l'étape \code{importance\_exclusions} (R8 à R10~: 14~états au lieu de
 R8 et~R9, 25~colonnes au lieu de 23 pour \code{smr\_comparateur\_2}),
 la nature \code{credibilite} des bornes de crédibilité (R16, R17) et la
 fin de l'avertissement \code{unite\_agregat} (R13, R17)~; les onze autres
-références y restent identiques, en comparaison réussie. Visas
+références y restent identiques, en comparaison réussie~; enfin R11 et
+R12 seulement, le 25/11/2026 (exécution 45607820898, calcul sur
+\code{8094e39}, commit \code{ad5105b}~; issue~\#359), pour la nature
+\code{contraste\_segments} de l'écart réduit $z_s$ de l'étape
+\code{homogeneite} (un élément sur~15 de
+\code{etapes/homogeneite/}\allowbreak\code{parametres/statuts/statut},
+section~\ref{sec:homogeneite})~; les quinze autres références y restent
+identiques, en comparaison réussie. Visas
 d'\code{actuary}~; aucune table finale ni aucun verdict ne change.
 
 \begin{encadre}
@@ -11114,7 +11121,9 @@ retirées, que l'étape \code{importance\_exclusions} ne calcule que sous
 une recette en lignes, à dates entières et bornées, par les gardes G1
 (\code{smr\_comparateur\_1()}) et G2 (\code{retrait\_contrefactuel()}),
 erreurs de programmation, la finitude y étant établie par majoration
-(spécification d'\code{actuary-approfondi} sur l'issue~\#360). \textbf{Changement
+(rapport de variance inférieur à $4 \cdot 10^{79}$ pour $E \le 2^{52}$~jours,
+$E^c \ge 1/366$ par cellule exposée et $D \le 2^{31}$~;
+spécification d'\code{actuary-approfondi} sur l'issue~\#360). \textbf{Changement
 de comportement} (accepté par M579)~: une construction dont une seule
 cellule porte une exposition de $10^{308}$, finie et produite jusque-là
 ($z = \mp 3{,}496029$ à l'étape \code{homogeneite}, état
@@ -12435,7 +12444,7 @@ une \code{variance}, 5~\code{valeur\_h0} et 3~\code{niveau} dans
 \code{intervalle}, \code{valeur\_h0} et \code{niveau} dans
 \code{STATUTS\_VALIDATION\_POSITIONNEE}~; 3~\code{intervalle} et une
 \code{variance} dans \code{STATUTS\_IMPORTANCE})~; les textes rendus par
-\code{mention\_independance()} pour chacune des neuf natures, et ses refus
+\code{mention\_independance()} pour chacune des dix natures, et ses refus
 (nature inconnue, \code{variance} sans objet ou d'objet numérique, objet
 donné à une autre nature, chaîne vide, \code{NA} ou nombre)~; sur les
 deux bornes de crédibilité de \code{STATUTS\_LISSAGE\_POISSON}, et sur
@@ -12455,7 +12464,7 @@ sortie exacte de \code{mention\_independance()}, avec les décomptes par
 nature (7~\code{brut\_intervalle} et une \code{brut\_variance}~; 2~\code{credibilite}~;
 8~\code{intervalle} au positionnement~; ceux de la validation et de
 l'importance ci-dessus~; à l'homogénéité, 3~\code{tests}, plus
-l'hypothèse nulle, une \code{variance} et 2~\code{ecart\_minimal})~;
+l'hypothèse nulle, une \code{contraste\_segments} et 2~\code{ecart\_minimal})~;
 au plus une fois par ligne dans les huit tables de statuts (positionnement,
 homogénéité et lissage de Poisson compris)~; les mêmes décomptes dans un
 sous-processus sous \code{LC\_ALL=C}~; sept témoins d'altération, sur des copies des tables
@@ -12886,7 +12895,7 @@ $q$, spécification, A.4)~: sa garantie est le cas K
 \catalogue{fonctions-brut}{AJOUT\_BINOMIAL\_CELLULES} & constante & --- & phrase ajoutée à l'hypothèse du binomial sous la forme \code{cellules}~: $E^i$ reçue, déclarée de définition «~cellule~», non vérifiée par le moteur \\
 \catalogue{fonctions-brut}{hypothese\_brut()} & interne & estimateur, forme rendue au noyau & texte de l'hypothèse de l'estimateur~: celui de \code{HYPOTHESES\_BRUT} sous \code{fenetres}~; sous \code{cellules}, clause de troncature remplacée (Poisson) ou phrase ajoutée (binomial) \\
 \catalogue{fonctions-brut}{PORTEE\_PROBABILITE} & constante & --- & portée de la probabilité de Poisson selon la cellule (année d'âge, année civile, âge $\times$ année) \\
-\catalogue{fonctions-brut}{mention\_independance()} & interne & nature (\code{tests}, \code{intervalle}, \code{credibilite}, \code{variance}, \code{valeur\_h0}, \code{niveau}, \code{ecart\_minimal}, \code{brut\_intervalle}, \code{brut\_variance}), objet (chaîne non vide, pour \code{variance} seule) & mention d'indépendance des unités~: préfixe commun (marqueur et cause) suivi de la conséquence propre à la nature, l'objet en tête de celle de \code{variance} (section~\ref{sec:validation-statistiques}~; sous les natures \code{brut\_intervalle} et \code{brut\_variance}, cause et conséquence des contrats d'une même tête, section~\ref{sec:brut-statuts})~; source unique de la mention dans les statuts des étapes \code{brut}, \code{lissage}, \code{positionnement}, \code{validation}, \code{homogeneite} et \code{importance\_exclusions}~; nature hors des neuf, \code{variance} sans objet, objet donné à une autre nature~: erreur de programmation (issues~\#330 et~\#359) \\
+\catalogue{fonctions-brut}{mention\_independance()} & interne & nature (\code{tests}, \code{intervalle}, \code{credibilite}, \code{variance}, \code{valeur\_h0}, \code{niveau}, \code{ecart\_minimal}, \code{brut\_intervalle}, \code{brut\_variance}, \code{contraste\_}\allowbreak\code{segments}), objet (chaîne non vide, pour \code{variance} seule) & mention d'indépendance des unités~: préfixe commun (marqueur et cause) suivi de la conséquence propre à la nature, l'objet en tête de celle de \code{variance} (section~\ref{sec:validation-statistiques}~; sous les natures \code{brut\_intervalle} et \code{brut\_variance}, cause et conséquence des contrats d'une même tête, section~\ref{sec:brut-statuts})~; source unique de la mention dans les statuts des étapes \code{brut}, \code{lissage}, \code{positionnement}, \code{validation}, \code{homogeneite} et \code{importance\_exclusions}~; nature hors des dix, \code{variance} sans objet, objet donné à une autre nature~: erreur de programmation (issues~\#330 et~\#359) \\
 \catalogue{fonctions-brut}{STATUTS\_BRUT} & constante & --- & statut, loi supposée et calcul de chaque grandeur (tableau~\ref{tab:statuts-brut}) \\
 \catalogue{fonctions-brut}{controler\_parametres\_brut()} & interne & estimateurs, niveau, \code{par\_annee} & refus des valeurs (section~\ref{sec:brut-etape})~; appelée par \code{valider\_plan()} seule (issues~\#22 et~\#82) \\
 \catalogue{fonctions-brut}{taux\_poisson()} & interne & $D$, $E^c$, niveau & taux, bornes exactes et asymptotiques, état (section~\ref{sec:brut-poisson}) \\
@@ -13468,8 +13477,8 @@ ne redonnent pas le total des événements est une erreur de programmation.\par}
     qui n'a pas de sens pour des intervalles bayésiens dont la couverture
     fréquentiste n'est pas établie. Le constat porté par le statut est un
     \emph{résultat exact} à ajustement donné~: dans le modèle de
-    quasi-Poisson de facteur de sur-dispersion $\varphi \ge 1$, la
-    quasi-log-vraisemblance est la log-vraisemblance de Poisson divisée par
+    quasi-Poisson de facteur de sur-dispersion $\varphi \ge 1$ commun à
+    toutes les cellules, la quasi-log-vraisemblance est la log-vraisemblance de Poisson divisée par
     $\varphi$~; la pénalité divisée par $\varphi$ elle aussi
     (paramètre de lissage $\lambda/\varphi$), le critère pénalisé est celui de
     Poisson divisé par $\varphi$, de même maximiseur $\hat\theta$, donc de
@@ -15103,8 +15112,9 @@ multinomiale, calcul exact). Les textes de ces conséquences ont une
 source unique, la fonction interne \code{mention\_independance()}, écrite
 dans \code{R/brut.R}, premier module qui l'emploie dans l'ordre des
 modules (tableau~\ref{tab:fonctions-brut}~; issue~\#359). Elle connaît
-neuf natures~: les cinq ci-dessus~; \code{ecart\_minimal}, pour
-$\theta_{80}$ de l'étape \code{homogeneite}
+dix natures~: les cinq ci-dessus~; \code{ecart\_minimal}, pour
+$\theta_{80}$ de l'étape \code{homogeneite}, et
+\code{contraste\_segments}, pour son écart réduit $z_s$ par segment
 (section~\ref{sec:homogeneite})~; \code{credibilite}, pour les bornes de
 crédibilité de \code{wh\_poisson} (section~\ref{sec:lissage-poisson})~;
 \code{brut\_intervalle} et \code{brut\_variance}, dont la cause est la
@@ -16147,13 +16157,50 @@ n'étant appariée (différence voulue avec l'étape \code{validation}).\par}
     contrat, les décès sont sur-dispersés et les tests sont
     anti-conservateurs à attendus grands (résultat asymptotique), l'erreur
     de niveau étant de sens non établi en général à petits attendus~»~;
-    pour \code{z}, nature \code{variance}, «~\ldots{} sur-dispersés et
-    V\_ss est sous-estimée~»~: $z_s$ ne donne aucune p-valeur, et la
-    conséquence d'un test ne le décrit pas~; ce que la sur-dispersion
-    atteint est la variance $V_{ss}$, calculée sous $H_0$ pour des unités
-    indépendantes, qui sert à le réduire (avis d'\code{actuary} sur l'issue~\#359,
-    Q2)~; pour $\theta_{80}$, nature \code{ecart\_minimal}
-    (ci-dessous). Jusqu'à l'issue~\#359, ces statuts, \code{z} compris,
+    pour \code{z}, nature \code{contraste\_segments}, «~\ldots{}
+    sur-dispersés et V\_ss sous-estime la variance de O\_s - A\_s à
+    attendus grands si les contrats d'une même tête sont dans un même
+    segment (résultat asymptotique), dans un sens non établi en général à
+    petits attendus, et peut la surestimer si des contrats d'une même tête
+    sont dans des segments différents~»~: $z_s$ ne donne aucune p-valeur,
+    et la conséquence d'un test ne le décrit pas~; ce que la
+    sur-dispersion atteint est la variance $V_{ss}$, calculée sous $H_0$
+    pour des unités indépendantes, qui sert à le réduire (avis
+    d'\code{actuary} sur l'issue~\#359, Q2). Fondement de ce texte (avis
+    d'\code{actuary} à la validation de la documentation de la branche,
+    décision du mainteneur du 25/11/2026), dans une cellule, avec $U_s =
+    O_s - A_s = (1 - \pi) D_s - \pi D_{-s}$, $\pi$ la part d'exposition du
+    segment $s$, $D_{-s}$ les décès des autres segments, $\varphi_s \ge 1$
+    et $\varphi_{-s} \ge 1$ les facteurs de sur-dispersion de $D_s$ et
+    de $D_{-s}$, et $V_{ss} = D_{\cdot c}\,\pi(1 - \pi)$~: (i)~dans le modèle de Poisson de $z_s$, $E^c$ tenue pour fixe, si les
+    contrats d'une tête sont dans un même segment, $D_s$ et $D_{-s}$ sont
+    indépendants, chacun de variance au moins égale à son espérance, d'où
+    $\operatorname{Var}(U_s) \ge (1-\pi)^2 E[D_s] + \pi^2 E[D_{-s}] =
+    E[V_{ss}]$ sous $H_0$, \emph{résultat exact}, sans conditionnement~;
+    (ii)~conditionnellement aux $D_{\cdot c}$, comme le test, le rapport
+    de $\operatorname{Var}(U_s \mid D_{\cdot c})$ à $V_{ss}$ tend, à
+    attendus grands, vers $\varphi_s \varphi_{-s} / (\pi \varphi_s +
+    (1-\pi)\varphi_{-s}) \ge 1$, \emph{résultat asymptotique} obtenu par
+    approximation normale (par exemple $4/3$ à $\pi = 1/2$, $\varphi_s =
+    1$, $\varphi_{-s} = 2$)~; (iii)~à petits $D_{\cdot c}$, la
+    sous-estimation n'est plus établie~: si les têtes de $s$ portent un
+    contrat et celles de $-s$ deux contrats, dont les décès tombent
+    ensemble, à $\pi = 1/2$ et $D_{\cdot c} = 1$, le décès vient
+    nécessairement de $s$, $U_s = 1/2$ est certain et sa variance est
+    nulle, contre $V_{ss} = 1/4$ (calcul exact)~; (iv)~si chaque tête porte
+    deux contrats, l'un dans $s$, l'autre dans $-s$, à $\pi = 1/2$, chaque
+    décès de tête apporte $1 - 2\pi = 0$ à $U_s$~: $U_s = 0$ est certain,
+    $V_{ss}$ surestime sa variance et les tests sont conservateurs (calcul
+    exact). Le cas~(iv) n'est décelé que si \code{id\_tete} est
+    déclaré~: il lève alors le motif de tête
+    \code{tete\_segment\_incoherent} (segmentation par \code{segment}) ou
+    \code{tete\_sexe\_incoherent} (segmentation par \code{sexe}~;
+    tableau~\ref{tab:motifs})~; sans
+    \code{id\_tete}, il n'est pas contrôlé. La nature \code{tests} des
+    p-valeurs et de l'hypothèse nulle, atteinte par la même cause, ne porte
+    pas encore la réserve des segments différents (issue~\#374, décision du
+    mainteneur du 25/11/2026)~; pour $\theta_{80}$, nature
+    \code{ecart\_minimal} (ci-dessous). Jusqu'à l'issue~\#359, ces statuts, \code{z} compris,
     finissaient par la constante \code{INDEPENDANCE\_HOMOGENEITE}, «~\ldots{}
     sur-dispersés et le test est anti-conservateur (p-valeurs trop
     petites)~», énoncé sans la réserve des petits attendus~; la constante
