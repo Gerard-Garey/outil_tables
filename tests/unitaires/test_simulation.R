@@ -42,6 +42,7 @@ GM_A <- 2e-4; GM_B <- 2.5e-5; GM_C <- 1.1
 GM <- table_gm(GM_A, GM_B, GM_C, 0:120)
 RACHAT <- table_constante(0.05, 0:120, "rachat constant 5 %")
 NUL <- table_constante(0, 0:120, "transition absente (q = 0)")
+R_FAIBLE <- table_constante(1e-9, 0:120, "rachat faible non nul (q = 1e-9)")
 loi <- function(deces = GM, rachat = RACHAT, f_deces = c(H = 1, F = 0.6), f_rachat = c(H = 1, F = 1))
   list(deces = list(table = deces, facteurs = f_deces), rachat = list(table = rachat, facteurs = f_rachat))
 PER <- list(debut = D("2015-01-01"), fin = D("2024-12-31"))
@@ -1742,9 +1743,12 @@ verifier("défauts : conditions_vides(), date_entree égale à la fin en mode ag
 # simuler_portefeuille() ; valeur exacte rendue (noms dans l'ordre, raisons).
 # Valeurs calculées à la main d'après la règle (c) de l'annotation. Chaque
 # cas : forme (lignes, agregats, stocks_successifs), libellé, mode,
-# portefeuille, période, forme brute (NULL : lignes), vecteur attendu. Les
-# cas « loi nulle » (#149) s'ajoutent à CAS_CV ; leurs conditions ou
-# exigences vidables, à VIDABLES_CV.
+# portefeuille, période, forme brute (NULL : lignes), vecteur attendu, loi
+# (NULL : conditions_vides() appelée sans `nulles`, comme avant #149 ; sinon
+# causes nulles calculées par causes_nulles() sur la loi effective contrôlée
+# par controler_couverture(), comme dans simuler_portefeuille()). Les cas
+# « loi nulle » (#149 ; annotation du 25/11/2026, (c) 3) s'ajoutent à
+# CAS_CV ; les exigences vidables par la loi, à VIDABLES_CV.
 PER_CV <- list(debut = D("2015-01-01"), fin = D("2017-12-31"))
 FIN_CV <- PER_CV$fin
 PER_CV_FIN <- list(debut = FIN_CV, fin = FIN_CV)
@@ -1776,8 +1780,17 @@ FA_CV <- function(pa, unite = NULL) {
 fs_cv <- function(dates) list(nom = "stocks_successifs", inventaires = D(dates))
 G_CV <- list(`2` = c("2014-12-31", "2017-12-31"), `3` = c("2014-12-31", "2016-06-30", "2017-12-31"),
              `4` = c("2014-12-31", "2015-12-31", "2016-12-31", "2017-12-31"))
-cas_cv <- function(forme_cas, libelle, mode, pf, per, forme, attendu)
-  list(forme_cas = forme_cas, libelle = libelle, mode = mode, pf = pf, per = per, forme = forme, attendu = attendu)
+FR_CV <- function(pa) modifyList(FA_CV(pa), list(transition = list(depart = "en_cours", arrivee = "rachat")))
+cas_cv <- function(forme_cas, libelle, mode, pf, per, forme, attendu, loi_cas = NULL)
+  list(forme_cas = forme_cas, libelle = libelle, mode = mode, pf = pf, per = per, forme = forme, attendu = attendu,
+       loi = loi_cas)
+# Lois nulles (#149) : décès nul par les facteurs (H = F = 0), rachat nul par
+# la table ; raisons calculées à la main d'après les âges atteignables de
+# controler_portefeuille() (PU_CV sur PER_CV : 30 à 69 ; PX_CV : 60 à 66).
+L_DN_CV <- loi(f_deces = c(H = 0, F = 0))
+L_RN_CV <- loi(rachat = NUL)
+r_loi_cv <- function(cause, a, b, sexes = "« H », « F »")
+  sprintf("loi « %s » nulle (q = 0) aux âges atteignables %d à %d, sexes tirés %s", cause, a, b, sexes)
 CAS_CV <- c(
   # Lignes, modes simples : un seul contrat par tête ; entrée = fin ; veille.
   lapply(c("uniforme", "age_exact"), function(mo)
@@ -1834,12 +1847,54 @@ CAS_CV <- c(
     cas_cv("stocks_successifs", sprintf("grille de %s dates", k), "uniforme", pf_cv(PU_CV, "uniforme"), PER_CV,
            fs_cv(G_CV[[k]]), if (k == "2") c(grille_trois_dates = r_grille_cv(2L)) else VIDE_CV)),
   list(cas_cv("stocks_successifs", "grille de 4 dates, date_entree = fin", "age_exact",
-              pf_cv(PX_CV, "age_exact", date_entree = FIN_CV), PER_CV, fs_cv(G_CV[["4"]]), VIDE_CV))
+              pf_cv(PX_CV, "age_exact", date_entree = FIN_CV), PER_CV, fs_cv(G_CV[["4"]]), VIDE_CV)),
+  # Lois nulles (#149). Lignes : décès nul, tete_multi_deces vide (raison de
+  # la loi jointe après celle du portefeuille si elle l'est déjà) ; rachat
+  # nul, aucune condition (la cible est refusée par controler_defauts()).
+  list(cas_cv("lignes", "décès nul", "uniforme", pf_cv(PU_CV, "uniforme"), PER_CV, NULL,
+              c(tete_multi = r_base_cv("uniforme"),
+                tete_multi_deces = paste(r_base_cv("uniforme"), r_loi_cv("deces", 30L, 69L), sep = " ; ")), L_DN_CV),
+       cas_cv("lignes", "rachat nul", "uniforme", pf_cv(PU_CV, "uniforme"), PER_CV, NULL,
+              tete_cv(r_base_cv("uniforme")), L_RN_CV),
+       cas_cv("lignes", "(0,6 ; 0,4), décès nul", "uniforme_multi", pf_cv(PU_CV, "uniforme_multi", c(0.6, 0.4)), PER_CV,
+              NULL, c(tete_multi_deces = r_loi_cv("deces", 30L, 69L)), L_DN_CV),
+       cas_cv("lignes", "(0,6 ; 0,4), rachat nul", "uniforme_multi", pf_cv(PU_CV, "uniforme_multi", c(0.6, 0.4)), PER_CV,
+              NULL, VIDE_CV, L_RN_CV),
+       cas_cv("lignes", "(0,6 ; 0,4), loi non nulle", "uniforme_multi", pf_cv(PU_CV, "uniforme_multi", c(0.6, 0.4)),
+              PER_CV, NULL, VIDE_CV, loi()),
+       cas_cv("lignes", "(0,6 ; 0,4), décès nul, date_entree = fin", "age_exact_multi",
+              pf_cv(PX_CV, "age_exact_multi", c(0.6, 0.4), date_entree = FIN_CV), PER_CV, NULL,
+              c(entree_avant_fin = r_fin_cv("date_entree"), tete_multi_deces = r_loi_cv("deces", 60L, 61L)), L_DN_CV),
+       cas_cv("lignes", "(0,6 ; 0,4), décès nul pour H, seuls H tirés", "age_exact_multi",
+              pf_cv(PX_CV, "age_exact_multi", c(0.6, 0.4), proportion_hommes = 1), PER_CV, NULL,
+              c(tete_multi_deces = r_loi_cv("deces", 60L, 66L, "« H »")), loi(f_deces = c(H = 0, F = 1)))),
+  # Agrégats : cause de la forme nulle, exigence evenements_positifs vide,
+  # après la condition de la forme ; cause de l'autre transition nulle : rien.
+  list(cas_cv("agregats", "décès, décès nul", "uniforme", pf_cv(PU_CV, "uniforme"), PER_CV, FA_CV(TRUE),
+              c(evenements_positifs = r_loi_cv("deces", 30L, 69L)), L_DN_CV),
+       cas_cv("agregats", "décès, par_annee = FALSE, décès nul", "uniforme", pf_cv(PU_CV, "uniforme"), PER_CV,
+              FA_CV(FALSE), c(annee = R_ANNEE_CV, evenements_positifs = r_loi_cv("deces", 30L, 69L)), L_DN_CV),
+       cas_cv("agregats", "décès, rachat nul", "uniforme", pf_cv(PU_CV, "uniforme"), PER_CV, FA_CV(TRUE), VIDE_CV,
+              L_RN_CV),
+       cas_cv("agregats", "rachat, rachat nul", "uniforme", pf_cv(PU_CV, "uniforme"), PER_CV, FR_CV(TRUE),
+              c(evenements_positifs = r_loi_cv("rachat", 30L, 69L)), L_RN_CV),
+       cas_cv("agregats", "rachat, décès nul", "uniforme", pf_cv(PU_CV, "uniforme"), PER_CV, FR_CV(TRUE), VIDE_CV,
+              L_DN_CV)),
+  # Stocks successifs : aucune condition vidée par la loi (cibles refusées
+  # par controler_defauts()).
+  list(cas_cv("stocks_successifs", "grille de 4 dates, décès et rachat nuls", "uniforme", pf_cv(PU_CV, "uniforme"),
+              PER_CV, fs_cv(G_CV[["4"]]), VIDE_CV, loi(rachat = NUL, f_deces = c(H = 0, F = 0))))
 )
 RENDUS_CV <- lapply(CAS_CV, function(k) {
   p <- tablexp:::controler_portefeuille(k$pf, k$per)
   f <- if (is.null(k$forme)) NULL else tablexp:::controler_forme(k$forme, p$mode, k$per$debut, k$per$fin)
-  if (is.null(f)) tablexp:::conditions_vides(p$mode, k$pf, k$per) else tablexp:::conditions_vides(p$mode, k$pf, k$per, f)
+  if (is.null(k$loi))
+    return(if (is.null(f)) tablexp:::conditions_vides(p$mode, k$pf, k$per)
+           else tablexp:::conditions_vides(p$mode, k$pf, k$per, f))
+  sexes <- tablexp:::MODALITES_SEXE[c(k$pf$proportion_hommes > 0, k$pf$proportion_hommes < 1)]
+  eff <- do.call(rbind, lapply(c("deces", "rachat"), function(cs) loi_effective(k$loi[[cs]], cs, sexes)))
+  tablexp:::controler_couverture(eff, p$age_bas, p$age_haut, sexes)
+  tablexp:::conditions_vides(p$mode, k$pf, k$per, f, tablexp:::causes_nulles(eff, p$age_bas, p$age_haut, sexes))
 })
 for (i in seq_along(CAS_CV)) {
   k <- CAS_CV[[i]]
@@ -1847,15 +1902,33 @@ for (i in seq_along(CAS_CV)) {
                    if (length(k$attendu)) paste(names(k$attendu), collapse = ", ") else "aucune"),
            identical(RENDUS_CV[[i]], k$attendu))
 }
-# Garde de couverture : conditions (et, après #149, exigences) que
-# conditions_vides() peut déclarer vides, par forme, lues dans le catalogue de
-# la forme (colonne condition, valeurs non vides) ; chacune a au moins un cas
-# vide et un cas non vide, et les noms rendus forment exactement cet ensemble.
-VIDABLES_CV <- lapply(tablexp:::DEFAUTS_FORMES, function(r) unique(r$catalogue$condition[nzchar(r$catalogue$condition)]))
-verifier("conditions_vides() figée (#148) : garde de couverture, ensembles des conditions par forme (lignes : entree_avant_fin, tete_multi, tete_multi_deces ; agrégats : annee ; stocks : grille_trois_dates)",
+# Garde de couverture : conditions et exigences que conditions_vides() peut
+# déclarer vides, par forme. Conditions lues dans le catalogue de la forme
+# (colonne condition, valeurs non vides) ; tete_multi_deces y est déjà, et
+# devient vidable aussi par la loi (décès nul, #149). Exigences vidables par
+# la loi (#149 ; annotation du 25/11/2026, (c) 3) : evenements_positifs des
+# agrégats, colonne d'éligibilité du catalogue, écrite ici (EXIGENCES_CV),
+# vérifiée colonne logique du catalogue de la forme. Chaque nom a au moins un
+# cas vide et un cas non vide, et les noms rendus forment exactement
+# l'ensemble ; chaque nom vidable par la loi a un cas vide par la loi seule.
+CONDITIONS_CV <- lapply(tablexp:::DEFAUTS_FORMES, function(r) unique(r$catalogue$condition[nzchar(r$catalogue$condition)]))
+EXIGENCES_CV <- list(lignes = character(0), agregats = "evenements_positifs", stocks_successifs = character(0))
+VIDABLES_CV <- Map(c, CONDITIONS_CV, EXIGENCES_CV[names(CONDITIONS_CV)])
+VIDABLES_LOI_CV <- list(lignes = "tete_multi_deces", agregats = "evenements_positifs", stocks_successifs = character(0))
+verifier("conditions_vides() figée (#148, #149) : garde de couverture, ensembles des conditions et exigences par forme (lignes : entree_avant_fin, tete_multi, tete_multi_deces ; agrégats : annee, evenements_positifs ; stocks : grille_trois_dates)",
          identical(lapply(VIDABLES_CV, sort),
-                   list(lignes = c("entree_avant_fin", "tete_multi", "tete_multi_deces"), agregats = "annee",
-                        stocks_successifs = "grille_trois_dates")))
+                   list(lignes = c("entree_avant_fin", "tete_multi", "tete_multi_deces"),
+                        agregats = c("annee", "evenements_positifs"), stocks_successifs = "grille_trois_dates")) &&
+           all(vapply(names(EXIGENCES_CV), function(fo) all(vapply(EXIGENCES_CV[[fo]], function(ex)
+             is.logical(tablexp:::DEFAUTS_FORMES[[fo]]$catalogue[[ex]]), logical(1L))), logical(1L))))
+for (fo in names(VIDABLES_LOI_CV)) for (cd in VIDABLES_LOI_CV[[fo]]) {
+  i_fo <- which(vapply(CAS_CV, function(k) k$forme_cas == fo && !is.null(k$loi), logical(1L)))
+  verifier(sprintf("conditions_vides() figée (#149) : forme %s, %s vide par la loi seule (raison de la loi seule) dans un cas au moins, non vide sous une loi non nulle", fo, cd),
+           any(vapply(i_fo, function(i) cd %in% names(RENDUS_CV[[i]]) &&
+                        identical(RENDUS_CV[[i]][[cd]], CAS_CV[[i]]$attendu[[cd]]) &&
+                        startsWith(RENDUS_CV[[i]][[cd]], "loi « "), logical(1L))) &&
+             any(vapply(i_fo, function(i) !(cd %in% names(RENDUS_CV[[i]])), logical(1L))))
+}
 for (fo in names(VIDABLES_CV)) {
   i_fo <- which(vapply(CAS_CV, function(k) k$forme_cas == fo, logical(1L)))
   noms <- lapply(RENDUS_CV[i_fo], names)
@@ -1867,9 +1940,165 @@ for (fo in names(VIDABLES_CV)) {
                  any(vapply(noms, function(n) !(cd %in% n), logical(1L))), logical(1L))) &&
              setequal(unlist(noms), VIDABLES_CV[[fo]]))
 }
-verifier("conditions_vides() figée (#148) : aucun nom de condition ne coïncide avec un nom de colonne des catalogues de défauts (ADR 0007, annotation du 25/11/2026, (d))",
-         !length(intersect(unlist(VIDABLES_CV),
+verifier("conditions_vides() figée (#148) : aucun nom de condition ne coïncide avec un nom de colonne des catalogues de défauts (ADR 0007, annotation du 25/11/2026, (d)) ; les exigences, elles, sont des colonnes (#149)",
+         !length(intersect(unlist(CONDITIONS_CV),
                            unlist(lapply(tablexp:::DEFAUTS_FORMES, function(r) names(r$catalogue))))))
+# Cause nulle par la loi (#149 ; ADR 0007, annotation du 25/11/2026, (b),
+# (c) 3, (d) et (e) ; M602 ; spécification d'actuary-approfondi sur #149) :
+# cause c dans {deces, rachat} de q == 0 exactement dans la loi effective
+# (facteurs et plafond compris) pour chaque sexe tiré et chaque âge entier
+# atteignable. Cible structurellement vide : refus defauts_invalides avant
+# tout tirage, en taux comme en nombre, zéro compris, sous graine du jeu NA
+# (graine_invalide non atteint) et sous graine valide, détails, message
+# exact (valeur calculée à la main : âges atteignables 30 à 69 de PU_CV sur
+# PER_CV), aléa de l'appelant inchangé. Avant #149 (5c31c3a) : jeu rendu à 0
+# éligible (taux, nombre 0) ou refus defauts_ineligibles après tirage
+# (nombre 1). Lignes, stocks successifs : par la cible ; tête : par la
+# condition tete_multi_deces ; agrégats : par l'exigence evenements_positifs.
+Q0_100 <- tablexp:::table_reference(
+  data.frame(age = 0:120, sexe = "ensemble", qx = ifelse(0:120 <= 100, 0, 0.5), stringsAsFactors = FALSE),
+  nom = "décès nul jusqu'à 100 ans", statut = "synthetique", source = "Table synthétique de test (#149)",
+  parametres = list(loi = "test"))
+PUM_149 <- pf_cv(PU_CV, "uniforme_multi", c(0.5, 0.5))
+FS4_149 <- fs_cv(G_CV[["4"]])
+r_149 <- function(type, raison) sprintf("déclaration 1 : type %s : aucune unité éligible par construction (%s), quel que soit le tirage.", type, raison)
+R_RN_149 <- r_loi_cv("rachat", 30L, 69L); R_DN_149 <- r_loi_cv("deces", 30L, 69L)
+CAS_149 <- list(
+  list("rachat nul, sortie_manquante, cible rachat", L_RN_CV, PU_CV, NULL,
+       list(type = "sortie_manquante", cible = "rachat"), r_149("sortie_manquante", paste("cible « rachat » :", R_RN_149))),
+  list("rachat nul, sortie_manquante, cible rachat et en_cours (en_cours non admise : ne sauve pas)", L_RN_CV, PU_CV, NULL,
+       list(type = "sortie_manquante", cible = c("rachat", "en_cours")),
+       r_149("sortie_manquante", paste("cible « rachat », « en_cours », réduite aux causes admises par le type à « rachat » :", R_RN_149))),
+  list("décès nul (facteurs H = F = 0), cause_hors_modalites, cible deces", L_DN_CV, PU_CV, NULL,
+       list(type = "cause_hors_modalites", cible = "deces"), r_149("cause_hors_modalites", paste("cible « deces » :", R_DN_149))),
+  list("décès nul aux seuls âges atteignables (q = 0 jusqu'à 100 ans, 0,5 au-delà), sortie_manquante, cible deces",
+       loi(deces = Q0_100), PU_CV, NULL, list(type = "sortie_manquante", cible = "deces"),
+       r_149("sortie_manquante", paste("cible « deces » :", R_DN_149))),
+  list("décès nul pour H (f_H = 0), seuls H tirés, sortie_avant_entree, cible deces", loi(f_deces = c(H = 0, F = 1)),
+       modifyList(PU_CV, list(proportion_hommes = 1)), NULL, list(type = "sortie_avant_entree", cible = "deces"),
+       r_149("sortie_avant_entree", paste("cible « deces » :", r_loi_cv("deces", 30L, 69L, "« H »")))),
+  list("décès et rachat nuls, combinaison cause_manquante + sexe_manquant, cible deces et rachat",
+       loi(rachat = NUL, f_deces = c(H = 0, F = 0)), PU_CV, NULL,
+       list(type = c("sexe_manquant", "cause_manquante"), cible = c("deces", "rachat")),
+       r_149("cause_manquante + sexe_manquant", paste("cible « deces », « rachat » :", R_DN_149, ";", R_RN_149))),
+  list("décès nul, uniforme_multi (0,5 ; 0,5), tete_observee_apres_deces (condition tete_multi_deces)", L_DN_CV, PUM_149,
+       NULL, list(type = "tete_observee_apres_deces"), r_149("tete_observee_apres_deces", R_DN_149)),
+  list("décès nul, uniforme, tete_observee_apres_deces (raison de la loi jointe à celle du portefeuille)", L_DN_CV, PU_CV,
+       NULL, list(type = "tete_observee_apres_deces"),
+       r_149("tete_observee_apres_deces", paste(r_base_cv("uniforme"), R_DN_149, sep = " ; "))),
+  list("décès nul, agrégats sous la transition de décès, evenements_sans_exposition (exigence evenements_positifs)",
+       L_DN_CV, PU_CV, FA_CV(TRUE), list(type = "evenements_sans_exposition"), r_149("evenements_sans_exposition", R_DN_149)),
+  list("rachat nul, agrégats sous la transition de rachat, evenements_sans_exposition", L_RN_CV, PU_CV, FR_CV(TRUE),
+       list(type = "evenements_sans_exposition"), r_149("evenements_sans_exposition", R_RN_149)),
+  list("rachat nul, stocks successifs (grille de 4 dates), sortie_non_renseignee, cible rachat", L_RN_CV, PU_CV, FS4_149,
+       list(type = "sortie_non_renseignee", cible = "rachat"),
+       r_149("sortie_non_renseignee", paste("cible « rachat » :", R_RN_149))),
+  list("décès nul, stocks successifs (grille de 4 dates), inventaire_duplique, cible deces", L_DN_CV, PU_CV, FS4_149,
+       list(type = "inventaire_duplique", cible = "deces"), r_149("inventaire_duplique", paste("cible « deces » :", R_DN_149))))
+for (k in CAS_149) for (va in list(list(taux = 0.5), list(nombre = 0), list(nombre = 1))) {
+  set.seed(25L); avant <- globalenv()$.Random.seed
+  d_k <- list(graine = GRAINE_DEF, declarations = list(c(k[[5L]], va)))
+  e <- lapply(list(NA_integer_, GRAINE), function(g)
+    tryCatch(simuler(k[[2L]], k[[3L]], PER_CV, g, defauts = d_k, forme = k[[4L]]), refus_tablexp = function(r) r))
+  verifier(sprintf("défauts (#149) : %s, %s = %s -> refus defauts_invalides avant tout tirage (graine du jeu NA non atteinte), détails, message exact, aléa de l'appelant inchangé",
+                   k[[1L]], names(va), format(va[[1L]])),
+           all(vapply(e, function(r) inherits(r, "refus_tablexp") && identical(r$module, "simulation") &&
+             identical(r$motif, "defauts_invalides") &&
+             identical(r$details, list(parametre = "defauts$declarations", declaration = 1L)) &&
+             identical(conditionMessage(r), paste("Défauts :", k[[6L]])), logical(1L))) &&
+             identical(globalenv()$.Random.seed, avant))
+}
+# Témoins admis (annotation, (b), avant-dernière ligne ; critère (ii) de la
+# spécification) : même déclaration sur une cause non nulle, ou cible qui
+# contient « en_cours » admise par le type, ou type de tête sans décès
+# requis. Constat de simulation (n = 2 000, graine du jeu 11, graine des
+# défauts 12) : éligibles 1 009, 16 et 1 984, mesurés identiques avant #149
+# (5c31c3a) ; recoupés par une identité exacte sur le jeu propre.
+verifier("défauts (#149) : témoins admis, mêmes nombres d'éligibles qu'avant #149 (décès nul, uniforme_multi, tete_sexe_incoherent : 1 009 ; rachat nul, sortie_manquante, cible deces : 16 ; rachat nul, cause_manquante, cible rachat et en_cours : 1 984), égaux au décompte du jeu propre", {
+  pu <- modifyList(PU_CV, list(n = 2000)); pum <- modifyList(PUM_149, list(n = 2000))
+  temoins <- list(list(L_DN_CV, pum, list(type = "tete_sexe_incoherent"), 1009L,
+                       function(j) sum(table(j$id_tete) >= 2L)),
+                  list(L_RN_CV, pu, list(type = "sortie_manquante", cible = "deces"), 16L,
+                       function(j) sum(j$cause_sortie == "deces")),
+                  list(L_RN_CV, pu, list(type = "cause_manquante", cible = c("rachat", "en_cours")), 1984L,
+                       function(j) sum(j$cause_sortie %in% c("rachat", "en_cours"))))
+  all(vapply(temoins, function(t) all(vapply(list(list(taux = 0.5), list(nombre = 0), list(nombre = 1)), function(va) {
+    r <- simuler(t[[1L]], t[[2L]], PER_CV, 11L, defauts = list(graine = 12L, declarations = list(c(t[[3L]], va))))
+    el <- attr(r, "defauts")$decomptes$declarations$eligibles
+    identical(el, t[[4L]]) && identical(el, t[[5L]](simuler(t[[1L]], t[[2L]], PER_CV, 11L)))
+  }, logical(1L))), logical(1L)))
+})
+verifier("défauts (#149) : témoin agrégats sous la transition de décès avec rachat nul, evenements_sans_exposition -> admis, même nombre d'éligibles qu'avant #149 (13), égal au décompte des cellules du jeu propre agrégé d'exposition positive et d'au moins un événement", {
+  pu <- modifyList(PU_CV, list(n = 2000))
+  propre <- simuler(L_RN_CV, pu, PER_CV, 11L, forme = FA_CV(TRUE))
+  n_cellules <- sum(propre$exposition_centrale > 0 & propre$evenements >= 1)
+  all(vapply(list(list(taux = 0.5), list(nombre = 0), list(nombre = 1)), function(va) {
+    r <- simuler(L_RN_CV, pu, PER_CV, 11L, defauts = list(graine = 12L, declarations = list(
+      c(list(type = "evenements_sans_exposition"), va))), forme = FA_CV(TRUE))
+    el <- attr(r, "defauts")$decomptes$declarations$eligibles
+    identical(el, 13L) && identical(el, n_cellules)
+  }, logical(1L)))
+})
+# Résidu (iii) de l'annotation, (c) 3 : cause nulle pour un seul des sexes
+# tirés (F), l'autre (H) de proportion 1e-11, sous la résolution du
+# générateur : aucune tête H tirée, aucun décès, mais la cause n'est pas
+# nulle par la loi (H est un sexe tiré, q_H > 0) : pas de refus avant
+# tirage ; vide qui dépend du tirage (jeu à 0 éligible en taux,
+# defauts_ineligibles en nombre 1). Constat : aucune tête H, aucun décès,
+# absence vérifiée sur le jeu propre.
+verifier("défauts (#149) : résidu (iii), décès nul pour F seul (f_F = 0), H de proportion 1e-11 (aucune tête H tirée) -> causes_nulles() vide, pas de refus avant tirage ; taux 0,5 : 0 éligible ; nombre 1 : defauts_ineligibles", {
+  pf <- modifyList(PU_CV, list(proportion_hommes = 1e-11)); l <- loi(f_deces = c(H = 1, F = 0))
+  propre <- simuler(l, pf, PER_CV, GRAINE)
+  d <- function(va) list(graine = GRAINE_DEF, declarations = list(c(list(type = "sortie_manquante", cible = "deces"), va)))
+  r <- simuler(l, pf, PER_CV, GRAINE, defauts = d(list(taux = 0.5)))
+  e <- tryCatch(simuler(l, pf, PER_CV, GRAINE, defauts = d(list(nombre = 1))), refus_tablexp = function(x) x)
+  eff <- do.call(rbind, lapply(c("deces", "rachat"), function(cs) loi_effective(l[[cs]], cs, c("H", "F"))))
+  !any(propre$sexe == "H") && !any(propre$cause_sortie == "deces") &&
+    length(tablexp:::causes_nulles(eff, 30, 69.5, c("H", "F"))) == 0L &&
+    identical(attr(r, "defauts")$decomptes$declarations$eligibles, 0L) &&
+    inherits(e, "refus_tablexp") && identical(e$motif, "defauts_ineligibles")
+})
+verifier("défauts (#149) : ordre des refus : cible disjointe avant la loi (message inchangé) ; cible vide par la loi avant un taux ou un nombre invalide ; déclaration de ligne valide en 1, cible vide par la loi en 2 -> declaration = 2", {
+  m_disj <- message_refus(simuler(L_RN_CV, PU_CV, PER_CV, GRAINE, defauts = list(graine = GRAINE_DEF, declarations = list(
+    list(type = "sortie_manquante", cible = "en_cours", taux = 0.5)))))
+  m_taux <- message_refus(simuler(L_RN_CV, PU_CV, PER_CV, GRAINE, defauts = list(graine = GRAINE_DEF, declarations = list(
+    list(type = "sortie_manquante", cible = "rachat", taux = 2)))))
+  m_nombre <- message_refus(simuler(L_DN_CV, PUM_149, PER_CV, GRAINE, defauts = list(graine = GRAINE_DEF, declarations = list(
+    list(type = "tete_observee_apres_deces", nombre = -1)))))
+  e2 <- tryCatch(simuler(L_RN_CV, PU_CV, PER_CV, GRAINE, defauts = list(graine = GRAINE_DEF, declarations = list(
+    list(type = "sortie_manquante", cible = "deces", taux = 0.5), list(type = "sortie_manquante", cible = "rachat", taux = 0.5)))),
+    refus_tablexp = function(r) r)
+  grepl("cible « en_cours » disjointe des causes admises pour sortie_manquante (« deces », « rachat »)", m_disj, fixed = TRUE) &&
+    identical(m_taux, paste("Défauts :", r_149("sortie_manquante", paste("cible « rachat » :", R_RN_149)))) &&
+    identical(m_nombre, paste("Défauts :", r_149("tete_observee_apres_deces", R_DN_149))) &&
+    inherits(e2, "refus_tablexp") && identical(e2$details, list(parametre = "defauts$declarations", declaration = 2L))
+})
+verifier("défauts (#149) : chemin sans défaut inchangé : loi de rachat nulle sans défauts -> jeu rendu (aucun refus), sans rachat, identique au jeu d'un appel à déclarations vides (attribut defauts retiré)", {
+  r0 <- simuler(L_RN_CV, PU_CV, PER_CV, GRAINE)
+  r1 <- simuler(L_RN_CV, PU_CV, PER_CV, GRAINE, defauts = list(graine = GRAINE_DEF, declarations = list()))
+  attr(r1, "defauts") <- NULL
+  is.data.frame(r0) && !any(r0$cause_sortie == "rachat") && is.null(attr(r0, "defauts")) && identical(r0, r1)
+})
+verifier("défauts (#149) : causes_nulles() (appel direct) : aucune cause nulle -> vecteur nommé vide ; décès et rachat nuls -> noms dans l'ordre de CAUSES_SIMULEES, raisons exactes ; q > 0 au-delà de l'âge atteignable maximal seulement -> nulle ; q > 0 au dernier âge atteignable -> non nulle", {
+  eff <- function(l, sexes = c("H", "F")) do.call(rbind, lapply(c("deces", "rachat"), function(cs) loi_effective(l[[cs]], cs, sexes)))
+  q_b <- function(b) loi(deces = tablexp:::table_reference(
+    data.frame(age = 0:120, sexe = "ensemble", qx = ifelse(0:120 < b, 0, 0.01), stringsAsFactors = FALSE),
+    nom = "test", statut = "synthetique", source = "test", parametres = list(loi = "test")))
+  identical(tablexp:::causes_nulles(eff(loi()), 30, 69.5, c("H", "F")), VIDE_CV) &&
+    identical(tablexp:::causes_nulles(eff(loi(rachat = NUL, f_deces = c(H = 0, F = 0))), 30, 69.5, c("H", "F")),
+              c(deces = R_DN_149, rachat = R_RN_149)) &&
+    identical(tablexp:::causes_nulles(eff(q_b(70)), 30, 69.5, c("H", "F")), c(deces = R_DN_149)) &&
+    identical(tablexp:::causes_nulles(eff(q_b(69)), 30, 69.5, c("H", "F")), VIDE_CV)
+})
+verifier("défauts (#149) : controler_defauts() et conditions_vides() sans l'argument nulles (défaut : aucune cause nulle) -> mêmes résultats qu'avec un vecteur vide ; controler_defauts() avec nulles -> cible vide par la loi refusée", {
+  d <- list(graine = 1L, declarations = list(list(type = "sortie_manquante", cible = "rachat", taux = 0.1)))
+  e <- tryCatch(tablexp:::controler_defauts(d, 2L, nulles = c(rachat = "raison de test")), refus_tablexp = function(x) x)
+  identical(tablexp:::controler_defauts(d, 2L), tablexp:::controler_defauts(d, 2L, nulles = VIDE_CV)) &&
+    identical(tablexp:::conditions_vides("uniforme", PU_CV, PER_CV),
+              tablexp:::conditions_vides("uniforme", PU_CV, PER_CV, nulles = VIDE_CV)) &&
+    inherits(e, "refus_tablexp") && identical(e$motif, "defauts_invalides") &&
+    grepl("(cible « rachat » : raison de test)", conditionMessage(e), fixed = TRUE)
+})
 verifier("défauts : graine des défauts égale à celle du jeu (double puis integer) -> refus defauts_invalides, texte et détails d'actuary", {
   e1 <- tryCatch(simuler(loi(), PF_M_1E3, PER, GRAINE, defauts = list(graine = as.double(GRAINE), declarations = list(D1))),
                  refus_tablexp = function(e) e)
@@ -1890,20 +2119,27 @@ verifier("défauts : nombre > éligibles -> refus defauts_ineligibles (après le
   # refus defauts_invalides avant tout tirage (#112).
   d_tete <- list(graine = GRAINE_DEF, declarations = list(list(type = "tete_sexe_incoherent", nombre = PF_M_1E3$n + 1)))
   d_tete_1 <- list(graine = GRAINE_DEF, declarations = list(list(type = "tete_sexe_incoherent", nombre = 1)))
-  # Vide qui dépend du jeu : aucun rachat tiré (loi de rachat nulle).
+  # Vide qui dépend du jeu : aucun rachat tiré sous une loi de rachat
+  # faible mais non nulle (q = 1e-9 : non nulle par la loi, #149), absence
+  # vérifiée sur le jeu propre de la même graine. Une loi de rachat nulle
+  # est un vide connu de la loi, refusé avant tout tirage (#149).
   d_ligne <- list(graine = GRAINE_DEF, declarations = list(D1, list(type = "sortie_manquante", cible = "rachat", nombre = 1)))
-  isTRUE(leve_refus(simuler(loi(), PF_M_1E3, PER, GRAINE, defauts = d_tete), "defauts_ineligibles")) &&
+  propre <- simuler(loi(rachat = R_FAIBLE), PF_M_1E3, PER, GRAINE)
+  !any(propre$cause_sortie == "rachat") &&
+    isTRUE(leve_refus(simuler(loi(), PF_M_1E3, PER, GRAINE, defauts = d_tete), "defauts_ineligibles")) &&
     isTRUE(leve_refus(simuler(loi(), PF_FORME, PER, GRAINE, defauts = d_tete_1), "defauts_invalides")) &&
-    isTRUE(leve_refus(simuler(loi(rachat = NUL), PF_M_1E3, PER, GRAINE, defauts = d_ligne), "defauts_ineligibles")) &&
+    isTRUE(leve_refus(simuler(loi(rachat = R_FAIBLE), PF_M_1E3, PER, GRAINE, defauts = d_ligne), "defauts_ineligibles")) &&
     grepl("déclaration 2 (sortie_manquante) : nombre = 1 dépasse le nombre d'unités éligibles (0)",
-          message_refus(simuler(loi(rachat = NUL), PF_M_1E3, PER, GRAINE, defauts = d_ligne)), fixed = TRUE) &&
+          message_refus(simuler(loi(rachat = R_FAIBLE), PF_M_1E3, PER, GRAINE, defauts = d_ligne)), fixed = TRUE) &&
     identical(globalenv()$.Random.seed, avant)
 })
-verifier("défauts : vide qui dépend du jeu, en taux -> admis, 0 unité retenue tracée dans decomptes", {
-  r <- simuler(loi(rachat = NUL), PF_M_1E3, PER, GRAINE, defauts = list(graine = GRAINE_DEF, declarations = list(
+verifier("défauts : vide qui dépend du jeu (rachat faible non nul, aucun rachat tiré, absence vérifiée), en taux -> admis, 0 unité retenue tracée dans decomptes", {
+  propre <- simuler(loi(rachat = R_FAIBLE), PF_M_1E3, PER, GRAINE)
+  r <- simuler(loi(rachat = R_FAIBLE), PF_M_1E3, PER, GRAINE, defauts = list(graine = GRAINE_DEF, declarations = list(
     list(type = "sortie_manquante", cible = "rachat", taux = 0.5))))
   dd <- attr(r, "defauts")$decomptes$declarations
-  identical(dd$eligibles, 0L) && identical(dd$retenues, 0L) && nrow(attr(r, "defauts")$lignes) == 0L
+  !any(propre$cause_sortie == "rachat") &&
+    identical(dd$eligibles, 0L) && identical(dd$retenues, 0L) && nrow(attr(r, "defauts")$lignes) == 0L
 })
 
 # Critère 4 : jeu à exclusion informative pour #69 (spécification, § 2.6).
