@@ -1235,6 +1235,16 @@ verifier("défauts (#238) : ligne_defauts() accepte les longueurs 1 et n pour ro
     grepl("role", ko[1L], fixed = TRUE) && grepl("unite", ko[2L], fixed = TRUE) &&
     grepl("defaut", ko[3L], fixed = TRUE) && grepl("premier", ko[4L], fixed = TRUE)
 })
+verifier("défauts (#238) : ligne_defauts() sans ligne rend le schéma vide, `premier` de longueur 1 compris (aucune erreur de recyclage)", {
+  v <- tablexp:::ligne_defauts(CATALOGUE_DEFAUTS, integer(0), 1L, "sexe_manquant", "ligne", "alteree", premier = 5)
+  v0 <- tablexp:::ligne_defauts(CATALOGUE_DEFAUTS, integer(0), 0L, character(0), character(0), character(0))
+  nrow(v) == 0L && identical(v, v0) && identical(class(v$premier_deces), "Date")
+})
+verifier("défauts (#238) : ligne_defauts() avec un type absent du catalogue de la forme -> erreur de programmation, message exact", {
+  e <- tryCatch(tablexp:::ligne_defauts(CATALOGUE_DEFAUTS, 1:2, 1L, "sexe_manqaunt", "ligne", "alteree"),
+                error = function(e) conditionMessage(e))
+  identical(e, "ligne_defauts() : type absent du catalogue de la forme (erreur de programmation).")
+})
 
 # #235 : texte de validité des défauts en lignes (spécification d'actuary-approfondi,
 # issue #235) ; chaîne exacte, constante en \uXXXX (fichier lisible sous toute locale).

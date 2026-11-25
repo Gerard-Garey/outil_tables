@@ -1064,7 +1064,8 @@ tirer_defauts <- function(graine, decl, etat, eligibles, marquer) {
 # et le refus attendus sont NA (stocks : propagation, amendement A1 de #191 ;
 # aucun par défaut). `role`, `unite`, `defaut` et `premier` ont la longueur 1
 # ou la longueur de `ligne`, sinon erreur de programmation (aucun recyclage
-# silencieux). Appelé avec `ligne` vide et `defaut` vide, rend le schéma vide.
+# silencieux) ; un `defaut` absent de `cat_` : erreur de programmation. Appelé
+# avec `ligne` vide, rend le schéma vide (`premier`, de longueur 1, y compris).
 ligne_defauts <- function(cat_, ligne, k, defaut, unite, role, premier = NULL, sans_motif = character(0)) {
   n <- length(ligne)
   longueurs <- c(role = length(role), unite = length(unite), defaut = length(defaut),
@@ -1073,12 +1074,14 @@ ligne_defauts <- function(cat_, ligne, k, defaut, unite, role, premier = NULL, s
     stop(sprintf("ligne_defauts() : argument(s) %s de longueur différente de 1 et du nombre de lignes (erreur de programmation).",
                  paste(names(longueurs)[longueurs != 1L & longueurs != n], collapse = ", ")), call. = FALSE)
   i <- match(defaut, cat_$defaut)
+  if (anyNA(i))
+    stop("ligne_defauts() : type absent du catalogue de la forme (erreur de programmation).", call. = FALSE)
   role <- rep_len(role, n)
   motif <- rep_len(cat_$motif_attendu[i], n); refus <- rep_len(cat_$refus_attendu[i], n)
   if (length(sans_motif)) {
     motif[role %in% sans_motif] <- NA_character_; refus[role %in% sans_motif] <- NA_character_
   }
-  if (is.null(premier)) premier <- rep(NA_real_, n)
+  premier <- if (is.null(premier)) rep(NA_real_, n) else rep_len(as.numeric(premier), n)
   data.frame(ligne = as.integer(ligne), declaration = rep(as.integer(k), n),
              defaut = rep_len(defaut, n), unite = rep_len(unite, n), role = role,
              motif_attendu = motif, refus_attendu = refus,
@@ -1438,7 +1441,7 @@ injecter_defauts_stocks <- function(tab, ctl, defauts, periode, forme) {
   morceaux <- vector("list", length(decl)); retraits <- vector("list", length(decl))
   for (k in seq_along(decl)) {
     t <- decl[[k]]$type; r <- retenues[[k]]
-    lu <- if (t != "inventaire_perdu") which(u %in% r)
+    lu <- if (decl[[k]]$unite != "inventaire") which(u %in% r)
     rm <- integer(0); m <- ligne_df(integer(0), k, t, character(0))
     switch(t,
            sortie_non_renseignee = {
