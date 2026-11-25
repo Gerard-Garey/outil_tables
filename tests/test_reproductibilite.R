@@ -497,37 +497,11 @@ TRANSITIONS_EN_COURS <- list()
 # constantes SUBST_360B, SUBST_359B, GRANDEURS_359B, SUBST_361B et CHEMINS_361B
 # retirées.
 
-# Transition #359 (B37, correction après la validation de la documentation,
-# étape (9) ; décision du mainteneur du 25/11/2026, avis d'actuary) :
-# conséquence de la mention d'indépendance de segments/z de l'homogénéité,
-# nature variance (objet V_ss) -> contraste_segments, R11 et R12. Changement :
-# la ligne segments / z de etapes/homogeneite/parametres/statuts/statut (texte
-# après tiré du texte avant de la référence par une substitution exacte,
-# SUBST_359C, en échappements \u, sans lire le package). Aucune autre chaîne
-# ni valeur changée. À clore par la régénération de B37, avec
-# transition_359c() et la constante SUBST_359C.
-SUBST_359C <- c(
-  "les d\u00e9c\u00e8s sont sur-dispers\u00e9s et V_ss est sous-estim\u00e9e",
-  paste("les d\u00e9c\u00e8s sont sur-dispers\u00e9s et V_ss sous-estime la variance de O_s - A_s \u00e0 attendus",
-        "grands si les contrats d'une m\u00eame t\u00eate sont dans un m\u00eame segment (r\u00e9sultat asymptotique), dans un",
-        "sens non \u00e9tabli en g\u00e9n\u00e9ral \u00e0 petits attendus, et peut la surestimer si des contrats d'une m\u00eame",
-        "t\u00eate sont dans des segments diff\u00e9rents"))
-# Marquage UTF-8 explicite, octets inchangés (sous la locale C, un littéral
-# \u est d'encodage « unknown » ; précédent de #218).
-Encoding(SUBST_359C) <- "UTF-8"
-transition_359c <- function(id) {
-  ref <- lire_reference(file.path(DOSSIER_REFERENCES, paste0(id, ".tsv")))$valeurs
-  st <- "etapes/homogeneite/parametres/statuts/"
-  k <- which(ref[[paste0(st, "table")]] == "segments" & ref[[paste0(st, "grandeur")]] == "z")
-  avant <- ref[[paste0(st, "statut")]][k]
-  if (length(k) != 1L || !endsWith(avant, SUBST_359C[1L]))
-    stop("transition_359c() : ligne segments / z de la r\u00e9f\u00e9rence introuvable ou d\u00e9j\u00e0 modifi\u00e9e (r\u00e9f\u00e9rence d\u00e9j\u00e0 r\u00e9g\u00e9n\u00e9r\u00e9e ? retirer transition_359c() et la constante SUBST_359C)")
-  apres <- sub(SUBST_359C[1L], SUBST_359C[2L], avant, fixed = TRUE)
-  list(issue = "#359", plans = id,
-       changements = list(list(chemin = paste0(st, "statut"), nature = "valeur de chaîne", valeurs = apres,
-                               positions = k)))
-}
-TRANSITIONS_EN_COURS <- c(TRANSITIONS_EN_COURS, lapply(c("R11", "R12"), transition_359c))
+# Transition #359 (nature contraste_segments de la mention d'indépendance de
+# segments/z de l'homogénéité, R11 et R12 ; validation de la documentation de
+# B37, étape (9), décision du mainteneur du 25/11/2026) close par la
+# régénération (R″) de B37 (exécution 45607820898, sur 8094e39) :
+# transition_359c() et la constante SUBST_359C retirées.
 
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
 CHAMPS_CHANGEMENT <- list(type = c("de", "vers"), valeur = c("valeurs", "positions"),
