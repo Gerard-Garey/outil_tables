@@ -716,7 +716,9 @@ local({
     # Colonne lue par nom : la colonne Mb qui suit « max used » (R_MAX_VSIZE
     # ajoute « limit (Mb) » et décale les positions ; #362).
     g1 <- gc()
-    pic <- sum(g1[, match("max used", colnames(g1)) + 1L])
+    j <- match("max used", colnames(g1))
+    stopifnot('gc() : colonne "max used" absente' = !is.na(j))
+    pic <- sum(g1[, j + 1L])
     verifier(sprintf("R1 d'audit : @longueur %s -> texte_longueur_incoherente en ligne 2, en moins d'1 s, pic gc sous 200 Mo", c_[[1L]]),
              if (inherits(r, "refus_tablexp") && identical(r$motif, "texte_longueur_incoherente") &&
                  identical(r$details$ligne, 2L) && duree < 1 && pic < 200) TRUE
