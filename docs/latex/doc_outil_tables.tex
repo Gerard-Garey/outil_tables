@@ -23105,6 +23105,22 @@ et 155~refus, identiques, attributs compris, avant et après).
     toutes les exclusions des motifs attendus déclarées, les lignes exclues
     par le module \code{donnees} sont celles de l'attribut, motif par
     motif~; sans exclusion, le module refuse (\code{ligne\_invalide}).
+    Le texte énonce une exception (issue~\#235)~: si ces exclusions ne
+    conservent aucune ligne, refus \code{aucune\_ligne\_conservee}, levé
+    par le module \code{donnees} quelles que soient les étapes du plan
+    (section~\ref{sec:controles-donnees})~; si les lignes conservées ne
+    donnent aucune exposition strictement positive ni aucun événement de la
+    transition, refus \code{periode\_sans\_exposition} si le plan comporte
+    l'étape \code{exposition}, seule à lever ce refus
+    (\code{calculer\_exposition()},
+    section~\ref{sec:troncature-censure}), un plan réduit à l'étape
+    \code{donnees} n'en levant aucun (constat, R~4.3.3, sur le jeu du test
+    de l'issue~\#235). Ces deux refus sont établis par mesure~;
+    l'exception énumère les refus établis, et l'absence d'autre refus
+    causé par l'exclusion sous les trois conditions est une
+    \textbf{hypothèse non démontrée}. Le texte de la forme agrégats énonce
+    la même exception, les cellules tenant lieu de lignes (forme
+    «~agrégats~», ci-dessous), sans condition sur les étapes du plan.
 \end{itemize}
 
 \noindent
@@ -24114,7 +24130,13 @@ de l'attribut \code{simulation}~; les champs et colonnes de l'attribut
 altération, valeur par valeur~; sur un jeu \code{uniforme\_multi} portant
 chaque type, les lignes exclues par \code{preparer\_donnees()} égales à
 l'attribut, motif par motif, le refus \code{ligne\_invalide} sans
-exclusion et le refus \code{date\_hors\_domaine} sur un jeu à part~;
+exclusion et le refus \code{date\_hors\_domaine} sur un jeu à part~; le
+texte de validité égal (\code{identical()}) au texte spécifié, recopié dans
+le test, et, sur deux jeux à part (issue~\#235), le refus
+\code{aucune\_ligne\_conservee} quand toutes les lignes sont exclues, le
+refus \code{periode\_sans\_exposition} sur une période d'un jour dont les
+lignes conservées n'ont ni exposition ni événement, et l'absence de refus
+sur ce même jeu sous un plan réduit à l'étape \code{donnees}~;
 \code{construire\_table()} et \code{ecrire\_rapport()} sur le jeu altéré~;
 chaque refus, leur ordre et la restauration de l'aléa de l'appelant~; pour
 la cible structurellement vide (issue~\#112), chaque type de tête dans
