@@ -22318,8 +22318,8 @@ $F_{m-1} \le 1$, qui s'écarte de la loi déclarée sur $p_m$ seul, de
 $\bigl|1 - \sum_k p_k\bigr| \le 10^{-12}$~; quand $F_{m-1} > 1$, ce que le
 contrôle de la somme admet (\code{c(1 + 5e-13, 1e-13)}~: $F_1 > 1$), ce
 vecteur, de dernier terme négatif, n'est pas une loi, et la loi tirée est
-tronquée à~1 (ici $(1, 0)$), à un écart total
-$\sum_k p_k - 1 \le 10^{-12}$ de la loi déclarée (\emph{approximation
+tronquée à~1 (ici $(1, 0)$), à une somme des écarts absolus
+$\sum_k |p_k - P(K = k)| = \sum_k p_k - 1 \le 10^{-12}$ de la loi déclarée (\emph{approximation
 numérique}, bornée par le contrôle de la somme, aux arrondis du cumul en
 double près). \textbf{Un seul contrat par tête sur la loi tirée}
 (ADR 0007, annotation du 25/11/2026, (c)~1~; décision du mainteneur M602,
@@ -22340,7 +22340,8 @@ miroir des sources de R, branche R~4.3)~: si $p_1 \ge 1$, $u < p_1$ pour
 tout tirage, et le critère est \emph{sûr}, un cas qu'il retient étant
 vide quelle que soit la graine. Si $p_1 < 1$, la loi tirée donne
 $P(K \ge 2) = 1 - p_1 > 0$. \emph{Limite admise} (M602)~: sous
-\code{GENERATEUR}, $u = y \cdot 2^{-32}$, $y$ entier de 32~bits
+\code{GENERATEUR}, $u = y \cdot 2^{-32}$ (0 étant remplacé par la routine C
+\code{fixup}), $y$ entier de 32~bits
 (routine C \code{MT\_genrand} du même fichier~; \code{?Random}~: «~they
 take at most 2\^{}32 distinct values~»), donc $u \le 1 - 2^{-32}$~; pour
 $p_1 \in (1 - 2^{-32}, 1)$, comme \code{c(1 - 1e-13, 1e-13)}, $K$ vaut~1
@@ -22933,7 +22934,10 @@ voies~:
     et des exigences vides, seul endroit qui en déclare, et la déclaration
     est refusée si une condition de son type (ou d'un type de sa
     combinaison) en fait partie, ou une exigence que porte l'un de ces
-    types~; \code{controler\_defauts()} lit ces colonnes dans le catalogue
+    types~; la cible vide par la loi est jugée par
+    \code{controler\_defauts()}, d'après les causes nulles rendues par
+    \code{causes\_nulles()}, hors de \code{conditions\_vides()}~;
+    \code{controler\_defauts()} lit ces colonnes dans le catalogue
     de la forme, sans liste de types écrite, si bien qu'un type ajouté au
     catalogue avec l'une de ces conditions, l'une de ces exigences ou les
     mêmes causes admises hérite ainsi du refus. Les cas sont les suivants.
@@ -22954,11 +22958,11 @@ voies~:
         loi retenue donne un seul contrat à chaque tête quelle que soit la
         graine (critère sûr), la réciproque tombant pour
         $p_1 \in (1 - 2^{-32}, 1)$ (limite admise ci-dessous~; preuve à la
-        section~\ref{sec:portefeuille-simule}). Sont donc
-        refusées les lois \code{c(1, 1e-13)}, \code{c(1, 0, 1e-13)} et
+        section~\ref{sec:portefeuille-simule}). Sont donc refusées, sous
+        les lois \code{c(1, 1e-13)}, \code{c(1, 0, 1e-13)} et
         \code{c(1 + 5e-13, 1e-13)}, admises par le contrôle du
-        portefeuille, qui ne change pas~: un jeu sans déclaration de type
-        de tête s'y tire comme avant. Le critère porte sur $p_1$, non sur
+        portefeuille, qui ne change pas, les déclarations d'un type de
+        tête~; un jeu qui n'en porte aucune s'y tire comme avant. Le critère porte sur $p_1$, non sur
         un $p_m$ tiré nul~: \code{c(0.5, 0.5, 1e-13)} a un $p_3$ tiré nul
         ($F_2 = 1$ en double) mais $K = 2$ y est tiré avec probabilité
         $1/2$, et n'est pas refusée~; \code{c(0, 1)}, qui donne deux
@@ -23064,12 +23068,14 @@ voies~:
         si petit que le générateur ne produit jamais l'événement (même
         nature que la limite admise du cas~(1)~; seuil \emph{non
         mesuré})~; (iii)~cause nulle pour un seul des sexes tirés, quand
-        l'autre, qui porte la cause, a une proportion inférieure à la
-        résolution du générateur (avec \code{proportion\_hommes = 1e-11}
-        et $f_F = 0$, aucune tête~H ni aucun décès n'est tiré, mais
-        \code{H} reste un sexe tiré et la cause n'est pas nulle par la
-        loi~; \emph{constat} figé par un test, confirmé par
-        \code{actuary}), comme un sexe de proportion non nulle reste un
+        l'autre, qui porte la cause, a une proportion au plus égale au
+        plus petit uniforme que rend \code{runif()} sous
+        \code{GENERATEUR}, soit $0{,}5/(2^{32}-1)$, valeur substituée à~0 par
+        la routine C \code{fixup} (avec
+        \code{proportion\_hommes = 1e-11} et $f_F = 0$, aucune tête~H ni
+        aucun décès n'est tiré, mais \code{H} reste un sexe tiré et la
+        cause n'est pas nulle par la loi~; \emph{constat} sur une graine,
+        figé par un test), comme un sexe de proportion non nulle reste un
         sexe tiré au cas~(1).
     \end{enumerate}
 \end{itemize}
@@ -23236,7 +23242,7 @@ Cet attribut est construit une seule fois pour les trois formes, dans
 \code{attribut\_defauts()}, et son champ \code{lignes} dans
 \code{ligne\_defauts()} (issue~\#238)~: chaque injecteur n'y passe que ce
 qui lui est propre, sans alignement entre formes. Cette mise en commun n'a
-changé aucun jeu (constat hors CI, R~4.3.3~: 371~appels de
+changé aucun des jeux comparés (constat hors CI, R~4.3.3~: 371~appels de
 \code{simuler\_portefeuille()} sur les trois formes, dont 216~jeux altérés
 et 155~refus, identiques, attributs compris, avant et après).
 
