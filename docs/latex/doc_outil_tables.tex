@@ -22307,10 +22307,48 @@ $m \ge 1$, de valeurs finies et positives ou nulles, $p_m > 0$ ($m$ est le
 plus grand nombre de contrats tirable) et
 $\bigl|\sum_k p_k - 1\bigr| \le 10^{-12}$~; sinon refus
 \code{portefeuille\_invalide}, au message propre au champ. Le tirage par
-inversion (ci-dessous) emploie la loi
-$(p_1, \dots, p_{m-1}, 1 - F_{m-1})$, $F_{m-1} = p_1 + \dots + p_{m-1}$,
-qui s'écarte de la loi déclarée d'au plus $10^{-12}$ sur $p_m$
-(\emph{approximation numérique}, bornée par le contrôle de la somme). $K$
+inversion (ci-dessous) compare un uniforme $u$ aux cumuls
+$F_k = p_1 + \dots + p_k$, $k = 1, \dots, m - 1$, calculés en double
+(\code{cumsum()})~: $K = 1 + \#\{k \le m - 1 : F_k \le u\}$, sauf quand
+\code{loi\_contrats} n'a qu'une probabilité non nulle, cas où $K$ vaut $m$
+sans tirage. Pour $u$ uniforme sur $(0, 1)$, la \emph{loi tirée} donne à
+$K = k$ la longueur de $[F_{k-1}, F_k) \cap (0, 1)$ ($F_0 = 0$,
+$F_m = +\infty$)~: c'est $(p_1, \dots, p_{m-1}, 1 - F_{m-1})$ quand
+$F_{m-1} \le 1$, qui s'écarte de la loi déclarée sur $p_m$ seul, de
+$\bigl|1 - \sum_k p_k\bigr| \le 10^{-12}$~; quand $F_{m-1} > 1$, ce que le
+contrôle de la somme admet (\code{c(1 + 5e-13, 1e-13)}~: $F_1 > 1$), ce
+vecteur, de dernier terme négatif, n'est pas une loi, et la loi tirée est
+tronquée à~1 (ici $(1, 0)$), à un écart total
+$\sum_k p_k - 1 \le 10^{-12}$ de la loi déclarée (\emph{approximation
+numérique}, bornée par le contrôle de la somme, aux arrondis du cumul en
+double près). \textbf{Un seul contrat par tête sur la loi tirée}
+(ADR 0007, annotation du 25/11/2026, (c)~1~; décision du mainteneur M602,
+critère dit A1~; issue~\#148)~: sous $p_m > 0$, la loi tirée donne
+$K = 1$ avec probabilité~1 si et seulement si $m = 1$ ou $p_1 \ge 1$,
+comparaison exacte en double, sans tolérance (\emph{résultat exact}).
+Preuve~: pour
+$m = 1$, $K = 1$ sans tirage (y compris \code{loi\_contrats = 1 - 5e-13},
+admise par le contrôle de la somme)~; pour $m \ge 2$, ou bien $p_m$ est la
+seule probabilité non nulle, et alors $p_1 = 0$ et $K = m \ge 2$ sans
+tirage, ou bien $K = 1$ si et seulement si $u < F_1$, où $F_1$, premier
+terme de \code{cumsum()}, est $p_1$ lui-même en double. Le générateur ne
+rend jamais~1 (\code{?Uniform}, R~4.3.3~: «~\code{runif} will not generate
+either of the extreme values unless [\ldots], and in particular not for the
+default arguments~»~; routine C \code{fixup} de \code{src/main/RNG.c},
+qui remplace~0 et~1, \url{https://github.com/wch/r-source/blob/R-4-3-branch/src/main/RNG.c},
+miroir des sources de R, branche R~4.3)~: si $p_1 \ge 1$, $u < p_1$ pour
+tout tirage, et le critère est \emph{sûr}, un cas qu'il retient étant
+vide quelle que soit la graine. Si $p_1 < 1$, la loi tirée donne
+$P(K \ge 2) = 1 - p_1 > 0$. \emph{Limite admise} (M602)~: sous
+\code{GENERATEUR}, $u = y \cdot 2^{-32}$, $y$ entier de 32~bits
+(routine C \code{MT\_genrand} du même fichier~; \code{?Random}~: «~they
+take at most 2\^{}32 distinct values~»), donc $u \le 1 - 2^{-32}$~; pour
+$p_1 \in (1 - 2^{-32}, 1)$, comme \code{c(1 - 1e-13, 1e-13)}, $K$ vaut~1
+pour toute graine alors que la loi tirée donne $P(K \ge 2) > 0$. Ce cas
+n'est pas retenu par le critère, qui ne dépend ainsi du générateur que
+par «~$u < 1$~» et non par sa résolution, comme un sexe de proportion non
+nulle reste un sexe tiré même sous cette résolution
+(section~\ref{sec:defauts-parametres}, «~Cible structurellement vide~»). $K$
 est tiré indépendamment de la mortalité et du rachat~: le simulateur ne
 représente aucune antisélection, et une dépendance entre $K$ et la mortalité
 est hors du périmètre. Le nombre de contrats tirés, au plus $n \times m$,
@@ -22872,66 +22910,105 @@ exactement \code{graine} et \code{declarations}~:
 Les noms des listes sont comparés sans tri (issue~\#100), par la règle
 unique \code{ecart\_noms()}, partagée avec le portefeuille (issue~\#113).
 \textbf{Cible structurellement vide} (ADR 0007, annotation du 05/11/2026,
-seconde, (c) et~(d)~; décisions du mainteneur M206, M207 et M208, du
-05/11/2026, sur l'avis d'\code{actuary}~; issues~\#112 et~\#135). Une déclaration dont aucune unité ne peut
-être éligible, et cela se sait \emph{avant tout tirage}, par le seul
-portefeuille déjà contrôlé, la période et le catalogue, quelle que soit la
-graine, est refusée (\code{defauts\_invalides}), en taux comme en
-nombre, zéro compris. Deux cas~:
+seconde, (c) et~(d), et annotation du 25/11/2026, (c) et~(d)~; décisions
+du mainteneur M206, M207 et M208, du 05/11/2026, sur l'avis
+d'\code{actuary}, et M602, du 25/11/2026~; issues~\#112, \#135, \#148,
+\#189 et~\#191). Une déclaration dont aucune unité ne peut
+être éligible, et cela se sait \emph{avant tout tirage}, quelle que soit
+la graine, par le portefeuille déjà contrôlé, la période, la forme
+validée et le catalogue de la forme, est refusée
+(\code{defauts\_invalides}), en taux comme en nombre, zéro compris. Deux
+voies~:
 \begin{itemize}[leftmargin=*, itemsep=2pt]
   \item une cible disjointe, par construction, des causes que le catalogue
     admet pour le type (pour une combinaison, pour tous ses types)~: aucune
     ligne n'y serait éligible, quel que soit le jeu~;
   \item un type dont une condition d'éligibilité, lue dans la colonne
-    \code{condition} du catalogue, est vide pour ce portefeuille~:
+    \code{condition} du catalogue, est vide~:
     \code{conditions\_vides()} calcule une fois l'ensemble de ces
     conditions, et la déclaration est refusée si une condition de son type
     (ou d'un type de sa combinaison) en fait partie~; un type ajouté au
-    catalogue avec l'une de ces conditions hérite ainsi du refus. Les types
-    de tête (\code{tete\_naissance\_incoherente},
-    \code{tete\_sexe\_incoherent}, \code{tete\_observee\_apres\_deces})
-    exigent une tête d'au moins deux lignes~: leurs conditions sont vides
-    quand le portefeuille n'a qu'un contrat par tête, dans les modes
-    \code{uniforme} et \code{age\_exact}, et dans les modes
-    \code{uniforme\_multi} et \code{age\_exact\_multi} dont
-    \code{loi\_contrats} est de longueur~1. Sur la \emph{loi déclarée},
-    sous la condition $p_m > 0$ imposée à \code{loi\_contrats} ($m$ étant
-    sa longueur, section~\ref{sec:portefeuille-simule}), le nombre de
-    contrats vaut~1 pour toute tête si et seulement si $m = 1$
-    (\emph{résultat exact})~: \code{loi\_contrats = c(0, 1)}, qui donne
-    deux contrats à chaque tête, n'est pas un cas de refus (issue~\#112).
-    La \emph{loi tirée}, $(p_1, \dots, p_{m-1}, 1 - F_{m-1})$, s'écarte de
-    la loi déclarée d'au plus $10^{-12}$ sur $p_m$
-    (section~\ref{sec:portefeuille-simule})~: une loi déclarée dont $p_m$
-    est de cet ordre peut donner une loi tirée de $p_m$ nul. Ainsi
-    \code{loi\_contrats = c(1, 1e-13)} passe le contrôle du portefeuille
-    ($F_1 = 1$, d'où un $p_2$ tiré nul), donne un seul contrat à chaque
-    tête quelle que soit la graine (résultat exact par lecture~:
-    \code{cumsum(c(1, 1e-13))[-2]} vaut~1 en double et \code{runif()} ne
-    rend jamais~1~; conséquences sur les défauts~: \emph{constat}, deux
-    graines~; issue proposée au mainteneur), et n'est pas refusée avant
-    tout tirage~: une déclaration d'un type de tête y est rendue avec zéro
-    éligible en taux, et refusée par \code{defauts\_ineligibles}, après le
-    tirage, en nombre positif. La condition
-    \code{entree\_avant\_fin} du type \code{en\_cours\_avant\_fin}
-    (entrée antérieure à la fin de la période) est vide quand aucune
-    entrée ne précède la fin~: \code{date\_entree} égale à la fin dans les
-    modes \code{age\_exact} et \code{age\_exact\_multi}, où toute entrée
-    vaut \code{date\_entree}~; \code{origine} égale à la fin dans les modes
-    \code{uniforme} et \code{uniforme\_multi}, où les entrées sont tirées
-    entre \code{origine} et la fin. Le contrôle du portefeuille imposant
-    déjà \code{date\_entree} au plus égale à la fin, et \code{origine} au
-    plus égale au début, lui-même au plus égal à la fin, ces égalités sont
-    exactement les cas vides (issue~\#135).
+    catalogue avec l'une de ces conditions hérite ainsi du refus. Les cas
+    de condition vide sont les suivants.
+    \begin{enumerate}[leftmargin=*, itemsep=2pt, label=(\arabic*)]
+      \item \emph{Un seul contrat par tête} (issues~\#112 et~\#148). Les
+        trois types de tête exigent une tête d'au moins deux lignes~:
+        \code{tete\_naissance\_incoherente} et
+        \code{tete\_sexe\_incoherent} (condition \code{tete\_multi}),
+        \code{tete\_observee\_apres\_deces} (condition
+        \code{tete\_multi\_deces}). Ces conditions sont
+        vides dans les modes \code{uniforme} et \code{age\_exact}, et dans
+        les modes \code{uniforme\_multi} et \code{age\_exact\_multi} dont
+        \code{loi\_contrats} $= (p_1, \dots, p_m)$ vérifie $m = 1$ ou
+        $p_1 \ge 1$, comparaison exacte en double, sans tolérance
+        (critère A1). C'est exactement l'ensemble des lois dont la loi
+        tirée, pour un uniforme sur $(0, 1)$, donne un seul contrat à
+        chaque tête (\emph{résultat exact})~; sous le générateur, toute
+        loi retenue donne un seul contrat à chaque tête quelle que soit la
+        graine (critère sûr), la réciproque tombant pour
+        $p_1 \in (1 - 2^{-32}, 1)$ (limite admise ci-dessous~; preuve à la
+        section~\ref{sec:portefeuille-simule}). Sont donc
+        refusées les lois \code{c(1, 1e-13)}, \code{c(1, 0, 1e-13)} et
+        \code{c(1 + 5e-13, 1e-13)}, admises par le contrôle du
+        portefeuille, qui ne change pas~: un jeu sans déclaration de type
+        de tête s'y tire comme avant. Le critère porte sur $p_1$, non sur
+        un $p_m$ tiré nul~: \code{c(0.5, 0.5, 1e-13)} a un $p_3$ tiré nul
+        ($F_2 = 1$ en double) mais $K = 2$ y est tiré avec probabilité
+        $1/2$, et n'est pas refusée~; \code{c(0, 1)}, qui donne deux
+        contrats à chaque tête, ne l'est pas non plus. \emph{Limite
+        admise}~: pour $p_1 \in (1 - 2^{-32}, 1)$, comme
+        \code{c(1 - 1e-13, 1e-13)}, $K$ vaut~1 pour toute graine sous
+        \code{GENERATEUR}, mais la déclaration n'est pas refusée avant
+        tout tirage~: elle est traitée comme un vide qui dépend du tirage
+        (zéro éligible en taux, \code{defauts\_ineligibles} en nombre
+        positif, ci-dessous). Options écartées (M602)~: un seuil
+        $p_1 > 1 - 2^{-32}$, exact et complet sous \code{GENERATEUR}, ferait
+        dépendre une règle métier de la résolution interne du générateur,
+        alors qu'un sexe de proportion non nulle reste un sexe tiré même
+        sous cette résolution~; une tolérance ($1 - p_1 \le 10^{-12}$)
+        serait un seuil arbitraire, ni exact ni complet~; refuser au
+        contrôle du portefeuille toute loi de $p_m$ tiré nul changerait le
+        domaine du portefeuille pour tous les jeux, avec ou sans défaut,
+        et refuserait \code{c(0.5, 0.5, 1e-13)}, où $K = 2$ est tirable.
+      \item \emph{Aucune entrée avant la fin de la période} (issue~\#135).
+        La condition \code{entree\_avant\_fin} du type
+        \code{en\_cours\_avant\_fin} (entrée antérieure à la fin de la
+        période) est vide quand aucune entrée ne précède la fin~:
+        \code{date\_entree} égale à la fin dans les modes
+        \code{age\_exact} et \code{age\_exact\_multi}, où toute entrée
+        vaut \code{date\_entree}~; \code{origine} égale à la fin dans les
+        modes \code{uniforme} et \code{uniforme\_multi}, où les entrées
+        sont tirées entre \code{origine} et la fin. Le contrôle du
+        portefeuille imposant déjà \code{date\_entree} au plus égale à la
+        fin, et \code{origine} au plus égale au début, lui-même au plus
+        égal à la fin, ces égalités sont exactement les cas vides.
+      \item \emph{Condition de la forme validée} (issues~\#189 et~\#191).
+        Sous une forme, \code{conditions\_vides()}, qui reçoit la forme
+        validée, n'examine que les conditions du catalogue de cette forme,
+        d'après la forme seule~: la condition \code{annee} est vide sous
+        des agrégats sans colonne \code{annee} (\code{par\_annee = FALSE}~;
+        type \code{annee\_hors\_periode}, «~Forme «~agrégats~»~»
+        ci-dessous), la condition \code{grille\_trois\_dates} sous une
+        grille de moins de trois dates d'inventaire (type
+        \code{presence\_interrompue}, «~Forme «~stocks successifs~»~»
+        ci-dessous). Cette lecture, dans le code depuis la PR~\#226, est
+        consignée par l'annotation du 25/11/2026, (c)~4, sans
+        changement du code.
+    \end{enumerate}
 \end{itemize}
 Le message nomme le type et la raison, formée à partir des valeurs
 reçues et citée («~Défauts~: déclaration [k]~: type [type]~: aucune
 unité éligible par construction ([raison]), quel que soit le tirage.~»,
 la raison étant «~un seul contrat par tête~: mode «~[mode]~»~», suivie en
-mode multi-contrats de «~, loi\_contrats de longueur 1~», ou «~aucune
+mode multi-contrats de «~, loi\_contrats de longueur 1~» ou de
+«~, loi\_contrats de longueur [m] de premier terme p\_1 = [p\_1], au moins
+égal à 1 (K = 1 pour toute tête)~», $p_1$ écrit au format
+\code{\%.17g} (au plus 17~chiffres significatifs~: «~1~»,
+«~1.0000000000005~»), ou «~aucune
 entrée avant la fin de la période~: date\_entree «~[date]~» égale à la fin
 «~[fin]~»~», \code{origine} au lieu de \code{date\_entree} dans les modes
-\code{uniforme} et \code{uniforme\_multi})~; les \code{details} sont \code{parametre}
+\code{uniforme} et \code{uniforme\_multi}~; celles des conditions de la
+forme sont citées aux sections des formes)~; les \code{details} sont \code{parametre}
 («~defauts\$declarations~») et \code{declaration} (le rang). Raisons du
 refus plutôt que d'un jeu rendu sans unité retenue~: c'est la règle déjà
 appliquée à la cible disjointe~; le refus ne dépend pas de la graine~; un
@@ -22946,8 +23023,9 @@ cible vide reçoit le refus de la cible vide. Un ensemble d'éligibles vide
 qui \emph{dépend du jeu tiré} (cause absente du jeu propre, y compris une
 transition de loi nulle, vide connu de la loi, hors de la règle
 (\emph{constat}~; issue proposée au mainteneur)~; aucune tête à deux lignes
-dans un mode multi-contrats à plusieurs probabilités, sauf l'exception
-ci-dessus d'une loi tirée de $p_m$ nul~; aucune entrée tirée avant la fin
+tirée dans un mode multi-contrats hors du cas~(1) ci-dessus, soit
+$m \ge 2$ et $p_1 < 1$, limite admise $p_1 \in (1 - 2^{-32}, 1)$
+comprise~; aucune entrée tirée avant la fin
 quand \code{origine} précède la fin) n'est pas refusé à ce stade~: en taux, il donne zéro unité retenue, tracé dans les
 décomptes~; en nombre, il relève du refus \code{defauts\_ineligibles}
 ci-dessous.
@@ -23142,8 +23220,8 @@ sans cet attribut a les mêmes empreintes (constat, R 4.3.3).
     un type de l'une sous l'autre, est inconnu),
     combinaison non admise, \code{cible} manquante, interdite, mal formée
     ou disjointe par construction, type dont une condition est
-    structurellement vide pour le portefeuille (ci-dessus~; issue~\#112) ou
-    pour la forme, type exclusif accompagné d'une autre déclaration (forme
+    structurellement vide pour le portefeuille (ci-dessus~; issues~\#112,
+    \#135 et~\#148) ou pour la forme, type exclusif accompagné d'une autre déclaration (forme
     stocks successifs, ci-dessous),
     \code{taux} et \code{nombre} tous deux
     présents ou tous deux absents, graine des défauts mal formée ou égale à
@@ -23166,18 +23244,20 @@ sans cet attribut a les mêmes empreintes (constat, R 4.3.3).
     \textbf{après le tirage du jeu propre} (sous une forme, après sa
     projection), dont il dépend~: à la
     différence du précédent, il dépend de la graine du jeu. Il ne couvre
-    plus que les vides qui dépendent du tirage, à deux exceptions près,
-    vides connus avant tout tirage mais hors de la règle de la cible
-    structurellement vide~: une transition de loi nulle, et un mode
-    multi-contrats dont la loi tirée de \code{loi\_contrats} a un $p_m$
-    nul, comme \code{c(1, 1e-13)} (ci-dessus~; \emph{constat}~; issue
-    proposée au mainteneur). Un type de tête dans un
-    portefeuille à un seul contrat par tête, et \code{en\_cours\_avant\_fin}
-    quand aucune entrée ne précède la fin, auparavant refusés ici quand
-    \code{nombre} était positif, et rendus avec zéro unité retenue quand il
-    était nul ou exprimé en taux, sont désormais refusés par
-    \code{defauts\_invalides}, avant tout tirage, même sous une graine du
-    jeu invalide (issues~\#112 et~\#135).
+    plus que les vides qui dépendent du tirage, dont la limite admise
+    $p_1 \in (1 - 2^{-32}, 1)$ d'un mode multi-contrats (ci-dessus), à
+    une exception près, vide connu avant tout tirage mais hors de la règle
+    de la cible structurellement vide~: une transition de loi nulle
+    (ci-dessus~; \emph{constat}~; issue proposée au mainteneur). Un type
+    de tête dans un portefeuille à un seul contrat par tête, et
+    \code{en\_cours\_avant\_fin} quand aucune entrée ne précède la fin,
+    auparavant refusés ici quand \code{nombre} était positif, et rendus
+    avec zéro unité retenue quand il était nul ou exprimé en taux, sont
+    désormais refusés par \code{defauts\_invalides}, avant tout tirage,
+    même sous une graine du jeu invalide (issues~\#112 et~\#135)~; il en
+    va de même, depuis l'issue~\#148, d'un type de tête dans un mode
+    multi-contrats de \code{loi\_contrats} de longueur au moins~2 et de
+    premier terme au moins égal à~1, comme \code{c(1, 1e-13)}.
 \end{itemize}
 
 \noindent
@@ -24146,7 +24226,17 @@ longueur~1), en taux et en nombre, zéro compris, sous deux graines du jeu
 dont l'une invalide~: refus \code{defauts\_invalides}, ses \code{details}
 et le mode cité, avant le refus \code{graine\_invalide} et sans changer
 l'aléa de l'appelant~; les modes multi-contrats de \code{loi\_contrats}
-$(0{,}5~; 0{,}5)$ et $(0~; 1)$ admis~; un nom vide dans les conditions
+$(0{,}5~; 0{,}5)$ et $(0~; 1)$ admis~; pour le critère A1
+(issue~\#148), les lois \code{c(1, 1e-13)}, \code{c(1, 0, 1e-13)} et
+\code{c(1 + 5e-13, 1e-13)}, dans les deux modes multi-contrats, pour
+chaque type de tête, en taux $0{,}5$ et en nombre~0 et~1, sous une graine
+du jeu manquante et sous une graine valide~: refus
+\code{defauts\_invalides} avant tout tirage, ses \code{details}, la raison
+exacte ($p_1$ au format \code{\%.17g}) et l'aléa de l'appelant
+inchangé~; \code{c(0, 1)} admise, à unités éligibles, et la limite
+\code{c(1 - 1e-13, 1e-13)} admise avant tirage, rendue à zéro éligible en
+taux et refusée par \code{defauts\_ineligibles} en nombre~1, ce qui fige
+la limite admise~; un nom vide dans les conditions
 vides sans effet~; \code{defauts\_ineligibles} d'un type de tête repris
 dans un mode multi-contrats avec un nombre supérieur aux éligibles~; pour
 \code{en\_cours\_avant\_fin} (issue~\#135), dans les quatre modes, une
@@ -24154,8 +24244,23 @@ date d'entrée ou une origine égale à la fin~: refus avant tout tirage, en
 taux et en nombre, zéro compris, sous une graine du jeu valide ou
 manquante, avec ses \code{details}, la raison et les dates citées, et
 l'aléa de l'appelant inchangé, et, dans les quatre modes, le cas voisin
-d'une entrée la veille de la fin admis~; \code{conditions\_vides()}~; le
-constat ci-dessus.
+d'une entrée la veille de la fin admis~; \code{conditions\_vides()}, dont
+une table figée (issue~\#148~; ADR 0007, annotation du 25/11/2026, (d))~:
+appels directs, sur un portefeuille validé par
+\code{controler\_portefeuille()} et une forme validée par
+\code{controler\_forme()}, comme dans \code{simuler\_portefeuille()},
+comparés par \code{identical()} au vecteur attendu (noms dans l'ordre et
+raisons), calculé à la main d'après la règle, pour les lignes individuelles
+dans les quatre modes (un seul contrat par tête, entrée égale à la fin ou
+la veille, lois de contrats \code{1}, \code{1 - 5e-13}, $(0{,}6~; 0{,}4)$,
+$(0~; 1)$, \code{c(0.5, 0.5, 1e-13)}, les trois lois refusées par le
+critère A1 et la limite \code{c(1 - 1e-13, 1e-13)}), pour les agrégats
+et pour les stocks successifs, dont des formes qui masquent les
+conditions des lignes~; et une garde de couverture lue au catalogue de
+chaque forme~: chaque condition a au moins un cas vide et un cas non
+vide, les noms rendus forment exactement l'ensemble des conditions de la
+forme, et aucun nom de condition ne coïncide avec un nom de colonne des
+catalogues~; le constat ci-dessus.
 \code{tests/unitaires/test\_simulateur\_logistique.R} vérifie la table
 logistique (issue~\#211)~: la forme (paramètres sans valeur par défaut,
 classe, statut, sexe, âges, attribut \code{parametres}, nom~; T1)~; les
@@ -24349,8 +24454,8 @@ identique, attribut compris, dans un autre processus R.
 \catalogue{fonctions-simulation}{age\_revolu\_minimal()} & interne & écart minimal en jours & borne basse $y_{\min}$ \\
 \catalogue{fonctions-simulation}{controler\_couverture()} & interne & loi effective, bornes, sexes & refus \code{table\_trop\_courte}, \code{qx\_egal\_a\_un} \\
 \catalogue{fonctions-simulation}{temps\_latent()} & interne & loi, composantes, âge et fraction à l'entrée, entrée, tirages $E$ & instant et jour de l'événement latent \\
-\catalogue{fonctions-simulation}{controler\_defauts()} & interne & défauts, graine du jeu, \code{vides} (conditions structurellement vides, vecteur nommé, aucune par défaut), règles de la forme (celles des lignes par défaut) & refus \code{defauts\_invalides}, avant tout tirage, dont une déclaration d'un type à condition vide (issue~\#112) et un type hors du catalogue de la forme (issue~\#189)~; \code{vides} est rendu par \code{conditions\_vides()}~; un nom vide ne fait jamais refuser un type sans condition~; cible requise ou interdite selon l'unité du type~; type exclusif de la forme accompagné d'une autre déclaration (issue~\#191)~; déclarations normalisées (types rangés dans l'ordre du catalogue, unité, cible, taux ou nombre) \\
-\catalogue{fonctions-simulation}{conditions\_vides()} & interne & mode, portefeuille contrôlé, période, forme validée (\code{NULL} par défaut) & conditions de la colonne \code{condition} de \code{CATALOGUE\_DEFAUTS} structurellement vides pour ce portefeuille, vecteur nommé (noms~: conditions, jamais \code{""}~; valeurs~: raison formée par \code{formuler()} à partir des valeurs reçues, citée au refus), vide si aucune~: conditions des types de tête pour un seul contrat par tête (issue~\#112), \code{entree\_avant\_fin} quand \code{date\_entree} ou \code{origine} égale la fin de la période (issue~\#135~; section~\ref{sec:defauts-parametres})~; sous une forme, les seules conditions de son catalogue, d'après la forme seule~: condition \code{annee} des agrégats sans \code{par\_annee} (issue~\#189), condition \code{grille\_trois\_dates} des stocks successifs sous une grille de moins de trois dates (issue~\#191) \\
+\catalogue{fonctions-simulation}{controler\_defauts()} & interne & défauts, graine du jeu, \code{vides} (conditions structurellement vides, vecteur nommé, aucune par défaut), règles de la forme (celles des lignes par défaut) & refus \code{defauts\_invalides}, avant tout tirage, dont une déclaration d'un type à condition vide (issues~\#112, \#135 et~\#148) et un type hors du catalogue de la forme (issue~\#189)~; \code{vides} est rendu par \code{conditions\_vides()}~; un nom vide ne fait jamais refuser un type sans condition~; cible requise ou interdite selon l'unité du type~; type exclusif de la forme accompagné d'une autre déclaration (issue~\#191)~; déclarations normalisées (types rangés dans l'ordre du catalogue, unité, cible, taux ou nombre) \\
+\catalogue{fonctions-simulation}{conditions\_vides()} & interne & mode, portefeuille contrôlé, période, forme validée (\code{NULL} par défaut) & conditions de la colonne \code{condition} de \code{CATALOGUE\_DEFAUTS} structurellement vides pour ce portefeuille, vecteur nommé (noms~: conditions, jamais \code{""}~; valeurs~: raison formée par \code{formuler()} à partir des valeurs reçues, citée au refus), vide si aucune~: conditions des types de tête pour un seul contrat par tête, modes \code{uniforme} et \code{age\_exact}, et modes multi-contrats dont \code{loi\_contrats} $= (p_1, \dots, p_m)$ vérifie $m = 1$ ou $p_1 \ge 1$, comparaison exacte en double (critère A1~; issues~\#112 et~\#148~; section~\ref{sec:portefeuille-simule}), \code{entree\_avant\_fin} quand \code{date\_entree} ou \code{origine} égale la fin de la période (issue~\#135~; section~\ref{sec:defauts-parametres})~; sous une forme, les seules conditions de son catalogue, d'après la forme seule~: condition \code{annee} des agrégats sans \code{par\_annee} (issue~\#189), condition \code{grille\_trois\_dates} des stocks successifs sous une grille de moins de trois dates (issue~\#191) \\
 \catalogue{fonctions-simulation}{tirer\_defauts()} & interne & graine des défauts, déclarations contrôlées, état initial, fonctions des éligibles et de marquage & sélection des unités en défaut, règle unique de toutes les formes~: un seul \code{sous\_graine()}, déclarations dans l'ordre reçu, éligibles non encore altérées, taux ou nombre, puis marquage (disjonction)~; refus \code{defauts\_ineligibles}~; nombre d'éligibles et unités retenues par déclaration (issue~\#189) \\
 \catalogue{fonctions-simulation}{ligne\_defauts()} & interne & catalogue de la forme, numéros de ligne, déclaration, type, unité, rôle, premier décès (manquant par défaut), rôles sans motif (aucun par défaut) & lignes du schéma \code{lignes} de l'attribut \code{defauts}, commun aux trois formes~: huit colonnes (\code{ligne}, \code{declaration}, \code{defaut}, \code{unite}, \code{role}, \code{motif\_attendu}, \code{refus\_attendu}, \code{premier\_deces}), motif et refus attendus lus à la ligne du type dans le catalogue de la forme, manquants pour les rôles sans motif (stocks successifs~: \code{propagation})~; type, unité, rôle et premier décès de longueur~1 ou du nombre de lignes, type présent au catalogue de la forme, sinon erreur R (erreur de programmation~: ni refus, ni recyclage silencieux)~; schéma vide pour zéro ligne (issue~\#238) \\
 \catalogue{fonctions-simulation}{attribut\_defauts()} & interne & défauts reçus, défauts contrôlés, règles de la forme, période, rôles, lignes, sélection, décomptes de lignes et de copies~; facultatifs~: validité, rôles hors défaut, décomptes propres à la forme, lignes retirées & attribut \code{defauts} des trois formes, assemblé une seule fois~: champs communs dans leur ordre (\code{parametre}, \code{graine}, \code{generateur}, \code{ordre\_tirages}, \code{validite}, \code{lignes}, \code{decomptes}), champs propres à la forme reçus de l'injecteur et placés en fin de \code{validite} et de \code{decomptes}, champ \code{retirees} en fin s'il est fourni (stocks successifs)~; aucun alignement entre formes (issue~\#238) \\
