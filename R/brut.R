@@ -131,7 +131,10 @@ PORTEE_PROBABILITE <- c(
 # même tête supposés indépendants, relevé tetes_multi_contrats ; autres
 # natures : décès sur-dispersés. tests : p-valeur ou statistique de test ;
 # intervalle ; tests, intervalle et brut_intervalle : sens de l'erreur établi
-# à attendus grands seulement (résultat asymptotique, Q-A (a)) ; variance :
+# à attendus grands seulement (résultat asymptotique, Q-A (a)) ; credibilite :
+# intervalle bayésien de Laplace (bornes de wh_poisson), plus étroit à
+# ajustement donné que sous quasi-Poisson, sans conséquence établie sur la
+# couverture (#359, décision du mainteneur D-b (a) du 25/11/2026) ; variance :
 # variance sous-évaluée, objet exigé (ex. « Var(X2) »), seule nature qui en
 # prend un ; valeur_h0 : espérance ou variance sous H0 (i) dont le sens de
 # l'écart n'est pas établi ; niveau : test dont le sens de l'erreur n'est pas
@@ -142,8 +145,8 @@ PORTEE_PROBABILITE <- c(
 # marquée, comme les littéraux auxquels elle est collée (le texte_moteur() de
 # chaque table la marque).
 mention_independance <- function(nature, objet = NULL) {
-  natures <- c("tests", "intervalle", "variance", "valeur_h0", "niveau", "ecart_minimal", "brut_intervalle",
-               "brut_variance")
+  natures <- c("tests", "intervalle", "credibilite", "variance", "valeur_h0", "niveau", "ecart_minimal",
+               "brut_intervalle", "brut_variance")
   if (!is.character(nature) || length(nature) != 1L || !nature %in% natures)
     stop("mention_independance() : nature inconnue (erreur de programmation).", call. = FALSE)
   if (if (identical(nature, "variance")) !(is.character(objet) && length(objet) == 1L && !is.na(objet) && nzchar(objet))
@@ -155,6 +158,9 @@ mention_independance <- function(nature, objet = NULL) {
                   "étant de sens non établi en général à petits attendus"),
     intervalle = paste("l'intervalle est trop étroit à attendus grands (résultat asymptotique), l'écart de",
                        "couverture étant de sens non établi en général à petits attendus"),
+    credibilite = paste("l'intervalle, à ajustement donné, est plus étroit que sous un modèle de quasi-Poisson",
+                        "(demi-largeur sur l'échelle de theta divisée par la racine du facteur de sur-dispersion), sans",
+                        "conséquence établie sur la couverture"),
     variance = paste(objet, "est sous-estimée"),
     valeur_h0 = "la valeur sous H0 (i) diffère de celle de la loi réelle, dans un sens non établi en général",
     niveau = "le niveau n'est plus garanti",

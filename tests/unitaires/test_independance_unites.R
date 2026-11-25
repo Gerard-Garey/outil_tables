@@ -50,12 +50,17 @@ M_PREFIXE_330 <- paste("unit\u00e9s d'observation ind\u00e9pendantes ; sous l'un
                        "sont sur-dispers\u00e9s et ")
 # Natures tests et intervalle qualifiées par #359 (F359, Q-A (a) ;
 # spécification d'actuary-approfondi, #359, commentaire 7137095929) ;
-# ecart_minimal (theta_80 de l'homogénéité) ajoutée par #359.
+# ecart_minimal (theta_80 de l'homogénéité) ajoutée par #359 ; credibilite
+# (bornes de crédibilité bayésiennes de wh_poisson) ajoutée par #359 (décision
+# du mainteneur D-b (a) du 25/11/2026 ; spécification d'actuary-approfondi).
 CONSEQUENCES_330 <- c(
   tests = paste("les tests sont anti-conservateurs \u00e0 attendus grands (r\u00e9sultat asymptotique), l'erreur de",
                 "niveau \u00e9tant de sens non \u00e9tabli en g\u00e9n\u00e9ral \u00e0 petits attendus"),
   intervalle = paste("l'intervalle est trop \u00e9troit \u00e0 attendus grands (r\u00e9sultat asymptotique), l'\u00e9cart de",
                      "couverture \u00e9tant de sens non \u00e9tabli en g\u00e9n\u00e9ral \u00e0 petits attendus"),
+  credibilite = paste("l'intervalle, \u00e0 ajustement donn\u00e9, est plus \u00e9troit que sous un mod\u00e8le de",
+                      "quasi-Poisson (demi-largeur sur l'\u00e9chelle de theta divis\u00e9e par la racine du facteur de",
+                      "sur-dispersion), sans cons\u00e9quence \u00e9tablie sur la couverture"),
   variance_x2 = "Var(X2) est sous-estim\u00e9e",
   variance_a = "Var(A^) est sous-estim\u00e9e",
   valeur_h0 = "la valeur sous H0 (i) diff\u00e8re de celle de la loi r\u00e9elle, dans un sens non \u00e9tabli en g\u00e9n\u00e9ral",
@@ -131,11 +136,12 @@ verifier("#159 #359 C3 STATUTS_BRUT (littéral de la spécification) : mention e
                  !any(grepl(MARQUEURS_159[2L], enc2utf8(s$statut), fixed = TRUE)))
   if (all(tous)) TRUE else paste("échec :", paste(names(tous)[!tous], collapse = ", "))
 })
-verifier("#330 #359 C2 mention_independance() (litt\u00e9ral de la sp\u00e9cification) : pr\u00e9fixe commun suivi de la cons\u00e9quence exacte de chacune des huit natures (tests, intervalle, variance, valeur_h0, niveau, ecart_minimal, brut_intervalle, brut_variance), objet de la variance repris", {
+verifier("#330 #359 C2 mention_independance() (litt\u00e9ral de la sp\u00e9cification) : pr\u00e9fixe commun suivi de la cons\u00e9quence exacte de chacune des neuf natures (tests, intervalle, credibilite, variance, valeur_h0, niveau, ecart_minimal, brut_intervalle, brut_variance), objet de la variance repris", {
   f <- tablexp:::mention_independance
-  obt <- enc2utf8(c(f("tests"), f("intervalle"), f("variance", "Var(X2)"), f("variance", "Var(A^)"), f("valeur_h0"),
-                    f("niveau"), f("ecart_minimal"), f("brut_intervalle"), f("brut_variance")))
-  att <- c(vapply(c("tests", "intervalle", "variance_x2", "variance_a", "valeur_h0", "niveau", "ecart_minimal"),
+  obt <- enc2utf8(c(f("tests"), f("intervalle"), f("credibilite"), f("variance", "Var(X2)"), f("variance", "Var(A^)"),
+                    f("valeur_h0"), f("niveau"), f("ecart_minimal"), f("brut_intervalle"), f("brut_variance")))
+  att <- c(vapply(c("tests", "intervalle", "credibilite", "variance_x2", "variance_a", "valeur_h0", "niveau",
+                    "ecart_minimal"),
                   mention_330, ""), M_BRUT_359)
   if (identical(obt, unname(att))) TRUE else paste("obtenu :", paste(obt, collapse = " | "))
 })
@@ -149,6 +155,7 @@ verifier("#330 C3 mention_independance() (litt\u00e9ral de la sp\u00e9cification
          objet_numerique_hors_variance = inherits(try(f("intervalle", 1), silent = TRUE), "try-error"),
          objet_numerique_variance = inherits(try(f("variance", 1), silent = TRUE), "try-error"),
          objet_ecart_minimal = inherits(try(f("ecart_minimal", "theta_80"), silent = TRUE), "try-error"),
+         objet_credibilite = inherits(try(f("credibilite", "theta"), silent = TRUE), "try-error"),
          objet_brut_variance = inherits(try(f("brut_variance", "Var(X2)"), silent = TRUE), "try-error"))
   if (all(r)) TRUE else paste("non refus\u00e9 :", paste(names(r)[!r], collapse = ", "))
 })
@@ -179,18 +186,18 @@ verifier("#159 #329 C3 STATUTS_VALIDATION_LISSEE (littéral de la spécification
          ecart_159(tablexp:::STATUTS_VALIDATION_LISSEE, character(0)))
 # STATUTS_LISSAGE_POISSON (#329 ; spécification d'actuary-approfondi, #329,
 # commentaire 7102999392, § 1, § 2 et § 4) : 2 lignes de loi sur 12, nature
-# intervalle, lues par grandeur seule ; fragment propre à R/lissage.R (lissage
-# précède validation), égal à l'octet à mention_independance("intervalle").
+# credibilite (#359, décision du mainteneur D-b (a) du 25/11/2026), lues par
+# grandeur seule ; fragment égal à l'octet à mention_independance("credibilite").
 BORNES_329 <- c("table_lissee/borne_inf_credibilite", "table_lissee/borne_sup_credibilite")
-verifier("#329 C3 STATUTS_LISSAGE_POISSON (litt\u00e9ral de la sp\u00e9cification) : 12 lignes ; marqueur une fois sur les deux bornes de cr\u00e9dibilit\u00e9, jamais ailleurs (parametre_lissage et laml comprises) ; mention de la nature intervalle en fin de statut, texte exact et identique \u00e0 l'octet \u00e0 mention_independance(\"intervalle\")", {
+verifier("#329 C3 STATUTS_LISSAGE_POISSON (litt\u00e9ral de la sp\u00e9cification) : 12 lignes ; marqueur une fois sur les deux bornes de cr\u00e9dibilit\u00e9, jamais ailleurs (parametre_lissage et laml comprises) ; mention de la nature credibilite (#359, D-b (a)) en fin de statut, texte exact et identique \u00e0 l'octet \u00e0 mention_independance(\"credibilite\")", {
   s <- tablexp:::STATUTS_LISSAGE_POISSON; st <- enc2utf8(s$statut[match(BORNES_329, s$grandeur)])
   e <- ecart_159(s, BORNES_329, s$grandeur)
-  m <- enc2utf8(tablexp:::mention_independance("intervalle"))
+  m <- enc2utf8(tablexp:::mention_independance("credibilite"))
   if (nrow(s) != 12L || !identical(names(s), c("grandeur", "statut"))) "STATUTS_LISSAGE_POISSON : 12 lignes, colonnes grandeur et statut attendues"
   else if (!isTRUE(e)) e
-  else if (!identical(m, mention_330("intervalle"))) "mention_independance(\"intervalle\") diff\u00e8re du litt\u00e9ral"
-  else if (!all(endsWith(st, paste(";", mention_330("intervalle"))))) "texte ou place de la mention (litt\u00e9ral)"
-  else if (!all(endsWith(st, paste(";", m)))) "fragment diff\u00e9rent de mention_independance(\"intervalle\")"
+  else if (!identical(m, mention_330("credibilite"))) "mention_independance(\"credibilite\") diff\u00e8re du litt\u00e9ral"
+  else if (!all(endsWith(st, paste(";", mention_330("credibilite"))))) "texte ou place de la mention (litt\u00e9ral)"
+  else if (!all(endsWith(st, paste(";", m)))) "fragment diff\u00e9rent de mention_independance(\"credibilite\")"
   else TRUE
 })
 verifier("#159 #330 C3 STATUTS_IMPORTANCE (litt\u00e9ral de la sp\u00e9cification) : marqueur une fois sur les 4 lignes de loi (bornes du comparateur 1, rapport_variance, bornes du comparateur 2), jamais ailleurs ; cons\u00e9quence de la nature (3 intervalles, 1 variance Var(A^)) ; mention en fin de statut, avant la relation ajustee_hors_outil pour smr_comparateur_2/bornes", {
@@ -296,7 +303,8 @@ statuts_359 <- function() lapply(stats::setNames(nm = TABLES_359), function(n) {
 })
 natures_359 <- function(tables) {
   f <- tablexp:::mention_independance
-  fixes <- c("tests", "intervalle", "valeur_h0", "niveau", "ecart_minimal", "brut_intervalle", "brut_variance")
+  fixes <- c("tests", "intervalle", "credibilite", "valeur_h0", "niveau", "ecart_minimal", "brut_intervalle",
+             "brut_variance")
   sorties <- stats::setNames(enc2utf8(vapply(fixes, f, "")), fixes)
   p <- enc2utf8(PREFIXE_359)
   lapply(tables, function(st) unlist(lapply(st, function(x) {
@@ -315,7 +323,7 @@ natures_359 <- function(tables) {
 }
 DECOMPTES_359 <- list(
   STATUTS_BRUT = c(brut_intervalle = 7L, brut_variance = 1L),
-  STATUTS_LISSAGE_POISSON = c(intervalle = 2L),
+  STATUTS_LISSAGE_POISSON = c(credibilite = 2L),
   STATUTS_POSITIONNEMENT = c(intervalle = 8L),
   STATUTS_VALIDATION = c(intervalle = 3L, niveau = 3L, tests = 10L, valeur_h0 = 5L, variance = 1L),
   STATUTS_VALIDATION_POSITIONNEE = c(intervalle = 1L, niveau = 3L, tests = 6L, valeur_h0 = 6L),
@@ -331,7 +339,7 @@ ecart_natures_359 <- function(tables) {
   }))
   if (length(e)) paste(e, collapse = " ; ") else TRUE
 }
-verifier("#359 C1-b contr\u00f4le \u00e0 l'ex\u00e9cution (litt\u00e9ral de la sp\u00e9cification pour les d\u00e9comptes) : dans les huit tables (STATUTS_BRUT, STATUTS_LISSAGE_POISSON, STATUTS_POSITIONNEMENT, STATUTS_VALIDATION, STATUTS_VALIDATION_POSITIONNEE, STATUTS_IMPORTANCE, STATUTS_HOMOGENEITE, HYPOTHESE_HOMOGENEITE), toute occurrence du pr\u00e9fixe est une sortie exacte de mention_independance() ; d\u00e9comptes par nature (validation tests 10, intervalle 3 ; positionn\u00e9e tests 6, intervalle 1 ; importance intervalle 3 ; lissage 2 ; positionnement 8 ; brut 7 + 1, Kaplan-Meier compris ; homog\u00e9n\u00e9it\u00e9 tests 3 + l'hypoth\u00e8se, variance 1 (segments/z, V_ss), 2 ecart_minimal ; avis d'actuary sur #359, Q1 et Q2)",
+verifier("#359 C1-b contr\u00f4le \u00e0 l'ex\u00e9cution (litt\u00e9ral de la sp\u00e9cification pour les d\u00e9comptes) : dans les huit tables (STATUTS_BRUT, STATUTS_LISSAGE_POISSON, STATUTS_POSITIONNEMENT, STATUTS_VALIDATION, STATUTS_VALIDATION_POSITIONNEE, STATUTS_IMPORTANCE, STATUTS_HOMOGENEITE, HYPOTHESE_HOMOGENEITE), toute occurrence du pr\u00e9fixe est une sortie exacte de mention_independance() ; d\u00e9comptes par nature (validation tests 10, intervalle 3 ; positionn\u00e9e tests 6, intervalle 1 ; importance intervalle 3 ; lissage credibilite 2 (#359, D-b (a)) ; positionnement 8 ; brut 7 + 1, Kaplan-Meier compris ; homog\u00e9n\u00e9it\u00e9 tests 3 + l'hypoth\u00e8se, variance 1 (segments/z, V_ss), 2 ecart_minimal ; avis d'actuary sur #359, Q1 et Q2)",
          ecart_natures_359(statuts_359()))
 verifier("#359 C1-b t\u00e9moin (valeur calcul\u00e9e \u00e0 la main) : copie dont une borne du positionnement reprend l'ancien texte non qualifi\u00e9 (\u00ab l'intervalle est trop \u00e9troit \u00bb, suivi de la fin du statut), puis copie dont l'hypoth\u00e8se de l'homog\u00e9n\u00e9it\u00e9 reprend celui d'INDEPENDANCE_HOMOGENEITE -> \u00e9cart signal\u00e9 sur la table", {
   t1 <- statuts_359(); i <- which(grepl("trop \u00e9troit \u00e0 attendus grands", t1$STATUTS_POSITIONNEMENT, fixed = TRUE))[1L]
@@ -378,9 +386,9 @@ verifier("#330 C3 t\u00e9moin (valeur calcul\u00e9e \u00e0 la main) : copie de S
 verifier("#329 C3 t\u00e9moin (valeur calcul\u00e9e \u00e0 la main) : copie de STATUTS_LISSAGE_POISSON dont borne_inf_credibilite perd sa mention, puis copie dont segments/parametre_lissage la re\u00e7oit -> \u00e9cart signal\u00e9 sur la ligne (cl\u00e9 grandeur)", {
   d <- tablexp:::STATUTS_LISSAGE_POISSON
   retrait <- d; i <- which(d$grandeur == BORNES_329[1L])
-  retrait$statut[i] <- sub(paste(" ;", mention_330("intervalle")), "", enc2utf8(retrait$statut[i]), fixed = TRUE)
+  retrait$statut[i] <- sub(paste(" ;", mention_330("credibilite")), "", enc2utf8(retrait$statut[i]), fixed = TRUE)
   ajout <- d; j <- which(d$grandeur == "segments/parametre_lissage")
-  ajout$statut[j] <- paste(ajout$statut[j], ";", mention_330("intervalle"))
+  ajout$statut[j] <- paste(ajout$statut[j], ";", mention_330("credibilite"))
   e1 <- ecart_159(retrait, BORNES_329, retrait$grandeur); e2 <- ecart_159(ajout, BORNES_329, ajout$grandeur)
   if (identical(e1, "table_lissee/borne_inf_credibilite : 0 au lieu de 1") &&
       identical(e2, "segments/parametre_lissage : 1 au lieu de 0")) TRUE

@@ -546,6 +546,40 @@ transition_360b <- function(id) {
 }
 TRANSITIONS_EN_COURS <- c(TRANSITIONS_EN_COURS, lapply(c("R8", "R9", "R10"), transition_360b))
 
+# Transition #359 (B37, correction après revue finale ; décision du
+# mainteneur D-b (a) du 25/11/2026 ; spécification d'actuary-approfondi) :
+# conséquence de la mention d'indépendance des deux bornes de crédibilité de
+# wh_poisson, nature intervalle -> credibilite, R16 et R17. Changement : les
+# deux lignes table_lissee/borne_inf_credibilite et borne_sup_credibilite de
+# etapes/lissage/parametres/statuts/statut (texte après tiré du texte avant
+# de la référence par une substitution exacte, SUBST_359B, en échappements
+# \u, sans lire le package). Aucune autre chaîne ni valeur changée. À clore
+# par la régénération de B37, avec transition_359b() et les constantes
+# *_359B.
+SUBST_359B <- c(
+  paste("les d\u00e9c\u00e8s sont sur-dispers\u00e9s et l'intervalle est trop \u00e9troit \u00e0 attendus grands",
+        "(r\u00e9sultat asymptotique), l'\u00e9cart de couverture \u00e9tant de sens non \u00e9tabli en g\u00e9n\u00e9ral \u00e0",
+        "petits attendus"),
+  paste("les d\u00e9c\u00e8s sont sur-dispers\u00e9s et l'intervalle, \u00e0 ajustement donn\u00e9, est plus \u00e9troit que",
+        "sous un mod\u00e8le de quasi-Poisson (demi-largeur sur l'\u00e9chelle de theta divis\u00e9e par la racine du",
+        "facteur de sur-dispersion), sans cons\u00e9quence \u00e9tablie sur la couverture"))
+# Marquage UTF-8 explicite, octets inchangés (voir SUBST_360B).
+Encoding(SUBST_359B) <- "UTF-8"
+GRANDEURS_359B <- c("table_lissee/borne_inf_credibilite", "table_lissee/borne_sup_credibilite")
+transition_359b <- function(id) {
+  ref <- lire_reference(file.path(DOSSIER_REFERENCES, paste0(id, ".tsv")))$valeurs
+  st <- "etapes/lissage/parametres/statuts/"
+  k <- match(GRANDEURS_359B, ref[[paste0(st, "grandeur")]])
+  avant <- ref[[paste0(st, "statut")]][k]
+  if (anyNA(k) || !all(endsWith(avant, SUBST_359B[1L])))
+    stop("transition_359b() : bornes de cr\u00e9dibilit\u00e9 de la r\u00e9f\u00e9rence introuvables ou d\u00e9j\u00e0 modifi\u00e9es (r\u00e9f\u00e9rence d\u00e9j\u00e0 r\u00e9g\u00e9n\u00e9r\u00e9e ? retirer transition_359b() et les constantes *_359B)")
+  apres <- sub(SUBST_359B[1L], SUBST_359B[2L], avant, fixed = TRUE)
+  list(issue = "#359", plans = id,
+       changements = list(list(chemin = paste0(st, "statut"), nature = "valeur de chaîne", valeurs = apres,
+                               positions = k)))
+}
+TRANSITIONS_EN_COURS <- c(TRANSITIONS_EN_COURS, lapply(c("R16", "R17"), transition_359b))
+
 NATURES_TRANSITION <- c("type", "valeur", "valeur de chaîne", "ajout", "retrait")
 CHAMPS_CHANGEMENT <- list(type = c("de", "vers"), valeur = c("valeurs", "positions"),
                           "valeur de chaîne" = c("valeurs", "positions"),
