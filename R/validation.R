@@ -2118,7 +2118,7 @@ STATUTS_HOMOGENEITE <- local({
             "différent de s), sans soustraction ; U du groupe de référence de sa composante pris égal à moins la",
             "somme des U des autres groupes (identité exacte) ; aucune p-valeur produite ; calcul en arithmétique",
             "flottante, approximation numérique ; aucune correction de multiplicité ;",
-            mention_independance("variance", "V_ss"))),
+            mention_independance("contraste_segments"))),
     c("ecart_minimal", "theta_80_superieur", statut_ecart_minimal(TRUE)),
     c("ecart_minimal", "theta_80_inferieur", statut_ecart_minimal(FALSE)))
   texte_moteur(data.frame(table = vapply(l, `[`, "", 1L), grandeur = vapply(l, `[`, "", 2L),

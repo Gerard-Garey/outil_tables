@@ -139,14 +139,17 @@ PORTEE_PROBABILITE <- c(
 # prend un ; valeur_h0 : espérance ou variance sous H0 (i) dont le sens de
 # l'écart n'est pas établi ; niveau : test dont le sens de l'erreur n'est pas
 # établi ; ecart_minimal : theta_80 de l'homogénéité ; brut_variance :
-# variance de Kaplan-Meier. Définie dans le module brut, premier de ses
+# variance de Kaplan-Meier ; contraste_segments : z de l'homogénéité par
+# segment, sans objet, sens de l'erreur sur V_ss selon que les contrats d'une
+# même tête sont ou non dans un même segment (#359, décision du mainteneur du
+# 25/11/2026, avis d'actuary à l'étape (9)). Définie dans le module brut, premier de ses
 # appelants (ORDRE_MODULES), appelée à l'installation par les tables de
 # statuts de brut, lissage, positionnement et validation ; chaîne non
 # marquée, comme les littéraux auxquels elle est collée (le texte_moteur() de
 # chaque table la marque).
 mention_independance <- function(nature, objet = NULL) {
   natures <- c("tests", "intervalle", "credibilite", "variance", "valeur_h0", "niveau", "ecart_minimal",
-               "brut_intervalle", "brut_variance")
+               "brut_intervalle", "brut_variance", "contraste_segments")
   if (!is.character(nature) || length(nature) != 1L || !nature %in% natures)
     stop("mention_independance() : nature inconnue (erreur de programmation).", call. = FALSE)
   if (if (identical(nature, "variance")) !(is.character(objet) && length(objet) == 1L && !is.na(objet) && nzchar(objet))
@@ -167,7 +170,11 @@ mention_independance <- function(nature, objet = NULL) {
     ecart_minimal = "theta_80 est trop proche de 1 (écart minimal détectable sous-estimé)",
     brut_intervalle = paste("l'intervalle trop étroit à grand nombre attendu d'événements (résultat asymptotique),",
                             "l'écart de couverture étant de sens non établi en général à petit nombre attendu"),
-    brut_variance = "la variance trop faible")
+    brut_variance = "la variance trop faible",
+    contraste_segments = paste("V_ss sous-estime la variance de O_s - A_s à attendus grands si les contrats d'une",
+                               "même tête sont dans un même segment (résultat asymptotique), dans un sens non",
+                               "établi en général à petits attendus, et peut la surestimer si des contrats d'une",
+                               "même tête sont dans des segments différents"))
   prefixe <- "unités d'observation indépendantes ; sous l'unité contrat,"
   if (startsWith(nature, "brut_"))
     paste(prefixe, "les contrats d'une même tête sont supposés indépendants (une dépendance positive rend",

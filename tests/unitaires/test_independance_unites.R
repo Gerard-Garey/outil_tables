@@ -52,7 +52,9 @@ M_PREFIXE_330 <- paste("unit\u00e9s d'observation ind\u00e9pendantes ; sous l'un
 # spécification d'actuary-approfondi, #359, commentaire 7137095929) ;
 # ecart_minimal (theta_80 de l'homogénéité) ajoutée par #359 ; credibilite
 # (bornes de crédibilité bayésiennes de wh_poisson) ajoutée par #359 (décision
-# du mainteneur D-b (a) du 25/11/2026 ; spécification d'actuary-approfondi).
+# du mainteneur D-b (a) du 25/11/2026 ; spécification d'actuary-approfondi) ;
+# contraste_segments (segments/z de l'homogénéité, sans objet) ajoutée par
+# #359 (décision du mainteneur du 25/11/2026, avis d'actuary à l'étape (9)).
 CONSEQUENCES_330 <- c(
   tests = paste("les tests sont anti-conservateurs \u00e0 attendus grands (r\u00e9sultat asymptotique), l'erreur de",
                 "niveau \u00e9tant de sens non \u00e9tabli en g\u00e9n\u00e9ral \u00e0 petits attendus"),
@@ -65,7 +67,11 @@ CONSEQUENCES_330 <- c(
   variance_a = "Var(A^) est sous-estim\u00e9e",
   valeur_h0 = "la valeur sous H0 (i) diff\u00e8re de celle de la loi r\u00e9elle, dans un sens non \u00e9tabli en g\u00e9n\u00e9ral",
   niveau = "le niveau n'est plus garanti",
-  ecart_minimal = "theta_80 est trop proche de 1 (\u00e9cart minimal d\u00e9tectable sous-estim\u00e9)")
+  ecart_minimal = "theta_80 est trop proche de 1 (\u00e9cart minimal d\u00e9tectable sous-estim\u00e9)",
+  contraste_segments = paste("V_ss sous-estime la variance de O_s - A_s \u00e0 attendus grands si les contrats d'une",
+                             "m\u00eame t\u00eate sont dans un m\u00eame segment (r\u00e9sultat asymptotique), dans un sens",
+                             "non \u00e9tabli en g\u00e9n\u00e9ral \u00e0 petits attendus, et peut la surestimer si des",
+                             "contrats d'une m\u00eame t\u00eate sont dans des segments diff\u00e9rents"))
 mention_330 <- function(n) paste0(M_PREFIXE_330, CONSEQUENCES_330[[n]])
 # Natures brut_* (STATUTS_BRUT, #359) : préfixe des contrats d'une même tête,
 # conséquence, puis renvoi au relevé tetes_multi_contrats.
@@ -136,13 +142,14 @@ verifier("#159 #359 C3 STATUTS_BRUT (littéral de la spécification) : mention e
                  !any(grepl(MARQUEURS_159[2L], enc2utf8(s$statut), fixed = TRUE)))
   if (all(tous)) TRUE else paste("échec :", paste(names(tous)[!tous], collapse = ", "))
 })
-verifier("#330 #359 C2 mention_independance() (litt\u00e9ral de la sp\u00e9cification) : pr\u00e9fixe commun suivi de la cons\u00e9quence exacte de chacune des neuf natures (tests, intervalle, credibilite, variance, valeur_h0, niveau, ecart_minimal, brut_intervalle, brut_variance), objet de la variance repris", {
+verifier("#330 #359 C2 mention_independance() (litt\u00e9ral de la sp\u00e9cification) : pr\u00e9fixe commun suivi de la cons\u00e9quence exacte de chacune des dix natures (tests, intervalle, credibilite, variance, valeur_h0, niveau, ecart_minimal, brut_intervalle, brut_variance, contraste_segments), objet de la variance repris", {
   f <- tablexp:::mention_independance
   obt <- enc2utf8(c(f("tests"), f("intervalle"), f("credibilite"), f("variance", "Var(X2)"), f("variance", "Var(A^)"),
-                    f("valeur_h0"), f("niveau"), f("ecart_minimal"), f("brut_intervalle"), f("brut_variance")))
+                    f("valeur_h0"), f("niveau"), f("ecart_minimal"), f("brut_intervalle"), f("brut_variance"),
+                    f("contraste_segments")))
   att <- c(vapply(c("tests", "intervalle", "credibilite", "variance_x2", "variance_a", "valeur_h0", "niveau",
                     "ecart_minimal"),
-                  mention_330, ""), M_BRUT_359)
+                  mention_330, ""), M_BRUT_359, mention_330("contraste_segments"))
   if (identical(obt, unname(att))) TRUE else paste("obtenu :", paste(obt, collapse = " | "))
 })
 verifier("#330 C3 mention_independance() (litt\u00e9ral de la sp\u00e9cification) : nature inconnue, variance sans objet et objet hors de la nature variance refus\u00e9s (erreur de programmation)", {
@@ -156,7 +163,8 @@ verifier("#330 C3 mention_independance() (litt\u00e9ral de la sp\u00e9cification
          objet_numerique_variance = inherits(try(f("variance", 1), silent = TRUE), "try-error"),
          objet_ecart_minimal = inherits(try(f("ecart_minimal", "theta_80"), silent = TRUE), "try-error"),
          objet_credibilite = inherits(try(f("credibilite", "theta"), silent = TRUE), "try-error"),
-         objet_brut_variance = inherits(try(f("brut_variance", "Var(X2)"), silent = TRUE), "try-error"))
+         objet_brut_variance = inherits(try(f("brut_variance", "Var(X2)"), silent = TRUE), "try-error"),
+         objet_contraste_segments = inherits(try(f("contraste_segments", "V_ss"), silent = TRUE), "try-error"))
   if (all(r)) TRUE else paste("non refus\u00e9 :", paste(names(r)[!r], collapse = ", "))
 })
 verifier("#159 #330 C3 STATUTS_VALIDATION (litt\u00e9ral de la sp\u00e9cification) : marqueur une fois sur les 22 lignes de loi, jamais ailleurs ; cons\u00e9quence de la nature de chaque ligne (10 tests, 3 intervalles, 1 variance Var(X2), 5 valeurs sous H0 (i), 3 niveaux) ; mention en fin de statut, avant la relation ajustee_hors_outil pour les deux lignes sous_groupes",
@@ -304,7 +312,7 @@ statuts_359 <- function() lapply(stats::setNames(nm = TABLES_359), function(n) {
 natures_359 <- function(tables) {
   f <- tablexp:::mention_independance
   fixes <- c("tests", "intervalle", "credibilite", "valeur_h0", "niveau", "ecart_minimal", "brut_intervalle",
-             "brut_variance")
+             "brut_variance", "contraste_segments")
   sorties <- stats::setNames(enc2utf8(vapply(fixes, f, "")), fixes)
   p <- enc2utf8(PREFIXE_359)
   lapply(tables, function(st) unlist(lapply(st, function(x) {
@@ -328,7 +336,7 @@ DECOMPTES_359 <- list(
   STATUTS_VALIDATION = c(intervalle = 3L, niveau = 3L, tests = 10L, valeur_h0 = 5L, variance = 1L),
   STATUTS_VALIDATION_POSITIONNEE = c(intervalle = 1L, niveau = 3L, tests = 6L, valeur_h0 = 6L),
   STATUTS_IMPORTANCE = c(intervalle = 3L, variance = 1L),
-  STATUTS_HOMOGENEITE = c(ecart_minimal = 2L, tests = 3L, variance = 1L),
+  STATUTS_HOMOGENEITE = c(contraste_segments = 1L, ecart_minimal = 2L, tests = 3L),
   HYPOTHESE_HOMOGENEITE = c(tests = 1L))
 ecart_natures_359 <- function(tables) {
   n <- natures_359(tables)
@@ -339,7 +347,7 @@ ecart_natures_359 <- function(tables) {
   }))
   if (length(e)) paste(e, collapse = " ; ") else TRUE
 }
-verifier("#359 C1-b contr\u00f4le \u00e0 l'ex\u00e9cution (litt\u00e9ral de la sp\u00e9cification pour les d\u00e9comptes) : dans les huit tables (STATUTS_BRUT, STATUTS_LISSAGE_POISSON, STATUTS_POSITIONNEMENT, STATUTS_VALIDATION, STATUTS_VALIDATION_POSITIONNEE, STATUTS_IMPORTANCE, STATUTS_HOMOGENEITE, HYPOTHESE_HOMOGENEITE), toute occurrence du pr\u00e9fixe est une sortie exacte de mention_independance() ; d\u00e9comptes par nature (validation tests 10, intervalle 3 ; positionn\u00e9e tests 6, intervalle 1 ; importance intervalle 3 ; lissage credibilite 2 (#359, D-b (a)) ; positionnement 8 ; brut 7 + 1, Kaplan-Meier compris ; homog\u00e9n\u00e9it\u00e9 tests 3 + l'hypoth\u00e8se, variance 1 (segments/z, V_ss), 2 ecart_minimal ; avis d'actuary sur #359, Q1 et Q2)",
+verifier("#359 C1-b contr\u00f4le \u00e0 l'ex\u00e9cution (litt\u00e9ral de la sp\u00e9cification pour les d\u00e9comptes) : dans les huit tables (STATUTS_BRUT, STATUTS_LISSAGE_POISSON, STATUTS_POSITIONNEMENT, STATUTS_VALIDATION, STATUTS_VALIDATION_POSITIONNEE, STATUTS_IMPORTANCE, STATUTS_HOMOGENEITE, HYPOTHESE_HOMOGENEITE), toute occurrence du pr\u00e9fixe est une sortie exacte de mention_independance() ; d\u00e9comptes par nature (validation tests 10, intervalle 3 ; positionn\u00e9e tests 6, intervalle 1 ; importance intervalle 3 ; lissage credibilite 2 (#359, D-b (a)) ; positionnement 8 ; brut 7 + 1, Kaplan-Meier compris ; homog\u00e9n\u00e9it\u00e9 tests 3 + l'hypoth\u00e8se, contraste_segments 1 (segments/z ; d\u00e9cision du mainteneur du 25/11/2026), 2 ecart_minimal ; avis d'actuary sur #359, Q1 et Q2)",
          ecart_natures_359(statuts_359()))
 verifier("#359 C1-b t\u00e9moin (valeur calcul\u00e9e \u00e0 la main) : copie dont une borne du positionnement reprend l'ancien texte non qualifi\u00e9 (\u00ab l'intervalle est trop \u00e9troit \u00bb, suivi de la fin du statut), puis copie dont l'hypoth\u00e8se de l'homog\u00e9n\u00e9it\u00e9 reprend celui d'INDEPENDANCE_HOMOGENEITE -> \u00e9cart signal\u00e9 sur la table", {
   t1 <- statuts_359(); i <- which(grepl("trop \u00e9troit \u00e0 attendus grands", t1$STATUTS_POSITIONNEMENT, fixed = TRUE))[1L]

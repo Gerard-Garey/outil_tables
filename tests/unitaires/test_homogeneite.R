@@ -74,9 +74,14 @@ INDEPENDANCE_TESTS_359 <- paste("unités d'observation indépendantes ; sous l'u
                                 "sur-dispersés et les tests sont anti-conservateurs à attendus grands (résultat",
                                 "asymptotique), l'erreur de niveau étant de sens non établi en général à petits",
                                 "attendus")
-# segments/z : nature variance, objet V_ss (avis d'actuary sur #359, Q2).
-INDEPENDANCE_Z_359 <- paste("unités d'observation indépendantes ; sous l'unité contrat, les décès sont",
-                            "sur-dispersés et V_ss est sous-estimée")
+# segments/z : nature contraste_segments, sans objet (#359, décision du
+# mainteneur du 25/11/2026, avis d'actuary à l'étape (9) ; remplace la nature
+# variance d'objet V_ss de l'avis Q2).
+INDEPENDANCE_Z_359 <- paste("unit\u00e9s d'observation ind\u00e9pendantes ; sous l'unit\u00e9 contrat, les d\u00e9c\u00e8s sont",
+                            "sur-dispers\u00e9s et V_ss sous-estime la variance de O_s - A_s \u00e0 attendus grands si les",
+                            "contrats d'une m\u00eame t\u00eate sont dans un m\u00eame segment (r\u00e9sultat asymptotique), dans",
+                            "un sens non \u00e9tabli en g\u00e9n\u00e9ral \u00e0 petits attendus, et peut la surestimer si des",
+                            "contrats d'une m\u00eame t\u00eate sont dans des segments diff\u00e9rents")
 verifier("A STATUTS_HOMOGENEITE : (table, grandeur) uniques ; mention d'indépendance sur chaque loi (M278) ; O/A non nommé SMR ; aucune attribution d'auteur (M200)", {
   s <- tablexp:::STATUTS_HOMOGENEITE
   loi <- paste(s$table, s$grandeur) %in% c("tests p_asymptotique", "tests p_exacte", "tests p_monte_carlo", "segments z")
