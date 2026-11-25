@@ -202,7 +202,10 @@ DEFAUTS_FORMES <- list(
                      "date_hors_domaine : refus du même nom, quelles que soient les exclusions déclarées.",
                      "Si aucune déclaration date_hors_domaine n'a retenu de ligne : toutes les exclusions des",
                      "motifs attendus déclarées, lignes exclues = lignes de l'attribut, motif par motif ; aucune",
-                     "exclusion, refus ligne_invalide.")),
+                     "exclusion, refus ligne_invalide. Exception : si ces exclusions ne conservent aucune ligne,",
+                     "refus aucune_ligne_conservee ; si les lignes conservées ne donnent aucune exposition",
+                     "strictement positive ni aucun événement de la transition, refus periode_sans_exposition si le",
+                     "plan comporte l'étape exposition.")),
   agregats = list(
     catalogue = data.frame(
       defaut = c("cellule_dupliquee", "exposition_negative", "evenements_non_entiers", "evenements_sans_exposition",

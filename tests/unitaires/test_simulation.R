@@ -1235,6 +1235,50 @@ verifier("défauts (#238) : ligne_defauts() accepte les longueurs 1 et n pour ro
     grepl("defaut", ko[3L], fixed = TRUE) && grepl("premier", ko[4L], fixed = TRUE)
 })
 
+# #235 : texte de validité des défauts en lignes (spécification d'actuary-approfondi,
+# issue #235) ; chaîne exacte, constante en \uXXXX (fichier lisible sous toute locale).
+TEXTE_VALIDITE_LIGNES <- paste(
+  "Motifs et refus attendus sous trois conditions : les sept r\u00f4les d\u00e9clar\u00e9s (colonne du",
+  "m\u00eame nom), un plan de p\u00e9riode \u00e9gale \u00e0 celle de la simulation, un d\u00e9lai de",
+  "d\u00e9claration nul. tete_observee_apres_deces : motif attendu si le premier d\u00e9c\u00e8s de la",
+  "t\u00eate (colonne premier_deces de lignes) pr\u00e9c\u00e8de fin - d\u00e9lai + 1 ; toujours le cas",
+  "sous un d\u00e9lai nul. date_hors_domaine : refus du m\u00eame nom, quelles que soient les exclusions",
+  "d\u00e9clar\u00e9es. Si aucune d\u00e9claration date_hors_domaine n'a retenu de ligne : toutes les",
+  "exclusions des motifs attendus d\u00e9clar\u00e9es, lignes exclues = lignes de l'attribut, motif par",
+  "motif ; aucune exclusion, refus ligne_invalide. Exception : si ces exclusions ne conservent aucune",
+  "ligne, refus aucune_ligne_conservee ; si les lignes conserv\u00e9es ne donnent aucune exposition",
+  "strictement positive ni aucun \u00e9v\u00e9nement de la transition, refus periode_sans_exposition si le",
+  "plan comporte l'\u00e9tape exposition.")
+verifier("défauts (#235) : attr(x, \"defauts\")$validite$texte du jeu en forme lignes identical() au texte spécifié",
+         identical(idf$validite$texte, TEXTE_VALIDITE_LIGNES) &&
+           identical(tablexp:::DEFAUTS_FORMES$lignes$validite, TEXTE_VALIDITE_LIGNES))
+# Les deux refus de l'exception du texte (exemples d'actuary-approfondi, mesurés) :
+# toutes les lignes exclues ; lignes conservées sans exposition ni événement.
+refus_mm <- function(expr) tryCatch({ force(expr); "aucun refus" },
+                                    refus_tablexp = function(e) paste(e$module, e$motif, sep = "/"))
+plan_excl <- function(periode, exclusions)
+  modifyList(plan_multi(VD, periode, "sexe"), list(etapes = list(donnees = list(exclusions = exclusions))))
+PF_235 <- list(mode = "age_exact", n = 20, proportion_hommes = 0.5, age = 60, date_entree = D("2010-01-01"))
+DEF_235 <- function(cible) list(graine = GRAINE_DEF, declarations = list(list(type = "sexe_manquant", cible = cible, taux = 1)))
+s235a <- simuler(loi(), PF_235, PER, GRAINE, defauts = DEF_235(TOUTES))
+verifier("défauts (#235) : sexe_manquant sur toutes les lignes, exclusion déclarée : refus donnees/aucune_ligne_conservee",
+         nrow(attr(s235a, "defauts")$lignes) == 20L &&
+           identical(refus_mm(construire_table(s235a, ROLES_SIM, plan_excl(PER, "sexe_manquant"))),
+                     "donnees/aucune_ligne_conservee"))
+PER_235 <- list(debut = D("2020-06-30"), fin = D("2020-06-30"))
+s235b <- simuler(loi(), PF_235, PER_235, GRAINE, defauts = DEF_235("en_cours"))
+verifier("défauts (#235) : période d'un jour, sexe_manquant sur en_cours, exclusion déclarée : refus exposition/periode_sans_exposition",
+         nrow(attr(s235b, "defauts")$lignes) > 0L && nrow(attr(s235b, "defauts")$lignes) < 20L &&
+           identical(refus_mm(construire_table(s235b, ROLES_SIM, plan_excl(PER_235, "sexe_manquant"))),
+                     "exposition/periode_sans_exposition"))
+# Condition d'étape de l'exception : le refus periode_sans_exposition naît de calculer_exposition() ;
+# plan réduit à l'étape donnees, mêmes données et même exclusion : aucun refus.
+plan_donnees <- plan_excl(PER_235, "sexe_manquant")
+plan_donnees$etapes <- plan_donnees$etapes["donnees"]
+verifier("défauts (#235) : même jeu, plan réduit à l'étape donnees, exclusion déclarée : aucun refus",
+         identical(names(plan_donnees$etapes), "donnees") &&
+           identical(refus_mm(construire_table(s235b, ROLES_SIM, plan_donnees)), "aucun refus"))
+
 # Ordre des tirages rejoué (identité exacte) : éligibles recalculés d'après
 # le catalogue de la spécification (SPEC_DEFAUTS), disjonction comprise,
 # sous sous_graine(GRAINE_DEF), déclarations dans l'ordre reçu.
