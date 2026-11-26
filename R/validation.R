@@ -595,8 +595,10 @@ STATUTS_VALIDATION_LISSEE <- local({
                "trace calculée en flottant, ddl_effectifs_retenus est posé exactement) : n cellules retenues, nu_s degrés de liberté effectifs du lissage",
                "du segment s (trace de la matrice de lissage, recopiés dans etapes/validation/parametres/ddl_effectifs ;",
                "somme des leviers retenus du segment dans ddl_effectifs_retenus), réel, en général non entier ;",
-               "contribution d'un segment qui compte exactement z cellules pondérées (z ordre des différences du",
-               "lissage, etapes/lissage/parametres/ordre_difference ; le lissage y interpole, chaque",
+               "contribution d'un segment qui compte exactement d_s cellules pondérées (levier > 0), d_s dimension de",
+               "l'espace non pénalisé du lissage (etapes/lissage/resultat/segments/dimension_non_penalisee, égale à",
+               "l'ordre des différences z sous Whittaker-Henderson, cas normal comme Poisson) ; le lissage y",
+               "interpole, chaque",
                "levier pondéré vaut 1 en arithmétique exacte) posée au nombre exact de ses cellules retenues de poids",
                "nul, 0 quand toutes sont pondérées ; ddl_effectifs_retenus = nombre de ses cellules retenues pondérées,",
                "interpolation_exacte vrai ; approximation : degrés de liberté résiduels du cas normal transposés au",
@@ -1668,19 +1670,17 @@ segments_complets <- function(dans, segment, ret) {
 #                      ignoré sous les autres relations ;
 #   construite, ddl_effectifs : table construite de l'étape productrice du
 #                      plan (colonne levier exigée sous lissee) et ddl
-#                      effectifs par segment (clés,
-#                      ddl_effectifs), rendus par la fonction d'orchestration
-#                      de la table construite (construire_table()), en
-#                      valeur, ou NULL ; lus sous la seule relation lissee
-#                      (#224 ; ADR 0017, points 1.5, 5 et 10.2), ignorés sous
-#                      les autres. Argument nommé `construite`, non
-#                      `table_construite` : graphe_modules.R lirait ce nom
-#                      comme un appel de la fonction homonyme du module
-#                      construire_table, interdit (ADR 0007, point 2.1) ;
-#   ordre_difference : ordre z des différences de l'étape lissage
-#                      (etapes/lissage/parametres, valeur entière en
-#                      double, au moins 1), ou NULL ; lu sous la seule
-#                      relation lissee (interpolation exacte, #239).
+#                      effectifs par segment (clés, ddl_effectifs,
+#                      dimension_non_penalisee : integer, sans NA, exigée
+#                      sous lissee, #242), rendus par la fonction
+#                      d'orchestration de la table construite
+#                      (construire_table()), en valeur, ou NULL ; lus sous la
+#                      seule relation lissee (#224 ; ADR 0017, points 1.5, 5,
+#                      5.7 et 10.2), ignorés sous les autres. Argument nommé
+#                      `construite`, non `table_construite` : graphe_modules.R
+#                      lirait ce nom comme un appel de la fonction homonyme du
+#                      module construire_table, interdit (ADR 0007, point
+#                      2.1).
 # Relation positionnee : la grille (clés, âges, E^c, D, q~) est celle du
 # positionnement (même exposition, même table, même plage : contrôlé,
 # erreur de programmation sinon) ; attendus A_c = theta^_s A~_c, force
@@ -1706,7 +1706,7 @@ segments_complets <- function(dans, segment, ret) {
 # la table (ADR 0015, point 5).
 calculer_validation <- function(exposition, segmentation, par_annee, convention, table, table_reference,
                                 relation_table, plage_ages, tranches_age, niveau, replications, graine,
-                                positionnement, construite, ddl_effectifs, ordre_difference) {
+                                positionnement, construite, ddl_effectifs) {
   manquantes <- setdiff(c(segmentation, "age", if (isTRUE(par_annee)) "annee", "evenements", "exposition_centrale"),
                         names(exposition))
   if (length(manquantes))
@@ -1720,9 +1720,11 @@ calculer_validation <- function(exposition, segmentation, par_annee, convention,
     stop("calculer_validation() : étape positionnement requise sous la relation positionnee (erreur de programmation).",
          call. = FALSE)
   if (lissee && (is.null(construite) || is.null(ddl_effectifs) || !("levier" %in% names(construite)) ||
-                 !valeurs_entieres_double(ordre_difference) || length(ordre_difference) != 1L || ordre_difference < 1))
-    stop(paste("calculer_validation() : table construite avec la colonne levier, ddl effectifs et ordre des",
-               "différences requis sous la relation lissee (erreur de programmation)."), call. = FALSE)
+                 !forme_exacte(ddl_effectifs[["dimension_non_penalisee"]], "integer") ||
+                 anyNA(ddl_effectifs[["dimension_non_penalisee"]])))
+    stop(paste("calculer_validation() : table construite avec la colonne levier, ddl effectifs et dimension",
+               "de l'espace non pénalisé (integer, sans NA) requis sous la relation lissee (erreur de",
+               "programmation)."), call. = FALSE)
   if (lissee) {
     # Grille unique (ADR 0017, point 10.2), q de la table construite apparié
     # par (segment, âge) : clés et âges identiques, dans le même ordre.
@@ -1736,6 +1738,11 @@ calculer_validation <- function(exposition, segmentation, par_annee, convention,
         !forme_exacte(ddl_effectifs[["ddl_effectifs"]], "double"))
       stop("calculer_validation() : grille différente de celle de la table construite (erreur de programmation).",
            call. = FALSE)
+    # 0 <= d_s <= n_s (ADR 0017, point 5.7 (ii)), n_s compté sur la grille.
+    d_s <- ddl_effectifs[["dimension_non_penalisee"]]
+    if (any(d_s < 0L | d_s > tabulate(ap$segment, nrow(seg_cles))))
+      stop(paste("calculer_validation() : dimension de l'espace non pénalisé hors de [0, nombre de cellules du",
+                 "segment] (erreur de programmation)."), call. = FALSE)
     qx_c <- construite$qx
     un <- qx_c == 1 & cel$exposition_centrale > 0
     if (any(un))
@@ -1757,8 +1764,9 @@ calculer_validation <- function(exposition, segmentation, par_annee, convention,
   # les seules cellules retenues (C+) ; une cellule pondérée par le lissage
   # mais non retenue (E^c = 0 sous la recette agregats) en est exclue.
   # Interpolation exacte (#239), détectée par la structure, sans tolérance :
-  # segment qui compte exactement z cellules de levier > 0 (pondérées ; z
-  # ordre des différences), retenues ou non. Le lissage y interpole, chaque
+  # segment qui compte exactement d_s cellules de levier > 0 (pondérées ; d_s
+  # = colonne dimension_non_penalisee de ddl_effectifs, dimension du noyau de
+  # la pénalité du lisseur, #242), retenues ou non. Le lissage y interpole, chaque
   # levier pondéré vaut 1 en arithmétique exacte (complément de Schur, avis
   # d'actuary) et la somme des leviers retenus est posée au nombre de
   # cellules retenues pondérées du segment : sa contribution au ddl vaut le
@@ -1766,7 +1774,8 @@ calculer_validation <- function(exposition, segmentation, par_annee, convention,
   # pondérées (en flottant, écart de ±1e-15 à ±1e-11 sans cette règle).
   if (lissee) {
     lev <- construite$levier
-    interpolation <- vapply(seq_len(nrow(seg_cles)), function(k) sum(lev[ap$segment == k] > 0) == ordre_difference, NA)
+    interpolation <- vapply(seq_len(nrow(seg_cles)), function(k)
+      sum(lev[ap$segment == k] > 0) == ddl_effectifs$dimension_non_penalisee[k], NA)
     retenus <- vapply(seq_len(nrow(seg_cles)), function(k)
       if (interpolation[k]) as.numeric(sum(ret & ap$segment == k & lev > 0)) else sum(lev[ret & ap$segment == k]), 0)
   }

@@ -416,11 +416,12 @@ verifier("G table_lissee : data.frame nu, colonnes sexe, age, qx, etat, levier, 
     is.integer(t$age) && all(t$qx > 0 & t$qx < 1) && all(t$etat == "observee") &&
     all(t$borne_inf_credibilite < t$qx & t$qx < t$borne_sup_credibilite)
 })
-verifier("G segments : colonnes et types (iterations integer) ; etat produite sous declare", {
+verifier("G segments : colonnes et types (iterations integer ; dimension_non_penalisee integer après ddl_effectifs, valeur z par segment, ADR 0017, point 5.7, #242) ; etat produite sous declare", {
   s <- L1$resultat$segments
   identical(names(s), c("sexe", "cellules", "cellules_ponderees", "cellules_interpolees", "evenements",
-                        "parametre_lissage", "ddl_effectifs", "regularite", "laml", "deviance_penalisee", "iterations",
-                        "residu_conservation_0", "residu_conservation_1", "etat")) &&
+                        "parametre_lissage", "ddl_effectifs", "dimension_non_penalisee", "regularite", "laml",
+                        "deviance_penalisee", "iterations", "residu_conservation_0", "residu_conservation_1", "etat")) &&
+    identical(s$dimension_non_penalisee, rep(as.integer(L1$parametres$ordre_difference), 2L)) &&
     all(vapply(s[c("cellules", "cellules_ponderees", "cellules_interpolees", "evenements", "iterations")], is.integer, NA)) &&
     all(vapply(s[c("parametre_lissage", "ddl_effectifs", "regularite", "laml", "deviance_penalisee",
                    "residu_conservation_0", "residu_conservation_1")], is.double, NA)) &&
@@ -443,9 +444,9 @@ verifier("G table_lissee recalculée par lisser_poisson() sur D et E^c de l'éta
     identical(s$ddl_effectifs[s$sexe == "H"], r$ddl_effectifs) && identical(s$laml[s$sexe == "H"], r$laml) &&
     identical(s$iterations[s$sexe == "H"], r$iterations)
 })
-verifier("G contrat de la table construite (ADR 0017, points 1.5 et 5.5) : table_construite() accepte table_lissee de wh_poisson, somme des leviers identical() à ddl_effectifs", {
+verifier("G contrat de la table construite (ADR 0017, points 1.5, 5.5 et 5.7) : table_construite() accepte table_lissee de wh_poisson, somme des leviers identical() à ddl_effectifs, ddl_effectifs rendu avec dimension_non_penalisee", {
   r <- tablexp:::table_construite(X1$etapes, "sexe", "lissage")
-  identical(r$table, L1$resultat$table_lissee) && identical(r$ddl_effectifs, L1$resultat$segments[c("sexe", "ddl_effectifs")])
+  identical(r$table, L1$resultat$table_lissee) && identical(r$ddl_effectifs, L1$resultat$segments[c("sexe", "ddl_effectifs", "dimension_non_penalisee")])
 })
 verifier("G cellule intérieure sans ligne (H, âge 50) : état interpolee, levier 0, bornes produites ; cellules_interpolees", {
   d <- jeu(); d <- d[!(d$sexe == "H" & d$age == 50), ]

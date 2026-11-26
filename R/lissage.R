@@ -151,6 +151,11 @@ STATUTS_LISSAGE <- local({
     c("segments/ddl_effectifs",
       paste("trace de (W + h K'K)^-1 W, définition des degrés de liberté effectifs du cas normal ; approximation",
             "numérique (QR)")),
+    c("segments/dimension_non_penalisee",
+      paste("résultat exact : dimension du noyau de la pénalité S (polynômes de degré au plus z - 1 en l'âge,",
+            "échelle q), égale à l'ordre des différences z ; entier, sans calcul flottant ; lue par la validation",
+            "(relation lissee) pour reconnaître, par la structure, un segment où le lissage interpole (nombre de",
+            "cellules pondérées (levier > 0) égal à cette dimension)")),
     c("segments/fidelite", descriptif),
     c("segments/regularite", descriptif),
     c("segments/critere", descriptif),
@@ -205,6 +210,11 @@ STATUTS_LISSAGE_POISSON <- local({
     c("segments/ddl_effectifs",
       paste("trace de (W + P)^-1 W, W à la convergence ; définition du cas normal transposée ; approximation",
             "numérique")),
+    c("segments/dimension_non_penalisee",
+      paste("résultat exact : dimension du noyau de la pénalité S (polynômes de degré au plus z - 1 en l'âge,",
+            "échelle ln mu), égale à l'ordre des différences z ; entier, sans calcul flottant ; lue par la",
+            "validation (relation lissee) pour reconnaître, par la structure, un segment où le lissage interpole",
+            "(nombre de cellules exposées (levier > 0) égal à cette dimension)")),
     c("segments/regularite", paste("descriptif, arithmétique flottante : somme des (Delta^z theta^)^2, échelle",
                                    "ln mu")),
     c("segments/laml",
@@ -723,6 +733,7 @@ lisser_segments_poisson <- function(cel, g_seg, segs, par_segment, segmentation,
   segments$evenements <- denombrement_entier(deces, "lissage", "segments/evenements")
   segments$parametre_lissage <- lire("lambda")
   segments$ddl_effectifs <- lire("ddl_effectifs")
+  segments$dimension_non_penalisee <- rep(as.integer(z), n_seg)
   segments$regularite <- lire("regularite")
   segments$laml <- lire("laml")
   segments$deviance_penalisee <- lire("deviance_penalisee")
@@ -1040,6 +1051,7 @@ calculer_lissage <- function(exposition, brut, segmentation, convention, methode
   segments$evenements <- denombrement_entier(deces, "lissage", "segments/evenements")
   segments$parametre_lissage <- rep(h, n_seg)
   segments$ddl_effectifs <- lire("ddl_effectifs")
+  segments$dimension_non_penalisee <- rep(as.integer(z), n_seg)
   segments$fidelite <- lire("fidelite")
   segments$regularite <- lire("regularite")
   segments$critere <- lire("critere")

@@ -1229,11 +1229,13 @@ controler_entrees <- function(donnees, roles, plan, provenance, tables_reference
 # segments du résultat présentes ensemble ou absentes ensemble (point 5.5
 # (ii)) ; si présentes : clés de la table segments identical() aux segments
 # de la grille, ddl_effectifs double fini, somme de levier par segment
-# (dans l'ordre de la table) identical() à ddl_effectifs. Rend
-# list(table, plage_ages (paramètre plage_ages de l'étape), ddl_effectifs
-# (table segments du résultat restreinte aux clés et à ddl_effectifs si elle
-# porte cette colonne, sinon NULL ; propriété du résultat, aucun nom d'étape
-# testé)).
+# (dans l'ordre de la table) identical() à ddl_effectifs ; colonne
+# dimension_non_penalisee de la table segments présente avec elles (les trois
+# ensemble ou aucune ; point 5.7 (ii), #242) : integer, sans NA, entre 0 et le
+# nombre de cellules du segment. Rend list(table, plage_ages (paramètre
+# plage_ages de l'étape), ddl_effectifs (table segments du résultat restreinte
+# aux clés, à ddl_effectifs et à dimension_non_penalisee si elle porte ces
+# colonnes, sinon NULL ; propriété du résultat, aucun nom d'étape testé)).
 table_construite <- function(etapes, segmentation, nom_etape) {
   element <- ETAPES$table_construite[match(nom_etape, ETAPES$etape)]
   if (length(element) != 1L || is.na(element))
@@ -1291,10 +1293,16 @@ table_construite <- function(etapes, segmentation, nom_etape) {
   }
   segs <- resultat[["segments"]]
   avec_ddl <- is.data.frame(segs) && "ddl_effectifs" %in% names(segs)
-  # Une seule source (point 5.5 (ii)) : levier et ddl_effectifs ensemble.
+  avec_dim <- is.data.frame(segs) && "dimension_non_penalisee" %in% names(segs)
+  # Une seule source (point 5.5 (ii)) : levier et ddl_effectifs ensemble ;
+  # dimension_non_penalisee avec eux (point 5.7 (ii), #242) : les trois
+  # colonnes présentes ou absentes ensemble.
   if (avec_levier != avec_ddl)
     hors_contrat(if (avec_levier) "colonne levier présente sans colonne ddl_effectifs de la table segments"
                  else "colonne ddl_effectifs de la table segments présente sans colonne levier")
+  if (avec_dim != avec_ddl)
+    hors_contrat(if (avec_ddl) "colonne ddl_effectifs présente sans colonne dimension_non_penalisee de la table segments"
+                 else "colonne dimension_non_penalisee de la table segments présente sans colonne ddl_effectifs")
   ddl <- NULL
   if (avec_ddl) {
     seg_grille <- cel[!duplicated(grille$segment), segmentation, drop = FALSE]
@@ -1306,7 +1314,14 @@ table_construite <- function(etapes, segmentation, nom_etape) {
     sommes <- vapply(seq_len(nrow(seg_grille)), function(s) sum(lev[grille$segment == s]), 0)
     if (!identical(sommes, segs[["ddl_effectifs"]]))
       hors_contrat("somme de la colonne levier par segment différente de ddl_effectifs de la table segments")
-    ddl <- segs[c(segmentation, "ddl_effectifs")]
+    # Dimension de l'espace non pénalisé d_s (point 5.7 (ii)) : integer, sans
+    # NA, 0 <= d_s <= n_s (nombre de cellules du segment dans la grille).
+    d_s <- segs[["dimension_non_penalisee"]]
+    if (!forme_exacte(d_s, "integer") || anyNA(d_s))
+      hors_contrat("colonne dimension_non_penalisee de la table segments integer sans NA attendue")
+    if (any(d_s < 0L | d_s > tabulate(grille$segment, nrow(seg_grille))))
+      hors_contrat("colonne dimension_non_penalisee de la table segments hors de [0, nombre de cellules du segment]")
+    ddl <- segs[c(segmentation, "ddl_effectifs", "dimension_non_penalisee")]
   }
   list(table = tab, plage_ages = plage_ages, ddl_effectifs = ddl)
 }
@@ -1402,8 +1417,7 @@ construire_table <- function(donnees, roles, plan, provenance = NULL, tables_ref
                                        tranches_age = pe[["tranches_age"]], niveau = pe[["niveau"]],
                                        replications = pe[["replications"]], graine = plan[["graine"]],
                                        positionnement = etapes[["positionnement"]],
-                                       construite = construite$table, ddl_effectifs = construite$ddl_effectifs,
-                                       ordre_difference = etapes[["lissage"]][["parametres"]][["ordre_difference"]]),
+                                       construite = construite$table, ddl_effectifs = construite$ddl_effectifs),
       importance_exclusions = calculer_importance_exclusions(donnees, roles, etapes[["donnees"]],
                                                              etapes[["exposition"]], etapes[["validation"]],
                                                              table = table_validation, p = p,

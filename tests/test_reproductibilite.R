@@ -464,6 +464,70 @@ CHEMINS_199 <- list(
 # bloc R11 et R12 de #218 (C4, recalcul indépendant, états, aucun signal) reste,
 # lu sur les références régénérées.
 TRANSITIONS_EN_COURS <- list()
+# Transition #242 (B39, étape (3) ; ADR 0017, annotation du 26/11/2026, point
+# 5.7 ; remesure (0') d'actuary-approfondi, § 2) : colonne integer
+# segments/dimension_non_penalisee du résultat du lissage (R15 à R17), ligne de
+# statut segments/dimension_non_penalisee insérée après segments/ddl_effectifs
+# dans etapes/lissage/parametres/statuts (une ligne de plus), colonne ajoutée à
+# @colonnes de segments, texte du statut du ddl de la validation (relation
+# lissee, deux lignes de etapes/validation/resultat/statistiques) ; aucune
+# valeur double. Une transition par plan, textes écrits ici en échappements \u
+# (UTF-8 en toute locale), sans lire le package ; vecteurs et positions tirés
+# de la référence. À clore par la régénération unique (R) de B39, avec
+# transition_242() et les constantes *_242.
+STATUT_DIM_242_A <- paste("r\u00e9sultat exact : dimension du noyau de la p\u00e9nalit\u00e9 S (polyn\u00f4mes de degr\u00e9 au",
+                          "plus z - 1 en l'\u00e2ge, \u00e9chelle q), \u00e9gale \u00e0 l'ordre des diff\u00e9rences z ;",
+                          "entier, sans calcul flottant ; lue par la validation (relation lissee) pour reconna\u00eetre, par la",
+                          "structure, un segment o\u00f9 le lissage interpole (nombre de cellules pond\u00e9r\u00e9es (levier >",
+                          "0) \u00e9gal \u00e0 cette dimension)")
+STATUT_DIM_242_B <- paste("r\u00e9sultat exact : dimension du noyau de la p\u00e9nalit\u00e9 S (polyn\u00f4mes de degr\u00e9 au",
+                          "plus z - 1 en l'\u00e2ge, \u00e9chelle ln mu), \u00e9gale \u00e0 l'ordre des diff\u00e9rences z ;",
+                          "entier, sans calcul flottant ; lue par la validation (relation lissee) pour reconna\u00eetre, par la",
+                          "structure, un segment o\u00f9 le lissage interpole (nombre de cellules expos\u00e9es (levier > 0)",
+                          "\u00e9gal \u00e0 cette dimension)")
+DDL_AVANT_242 <- paste("contribution d'un segment qui compte exactement z cellules pond\u00e9r\u00e9es (z ordre",
+                       "des diff\u00e9rences du lissage, etapes/lissage/parametres/ordre_difference ; le lissage",
+                       "y interpole, chaque")
+DDL_APRES_242 <- paste("contribution d'un segment qui compte exactement d_s cellules pond\u00e9r\u00e9es (levier",
+                       "> 0), d_s dimension de l'espace non p\u00e9nalis\u00e9 du lissage",
+                       "(etapes/lissage/resultat/segments/dimension_non_penalisee, \u00e9gale \u00e0 l'ordre des",
+                       "diff\u00e9rences z sous Whittaker-Henderson, cas normal comme Poisson) ; le lissage y",
+                       "interpole, chaque")
+SEGMENTS_242 <- "etapes/lissage/resultat/segments/"
+STATUTS_242 <- "etapes/lissage/parametres/statuts/"
+STAT_VALIDATION_242 <- "etapes/validation/resultat/statistiques/statut"
+# Transition #242 du plan `id` (statut de la ligne ajoutée : `statut`) :
+# insertion après segments/ddl_effectifs (grandeur et statut des statuts,
+# @colonnes de segments), @lignes des statuts augmenté de 1, remplacement de DDL_AVANT_242
+# dans les deux statuts du ddl de la validation (positions lues dans la
+# référence, deux exactement).
+transition_242 <- function(id, statut) {
+  ref <- lire_reference(file.path(DOSSIER_REFERENCES, paste0(id, ".tsv")))$valeurs
+  apres <- function(v, avant, nouveau) {
+    k <- match(avant, v)
+    if (is.na(k)) stop(sprintf("transition_242(%s) : %s absent de la r\u00e9f\u00e9rence (erreur de programmation)", id, avant))
+    append(v, nouveau, after = k)
+  }
+  gr <- ref[[paste0(STATUTS_242, "grandeur")]]
+  k <- match("segments/ddl_effectifs", gr)
+  st <- ref[[STAT_VALIDATION_242]]
+  pos <- which(grepl(DDL_AVANT_242, st, fixed = TRUE, useBytes = TRUE))
+  if (length(pos) != 2L) stop(sprintf("transition_242(%s) : deux statuts du ddl attendus, %d trouv\u00e9(s)", id, length(pos)))
+  list(issue = "#242", plans = id, changements = list(
+    list(chemin = paste0(SEGMENTS_242, "dimension_non_penalisee"), nature = "ajout", type = "integer", longueur = 2L),
+    list(chemin = paste0(SEGMENTS_242, "@colonnes"), nature = "valeur de chaîne",
+         valeurs = apres(ref[[paste0(SEGMENTS_242, "@colonnes")]], "ddl_effectifs", "dimension_non_penalisee")),
+    list(chemin = paste0(STATUTS_242, "@lignes"), nature = "valeur", valeurs = ref[[paste0(STATUTS_242, "@lignes")]] + 1L),
+    list(chemin = paste0(STATUTS_242, "grandeur"), nature = "valeur de chaîne",
+         valeurs = append(gr, "segments/dimension_non_penalisee", after = k)),
+    list(chemin = paste0(STATUTS_242, "statut"), nature = "valeur de chaîne",
+         valeurs = append(ref[[paste0(STATUTS_242, "statut")]], statut, after = k)),
+    list(chemin = STAT_VALIDATION_242, nature = "valeur de chaîne", positions = pos,
+         valeurs = vapply(st[pos], function(x) sub(DDL_AVANT_242, DDL_APRES_242, x, fixed = TRUE), "",
+                          USE.NAMES = FALSE))))
+}
+TRANSITIONS_EN_COURS <- c(TRANSITIONS_EN_COURS, list(
+  transition_242("R15", STATUT_DIM_242_A), transition_242("R16", STATUT_DIM_242_B), transition_242("R17", STATUT_DIM_242_B)))
 # Transition #218 de la correction de theta_80 (B30, constat C1 de la revue
 # finale, c35eb9d) close par la seconde régénération (R′) de R1 à R17
 # (exécution 44698750703, sur c35eb9d) : transition_218c(), apres_218c() et
