@@ -97,8 +97,9 @@ HYPOTHESE_LISSAGE <- paste(
   "(force constante par âge entier), qui diffère de l'hypothèse de répartition du binomial d'entrée : écart entre",
   "les taux centraux de l'ordre de q^3/12.")
 REFERENCE_METHODE_LISSAGE <- paste(
-  "Lignes directrices mortalité de la Commission d'agrément de l'Institut des actuaires, recommandation du 20 juin",
-  "2006, chap. 3, IV.2.a (p. 31-32) et IV.2.d (p. 33), SHA-256",
+  "Lignes directrices mortalité de la Commission d'agrément, version approuvée, insérée en tant que recommandation",
+  "dans les règles professionnelles de l'Institut des actuaires par le Conseil d'administration du 20 juin 2006,",
+  "chap. 3, IV.2.a (p. 31-32) et IV.2.d (p. 33), SHA-256",
   "70ba7463b840bb4fd378dd05c7dad66213239d0bb033ea126b7b0b4669d26835 ; écarts documentés")
 # Variante (b) (#225 ; spécification de forme, §§ 2 et 3) : hypothèse, règles
 # non tirées de la source comprises (D12), et référence.

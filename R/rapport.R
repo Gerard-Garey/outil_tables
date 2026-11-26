@@ -2212,7 +2212,10 @@ MENTIONS_RAPPORT <- texte_moteur(c(
     "Pour les critères de régularité et de fidélité, les Lignes directrices écrivent : « sauf erreur de construction",
     "manifeste, les résultats de ces tests ne permettront pas de rejeter la table construite, ils donneront, en",
     "revanche, des éléments d'appréciation de sa qualité » (chap. 4, III, p. 38). Pour la cohérence des taux, elles",
-    "prescrivent la vérification (« il faut », chap. 4, II, p. 36-37) sans règle de rejet ; pour l'ordre entre",
+    "prescrivent la vérification de la croissance des taux avec l'âge (« il faut s'assurer que les taux obtenus sont",
+    "cohérents entre eux », chap. 4, II, p. 36 ; II.1, p. 37) et de l'ordre entre segments (« il faut vérifier »,",
+    "II.3, p. 37), sans règle de rejet ; la croissance des différences premières n'est présentée que comme une",
+    "vérification utile (« Il peut également être intéressant de vérifier », II.1, p. 37). Pour l'ordre entre",
     "segments, un défaut appelle à « rechercher des explications » (II.3, p. 37). L'outil restitue les valeurs et les",
     "âges où une inégalité n'est pas vérifiée, sans verdict ni seuil ; l'appréciation revient à l'actuaire."),
   coherence_comparaison = paste(

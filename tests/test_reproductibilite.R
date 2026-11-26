@@ -970,11 +970,55 @@ transition_242 <- function(id, statut) {
          valeurs = vapply(st[pos], function(x) sub(DDL_AVANT_242, DDL_APRES_242, x, fixed = TRUE), "",
                           USE.NAMES = FALSE))))
 }
+# Transition #248 (B39, étape (6) ; circuit 2, visa P3 du mainteneur du
+# 26/11/2026 ; M425) : textes de R15 seule — attribution harmonisée des
+# Lignes directrices dans les deux références de méthode (lissage (a) et
+# coherence_regularite), statut de C2 (vérification présentée comme
+# facultative, II.1, p. 37) et de C3 (citation entière de la p. 38) ; R16 et
+# R17 (wh_poisson, sans coherence_regularite) inchangés, mesuré ; aucune
+# valeur double. Chemins distincts de ceux de #242 (R15) : aucune
+# composition. Chaque fragment remplacé doit figurer une fois exactement dans
+# la référence ; recherche et remplacement par octets (useBytes), les
+# littéraux non ASCII de ce fichier n'étant pas marqués UTF-8 sous la locale C, valeurs
+# marquées UTF-8 ensuite. À clore par la régénération unique (R) de B39, avec
+# transition_248() et les constantes *_248.
+ATTRIBUTION_248 <- paste("de la Commission d'agrément, version approuvée, insérée en tant que",
+                         "recommandation dans les règles professionnelles de l'Institut des actuaires par le",
+                         "Conseil d'administration du 20 juin 2006,")
+SUBST_248 <- list(
+  "etapes/lissage/parametres/reference_methode" = list(
+    c("de la Commission d'agrément de l'Institut des actuaires, recommandation du 20 juin 2006,", ATTRIBUTION_248)),
+  "etapes/coherence_regularite/parametres/reference_methode" = list(
+    c("de la Commission d'agrément, recommandation du 20 juin 2006,", ATTRIBUTION_248)),
+  "etapes/coherence_regularite/parametres/statuts/statut" = list(
+    c("delta2_x >= 0 (Lignes directrices, chap. 4, II.1) ;",
+      paste("delta2_x >= 0 (Lignes directrices, chap. 4, II.1, p. 37 : vérification présentée comme",
+            "facultative, « Il peut également être intéressant de vérifier si les",
+            "différences premières des taux de décès augmentent avec l'âge ») ;")),
+    c("vis-à-vis des autres critères » (p. 38)",
+      "vis-à-vis des autres critères influant sur le risque de mortalité » (p. 38)")))
+transition_248 <- function(id) {
+  ref <- lire_reference(file.path(DOSSIER_REFERENCES, paste0(id, ".tsv")))$valeurs
+  ch <- lapply(names(SUBST_248), function(c_) {
+    v <- ref[[c_]]
+    if (is.null(v)) stop(sprintf("transition_248(%s) : %s absent de la référence (erreur de programmation)", id, c_))
+    pos <- integer(0)
+    for (sb in SUBST_248[[c_]]) {
+      k <- which(grepl(sb[1L], v, fixed = TRUE, useBytes = TRUE))
+      if (length(k) != 1L || lengths(regmatches(v[k], gregexpr(sb[1L], v[k], fixed = TRUE, useBytes = TRUE))) != 1L)
+        stop(sprintf("transition_248(%s) : fragment de %s absent ou répété (référence déjà régénérée ?)", id, c_))
+      v[k] <- sub(sb[1L], sb[2L], v[k], fixed = TRUE, useBytes = TRUE); pos <- c(pos, k)
+    }
+    pos <- sort(pos); w <- v[pos]; Encoding(w) <- "UTF-8"
+    list(chemin = c_, nature = "valeur de chaîne", positions = pos, valeurs = w)
+  })
+  list(issue = "#248", plans = id, changements = ch)
+}
 TRANSITIONS_EN_COURS <- c(TRANSITIONS_EN_COURS, list(
   transition_242("R15", STATUT_DIM_242_A), transition_242("R16", STATUT_DIM_242_B), transition_242("R17", STATUT_DIM_242_B),
   transition_249("R16", STATUT_DIM_242_B, APRES_R16_249, STATISTIQUES_R16_249),
   transition_249("R17", STATUT_DIM_242_B, APRES_R17_249),
-  transition_247("R16"), transition_247("R17")))
+  transition_247("R16"), transition_247("R17"), transition_248("R15")))
 # Transition #218 de la correction de theta_80 (B30, constat C1 de la revue
 # finale, c35eb9d) close par la seconde régénération (R′) de R1 à R17
 # (exécution 44698750703, sur c35eb9d) : transition_218c(), apres_218c() et

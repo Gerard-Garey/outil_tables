@@ -55,9 +55,11 @@ EMPREINTE_CODE <- tablexp:::EMPREINTE_CODE
 #  - reporté à #361 (validation_unite_contrat, validation_unite_non_determinee) :
 #    4377a128d9595c589e34eaa23c4f2aa1 ;
 #  - reporté à #242 (validation_lissee : d_s, dimension de l'espace non pénalisé) :
-#    960b84695e7b029c13303ef05b80da85.
+#    960b84695e7b029c13303ef05b80da85 ;
+#  - reporté à #248 (coherence_portee : C1 et C3 prescrits, C2 vérification
+#    utile, II.1, p. 37) : 6fe626f439ae6bddea40fedb9a276149.
 # TEXTE_REJEU_FICHE : relevé à 8a81102, inchangé.
-MD5_MENTIONS_RAPPORT <- "960b84695e7b029c13303ef05b80da85"
+MD5_MENTIONS_RAPPORT <- "6fe626f439ae6bddea40fedb9a276149"
 MD5_TEXTE_REJEU_FICHE <- "ddbaf36e1e6fa260b51e57ca46e6604f"
 
 # Ligne 8 « tables_reference » (contrôle 7 bis, ADR 0015, point 4.3 ; #73) :

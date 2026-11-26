@@ -2894,9 +2894,10 @@ calculer_homogeneite <- function(exposition, segmentation, par_annee, convention
 # Référence de méthode (texte de la spécification, § 3 ; source lue sur le
 # rendu des pages par regulatory-approfondi, SHA-256 consigné, § 0).
 REFERENCE_METHODE_COHERENCE_REGULARITE <- texte_moteur(paste(
-  "Lignes directrices mortalité de la Commission d'agrément, recommandation du 20 juin 2006, chap. 4, II (p. 36-38)",
-  "et III.1 (p. 38), SHA-256 70ba7463b840bb4fd378dd05c7dad66213239d0bb033ea126b7b0b4669d26835 ; propriétés",
-  "déterministes de la table, sans seuil ni verdict"))
+  "Lignes directrices mortalité de la Commission d'agrément, version approuvée, insérée en tant que recommandation",
+  "dans les règles professionnelles de l'Institut des actuaires par le Conseil d'administration du 20 juin 2006,",
+  "chap. 4, II (p. 36-38) et III.1 (p. 38), SHA-256 70ba7463b840bb4fd378dd05c7dad66213239d0bb033ea126b7b0b4669d26835 ;",
+  "propriétés déterministes de la table, sans seuil ni verdict"))
 
 # Convention d'âge restituée pour une table de référence évaluée
 # (spécification de forme, § 3 ; ADR 0017, point 13.4 : option « non portée
@@ -2937,14 +2938,16 @@ STATUTS_COHERENCE_REGULARITE <- local({
             "verdict")),
     c("ages", "differences_croissantes", "toutes",
       paste("descriptif : delta2_x = (g_(x+2) - g_(x+1)) - (g_(x+1) - g_x) en arithmétique flottante, inégalité",
-            "delta2_x >= 0 (Lignes directrices, chap. 4, II.1) ; erreur d'arrondi de l'ordre de 2u(|g_x| + 2|g_(x+1)| + |g_(x+2)|)",
+            "delta2_x >= 0 (Lignes directrices, chap. 4, II.1, p. 37 : vérification présentée comme facultative,",
+            "« Il peut également être intéressant de vérifier si les différences premières des taux de décès",
+            "augmentent avec l'âge ») ; erreur d'arrondi de l'ordre de 2u(|g_x| + 2|g_(x+1)| + |g_(x+2)|)",
             "(u = 2^-53), plus l'erreur numérique de la construction de la table : un delta2_x de cet ordre n'établit",
             "pas le signe ; aucune exception d'âge appliquée, aucun verdict")),
     c("ordre_segments", "inegalite_verifiee", "construite",
       paste("résultat exact sur les valeurs enregistrées : inégalité g_x(a) >= g_x(b) pour l'ordre déclaré (Lignes",
             "directrices, chap. 4, II.3) ; pour les sexes, propriété attendue « si les groupes constitués par les",
-            "hommes et les femmes ont des distributions comparables vis-à-vis des autres critères » (p. 38) ; un",
-            "défaut appelle une explication, aucun verdict")),
+            "hommes et les femmes ont des distributions comparables vis-à-vis des autres critères influant sur le",
+            "risque de mortalité » (p. 38) ; un défaut appelle une explication, aucun verdict")),
     c("ordre_segments", "inegalite_verifiee", "reference",
       "choix de l'outil, à finalité comparative, non prescrit par II.3"),
     c("regularite", "regularite", "toutes",
