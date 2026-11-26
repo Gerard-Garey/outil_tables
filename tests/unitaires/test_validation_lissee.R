@@ -208,6 +208,18 @@ verifier("B controler_parametres_validation() en appel direct (C-1 d'actuary, m2
     positionnee_avec = isTRUE(cpv("tv", "positionnee", c(40, 60), 40, 0.95, 9, pos))))
 })
 
+verifier("B controler_parametres_validation() en appel direct (#240) : positionnement omis (défaut NULL) sous positionnee : refus positionnement_absent (message exact, details), jamais une erreur R générique ; omis sous independante : TRUE", {
+  cpv <- tablexp:::controler_parametres_validation
+  r <- tryCatch({ cpv("tv", "positionnee", c(40, 60), 40, 0.95, 9); NULL }, error = function(e) e)
+  tous(list(
+    classe = inherits(r, "refus_tablexp"),
+    refus = controle(r, "validation", "positionnement_absent",
+                     paste("La relation « positionnee » valide la table positionnée de cette construction : l'étape",
+                           "positionnement doit figurer au plan (avant l'étape validation)."),
+                     list(relation_table = "positionnee")),
+    independante = isTRUE(cpv("tv", "independante", c(40, 60), 40, 0.95, 9))))
+})
+
 # --- C. Étape validation sous lissee ------------------------------------------------
 
 verifier("C parametres : table_reference et table_nom absents ; parametres_estimes NA_integer_ ; ddl_effectifs (clés, ddl_effectifs double recopiés de l'étape lissage, ddl_effectifs_retenus double, identical() à ddl_effectifs, toute cellule étant retenue, interpolation_exacte FALSE par segment, #239) ; appariement_sexe par_segment ; hypothèse nulle propre (valeur calculée à la main, identité exacte)", {

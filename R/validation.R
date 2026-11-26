@@ -720,19 +720,22 @@ controler_replications <- function(replications, etape) {
 # positionnée sur cette référence, sur cette plage : la contrainte
 # somme A = O et les lois conditionnelles n'en tiennent qu'à ce prix).
 # `positionnement` : paramètres de l'étape positionnement du plan (déjà
-# contrôlés par valider_plan()), ou NULL si elle est absente. Sous la
+# contrôlés par valider_plan()), ou NULL si elle est absente (défaut NULL,
+# comme `lissage` : omis sous positionnee, un appel direct reçoit le refus
+# positionnement_absent, non une erreur R générique ; #240). Sous la
 # relation lissee (#224 ; ADR 0017, point 15), dans l'ordre : lissage_absent
 # (étape lissage absente du plan) ; plage_ages_differente_lissage (les ddl
 # effectifs sont ceux du lissage sur ses cellules). `lissage` : paramètres de
 # l'étape lissage du plan, ou NULL si elle est absente (défaut NULL : un
-# appel direct hors lissee peut l'omettre) ; lu sous la seule relation
+# appel direct hors lissee peut l'omettre, comme `positionnement` hors
+# positionnee) ; lu sous la seule relation
 # lissee. `table_reference` : absent (missing()) quand le plan ne le porte
 # pas (paramètre conditionnel à relation_table, ADR 0017, point 3.4 ; sa
 # présence est contrôlée par controler_parametres_condition()) ; sa forme
 # n'est contrôlée que s'il est passé ; absent sous positionnee : erreur de
 # programmation préfixée. Rend TRUE, invisible.
 controler_parametres_validation <- function(table_reference, relation_table, plage_ages, tranches_age, niveau,
-                                            replications, positionnement, lissage = NULL) {
+                                            replications, positionnement = NULL, lissage = NULL) {
   if (!missing(table_reference)) controler_cle_table(table_reference, "validation")
   controler_relation_table(relation_table)
   controler_plage_ages(plage_ages, "validation")
