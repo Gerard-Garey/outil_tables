@@ -13479,10 +13479,16 @@ place du refus $D > E^i$, qui ne vaut pas sous~(b))~;
 comme sous~(a), le poids étant nul si et seulement si $E^c = 0$~;
 \code{lissage\_interpolation\_deces\_nul} (exactement $z$ cellules exposées,
 dont au moins une sans décès~: aucun maximum fini)~;
+\code{lissage\_maximum\_inexistant} ($C < z$, $C$ décompte des blocs de
+cellules exposées avec décès~: aucun maximum fini, quels que soient
+$\lambda$ et les effectifs~; évalué sur tous les segments avant toute
+itération, sous \code{declare} comme sous \code{laml}, sans citer
+$\lambda$~; issue~\#247)~;
 \code{lissage\_systeme\_rang\_deficient}~; \code{lissage\_non\_convergent}
-(plafond d'itérations, recherche linéaire épuisée sans convergence
-numérique, ou rang perdu en cours d'itération), chacun cité au $\lambda$
-de l'échec~; aucun refus de domaine (section~\ref{sec:lissage-poisson}).
+(maximum existant, $C \ge z$~; plafond d'itérations, recherche linéaire
+épuisée sans convergence numérique, ou rang perdu en cours d'itération),
+ces deux derniers cités au $\lambda$ de l'échec~; aucun refus de domaine
+(section~\ref{sec:lissage-poisson}).
 Une table d'exposition dont les décomptes de la plage et hors de la plage
 ne redonnent pas le total des événements est une erreur de programmation.\par}
 
@@ -13714,14 +13720,174 @@ ne redonnent pas le total des événements est une erreur de programmation.\par}
     E^c_x e^{\theta_x}$~; pour une cellule exposée sans décès, cette borne
     vaut~0 et n'est atteinte pour aucun $\theta_x$ fini~: aucun maximum
     fini n'existe, d'où le refus \code{lissage\_interpolation\_deces\_nul}
-    (avis d'\code{actuary}, Q4 de l'issue~\#239). Hors de ce cas, le
-    document n'établit pas l'existence du maximum pour toutes les données
-    (il est des données sans maximum~: sous $z = 2$, si tous les décès d'un segment sont à un âge extrême $x_e$ de la plage, la direction $d_x = -\lvert x - x_e\rvert$, affine sur la plage, de pénalité nulle, nulle où il y a des décès et négative ailleurs, fait croître strictement $\ell_P$ sans maximum atteint~; l'algorithme ne converge pas, test A6 ; condition nécessaire et suffisante d'existence proposée en issue~\#247)~; un échec de l'algorithme est refusé
-    (\code{lissage\_non\_convergent}), sans table.
+    (avis d'\code{actuary}, Q4 de l'issue~\#239). Hors de ce cas,
+    l'existence est décidée par une condition exacte, contrôlée avant
+    les itérations (issue~\#247~; ADR 0017, annotation du 26/11/2026,
+    point~15), énoncée et démontrée à l'item suivant~; un segment qui ne la
+    remplit pas est refusé (\code{lissage\_maximum\_inexistant}), sans
+    table.
+  \item \textbf{Existence du maximum} (résultat exact~; théorème et preuve
+    de l'avis d'\code{actuary-approfondi} du 15/11/2026 sur
+    l'issue~\#247, repris et détaillés ici). Notations~: $\mathcal E$ est
+    l'ensemble des cellules exposées ($E^c > 0$) d'un segment,
+    $\mathcal P \subseteq \mathcal E$ celui des cellules avec décès
+    ($D > 0$~; une cellule sans exposition n'a pas de décès, refus
+    \code{lissage\_evenement\_sans\_exposition})~; un \emph{polynôme de
+    récession} est un vecteur $d \ne 0$ de $\mathbb R^n$ tel que $Kd = 0$,
+    c'est-à-dire les valeurs aux âges de la plage d'un polynôme de degré au
+    plus $z - 1$, avec $d \le 0$ sur $\mathcal E$ et $d = 0$ sur
+    $\mathcal P$. \emph{Décompte $C$} (\code{decompte\_maximum()})~: on
+    parcourt les cellules exposées dans l'ordre des âges, une cellule sans
+    exposition étant ignorée et ne séparant pas deux cellules exposées~; un
+    \emph{bloc} est une suite maximale de cellules exposées consécutives
+    (dans ce parcours) qui comptent toutes des décès~; un bloc de
+    longueur~$L$ coûte $L$ s'il contient la première ou la dernière cellule
+    exposée, sinon $L + 1$ si $L$ est impair et $L$ s'il est pair~; $C$ est
+    la somme des coûts, décompte entier sur des indicateurs, sans
+    arithmétique flottante ni tolérance. \emph{Théorème}~: pour $\lambda >
+    0$, sous les hypothèses «~au moins $z$ cellules exposées~» et
+    «~première et dernière cellules de la plage exposées~», garanties par
+    les refus qui précèdent (section~\ref{sec:lissage-etape}),
+    (1)~$\ell_P$ admet un maximum fini si et seulement s'il n'existe aucun
+    polynôme de récession, et ce maximum est alors unique~; (2)~il n'en
+    existe aucun si et seulement si $C \ge z$. La condition ne dépend ni de
+    $\lambda$, ni des valeurs de $E^c$ et de $D$, mais seulement des
+    cellules exposées et de celles qui ont des décès. Lecture~: sous $z =
+    1$, au moins un décès~; sous $z = 2$, au moins deux cellules avec
+    décès, ou une seule qui ne soit pas la première ou la dernière cellule
+    exposée (le test A6, décès au seul âge extrême, donne $C = 1$)~; sous
+    $z = 3$, une seule cellule avec décès ne suffit jamais, ni deux
+    cellules consécutives parmi les cellules exposées, ni les deux
+    extrêmes. \code{lissage\_sans\_deces} ($C = 0$) et
+    \code{lissage\_interpolation\_deces\_nul} (exactement $z$ cellules
+    exposées dont une au moins sans décès, d'où $C \le z - 1$) en sont des
+    cas particuliers, conservés et évalués avant lui~: un plan qui relève
+    de deux de ces motifs reçoit le premier dans l'ordre de la
+    section~\ref{sec:lissage-etape}.
+
+    \emph{Preuve.} On note $\varphi = -\ell_P$, convexe et continue sur
+    $\mathbb R^n$~; chaque terme $E^c_x e^{\theta_x} - D_x\theta_x$
+    ($x \in \mathcal E$) et le terme $\frac\lambda2 S(\theta)$ sont
+    minorés. (i)~\emph{Un polynôme de récession $d$ exclut le maximum.}
+    Pour tout $\theta$, $t \mapsto \varphi(\theta + td)$ ($t \ge 0$) est
+    non croissante~: la pénalité est constante ($Kd = 0$), les termes de
+    $\mathcal P$ sont constants ($d = 0$ sur $\mathcal P$), les termes
+    $E^c_x e^{\theta_x + td_x}$ décroissent ($d \le 0$ sur $\mathcal E$)
+    et $D_x = 0$ sur $\mathcal E \setminus \mathcal P$. Un polynôme non
+    nul de degré au plus $z - 1$ a au plus $z - 1$ racines~; comme
+    $\lvert\mathcal E\rvert \ge z$, $d_x < 0$ en au moins une cellule
+    exposée, et la décroissance est stricte~: aucun $\theta$ ne minimise
+    $\varphi$ (le long de $\theta + td$, $\theta_x$ tend vers $-\infty$
+    aux cellules où $d_x < 0$). (ii)~\emph{Sans polynôme de récession, le
+    maximum existe et il est unique.} Supposons non borné l'ensemble de
+    niveau $N = \{\varphi \le \varphi(\theta_0)\}$, convexe et fermé~: il
+    contient une suite $\theta_k$ avec $\lVert\theta_k - \theta_0\rVert
+    \to \infty$, et une sous-suite de $(\theta_k - \theta_0)/\lVert\theta_k
+    - \theta_0\rVert$ converge vers un $d$ unitaire~; pour $t \ge 0$ fixé,
+    $\theta_0 + t(\theta_k - \theta_0)/\lVert\theta_k - \theta_0\rVert$
+    appartient à $N$ dès que $\lVert\theta_k - \theta_0\rVert \ge t$
+    (convexité), d'où $\theta_0 + td \in N$ (fermeture). Le long de cette
+    demi-droite, $\varphi$ est majorée par $\varphi(\theta_0)$, donc chacun
+    de ses termes, tous minorés, est majoré~: la pénalité impose $Kd = 0$
+    (sinon elle croît comme $t^2$), un terme exponentiel impose $d_x \le
+    0$ sur $\mathcal E$ (sinon il diverge), un terme $-D_x t d_x$ impose
+    $d_x = 0$ sur $\mathcal P$ (sinon il diverge)~: $d$ est un polynôme
+    de récession, contradiction. Les ensembles de niveau sont donc
+    compacts et $\varphi$ atteint son minimum~; celui-ci est unique, la
+    hessienne $W + P$ étant définie positive dès que $\lvert\mathcal
+    E\rvert \ge z$ (item précédent). (iii)~\emph{Le plus petit degré d'un
+    polynôme de récession vaut $C$}, d'où (2) par (1). \emph{Construction
+    de degré $C$.} Pour un bloc $R$ de cellules aux âges $r_1 < \dots <
+    r_L$, soit $\pi_R(x) = \prod_j (x - r_j)$ s'il contient la première
+    cellule exposée ou s'il est intérieur et de longueur paire,
+    $(-1)^L\prod_j (x - r_j)$ s'il contient la dernière (et non la
+    première), $(x - r_1)^2\prod_{j \ge 2}(x - r_j)$ s'il est intérieur
+    et de longueur impaire~: $\pi_R$ est de degré égal au coût du bloc,
+    s'annule sur $R$ et est positif ou nul sur $\mathcal E$, aucune
+    cellule exposée ne se trouvant strictement entre deux cellules d'un
+    même bloc. Le polynôme $p = -\prod_R \pi_R$ ($p = -1$ sans aucun
+    décès) est de degré $C$, au plus nul sur $\mathcal E$ et nul sur
+    $\mathcal P$~: si $C \le z - 1$, c'est un polynôme de récession.
+    \emph{Minoration du degré.} Soit $p$ un polynôme de récession~; il
+    s'annule en chaque cellule de $\mathcal P$. Pour un bloc intérieur
+    $R$ de longueur $L$ impaire, de voisins exposés $e_- < r_1$ et $r_L <
+    e_+$ (sans décès, donc $p(e_\pm) \le 0$), soit $p$ compte, avec
+    multiplicité, au moins $L + 1$ racines dans $]e_-, e_+[$, soit ses
+    seules racines y sont les $r_j$, simples~: $p$ y change alors de signe
+    un nombre impair de fois, il est strictement positif juste à droite de
+    $e_-$ ou juste à gauche de $e_+$, et, étant au plus nul en cette
+    cellule, il s'y annule~; le bloc en «~réclame~» la racine. Les
+    intervalles $]e_-, e_+[$ de deux blocs sont disjoints et ne contiennent
+    aucune cellule exposée hors du bloc~; une cellule réclamée, exposée
+    sans décès, n'est ni dans $\mathcal P$ ni dans un tel intervalle, et
+    elle ne peut l'être que par ses deux blocs voisins~; une cellule $e$
+    réclamée par deux blocs, un de chaque côté, est une racine où $p$ est positif des
+    deux côtés, donc de multiplicité paire, au moins~2. En comptant les
+    multiplicités, $p$ a au moins $\sum_R L + \#\{\text{blocs intérieurs
+    de longueur impaire}\} = C$ racines~: $C \le \deg p \le z - 1$.
+    $\square$
+
+    \emph{Statuts.} Le théorème est un résultat exact, établi par la
+    preuve ci-dessus~; cette preuve n'est vérifiée sur aucune source
+    publiée~: la source de la méthode (Biessy, arXiv:2306.06932 v5) ne
+    traite pas l'existence du maximum, et son algorithme~1 (annexe~D,
+    p.~54) ne contient aucun contrôle d'existence (vérifié sur la couche
+    texte du PDF de même SHA-256 que \code{REFERENCE\_METHODE\_LISSAGE\_POISSON})~;
+    le rapprochement avec l'existence de l'estimateur du maximum de
+    vraisemblance des modèles log-linéaires n'est pas vérifié sur les
+    textes et n'est pas cité. Le décompte est confronté, par un
+    \textbf{constat} qui confirme la preuve sans la remplacer, à un test
+    direct du cône des polynômes de récession~: 17\,236 configurations
+    ($n \le 8$, $z = 1$ à~4), sans désaccord, par la batterie unitaire
+    (section~\ref{sec:lissage-verifications})~; 1\,416\,612 configurations
+    ($n \le 12$, en arithmétique rationnelle exacte, avis du 15/11/2026)
+    et 157\,068 ($n \le 10$, remesure (0$'$) de la PR~\#384), sans
+    désaccord (constats rapportés). Un échec de l'algorithme à maximum
+    existant (plafond d'itérations, recherche linéaire épuisée sans
+    convergence numérique, rang perdu en cours d'itération) reste possible
+    près de la limite $C = z$~: il est refusé
+    (\code{lissage\_non\_convergent}, dont le message dit que le maximum
+    existe, condition $C \ge z$ vérifiée avant les itérations, mais n'est
+    pas atteint numériquement~: texte ci-dessous), sans table. Le cas d'essai de ce refus
+    ($C = z = 4$~; sous \code{declare}, $\lambda = 1$, plafond de 100
+    itérations atteint~; sous \code{laml}, échec au $\lambda = 1$ de la
+    grille) est un
+    comportement spécifié, non un défaut~: avec un plafond relevé,
+    l'algorithme converge en 107 itérations vers un maximum dégénéré
+    ($\min\hat\theta = -88\,606{,}67$, $\hat m$ nul en flottant sur 54 des
+    71 âges), qui produirait une table à taux nuls (mesure,
+    section~\ref{sec:lissage-verifications}).
+
+    {\sloppy\emph{Textes du moteur} (\code{R/lissage.R}, recopiés tels
+    quels). Phrase de \code{HYPOTHESE\_LISSAGE\_POISSON}~: «~Existence du
+    maximum (résultat exact, contrôlée avant les itérations)~: theta\textasciicircum{}
+    existe, unique, si et seulement si C >= z, C somme sur les blocs
+    (suites maximales de cellules exposées consécutives qui comptent toutes
+    des décès) d'un coût L s'il contient la première ou la dernière
+    cellule exposée, L + 1 si L est impair et L s'il est pair sinon~;
+    refus lissage\_maximum\_inexistant si C < z.~» Message de
+    \code{lissage\_maximum\_inexistant}~: «~Lissage~: \%d segment(s) sans
+    maximum fini de la vraisemblance de Poisson pénalisée sur la plage
+    d'âges \%d à \%d (z = \%d)~: \%s. Le maximum existe si et seulement si
+    C >= z, C décompte des blocs de cellules exposées consécutives avec
+    décès (un bloc de L cellules compte L s'il contient la première ou la
+    dernière cellule exposée, sinon L arrondi au pair supérieur)~; la
+    condition ne dépend ni de lambda ni des effectifs. Élargir la plage
+    d'âges, regrouper des segments ou prendre ordre\_difference au plus
+    égal au plus petit C cité.~», chaque segment cité étant suivi de
+    «~(âge(s) avec décès~: \ldots, C = \%d)~»~; \code{details}~:
+    \code{plage\_ages}, \code{ordre\_difference}, \code{segments} (clés des
+    segments cités), \code{decompte} (\code{integer}, $C$ de chaque
+    segment cité), sans \code{parametre\_lissage}. Fin du message de
+    \code{lissage\_non\_convergent}~: «~le maximum existe pour ces données
+    (condition C >= z vérifiée avant les itérations) mais n'est pas
+    atteint numériquement~; aucune table lissée n'est produite.~»\par}
   \item \textbf{Calcul} (\code{lisser\_poisson()}~; Biessy, annexe~D,
     algorithme~1, p.~54~; ADR 0017, point~9.1)~: départ $\theta_0 =
-    \ln(\max(D, \varepsilon)/E^c)$ aux cellules exposées, 0 ailleurs
-    ($\varepsilon$ = \code{EPSILON\_DEPART\_LISSAGE})~; à chaque
+    \ln(\max(D, \varepsilon)/E^c)$ aux cellules exposées, de
+    l'algorithme de la source, qui ne fixe pas la valeur de $\varepsilon$
+    (\code{EPSILON\_DEPART\_LISSAGE}, règle de \code{WH} 2.0.0), et 0
+    aux cellules sans exposition (règle de \code{WH} 2.0.0)~; à chaque
     itération de Newton (\code{iteration\_pirls()}), réponse de travail
     $z_k = \theta + D/m - 1$ aux cellules exposées, $\theta$ ailleurs, et
     nouveau $\theta$ par QR des moindres carrés augmentés
@@ -13778,8 +13944,10 @@ ne redonnent pas le total des événements est une erreur de programmation.\par}
     LAML, non la précision de $\hat\lambda$, une constante ajoutée à la
     LAML ne déplaçant pas son maximiseur en arithmétique exacte.
   \item \textbf{Règles non tirées de la source} (décision D12~; nommées
-    dans l'hypothèse)~: reprises du code de \code{WH} 2.0.0~: le départ
-    $\theta_0$ et sa valeur 0 aux cellules sans exposition, la réponse de
+    dans l'hypothèse)~: reprises du code de \code{WH} 2.0.0~: la valeur
+    de $\varepsilon$ dans le départ $\theta_0$ de la source
+    (\code{EPSILON\_DEPART\_LISSAGE}) et la valeur 0 de $\theta_0$ aux
+    cellules sans exposition, la réponse de
     travail $\theta$ aux cellules sans exposition, la recherche linéaire par
     divisions du pas~; propres à l'outil~: la réponse de travail $\theta - 1$
     aux cellules exposées sans décès ($D/m$ pris nul, valeur exacte pour
@@ -13799,8 +13967,9 @@ ne redonnent pas le total des événements est une erreur de programmation.\par}
     \code{lissage\_non\_convergent}.
   \item \textbf{Constantes} (\code{CONSTANTES\_LISSAGE\_POISSON}, recopiées
     dans les paramètres avec leur origine~; ADR 0017, point~9.3)~:
-    \code{EPSILON\_DEPART\_LISSAGE} $= 10^{-8}$ (non tirée de la source,
-    code de \code{WH} 2.0.0)~; \code{EPSILON\_DEVIANCE\_LISSAGE} $= 10^{-8}$
+    \code{EPSILON\_DEPART\_LISSAGE} $= 10^{-8}$ (valeur de
+    $\varepsilon$, que l'algorithme~1 ne fixe pas~; non tirée de la
+    source, code de \code{WH} 2.0.0)~; \code{EPSILON\_DEVIANCE\_LISSAGE} $= 10^{-8}$
     (tirée de la source, algorithme~1, p.~54)~;
     \code{ITERATIONS\_MAX\_LISSAGE} $= 100$ et
     \code{DEMI\_PAS\_MAX\_LISSAGE} $= 30$ (non tirées de la source)~; sous
@@ -14125,7 +14294,7 @@ $\hat\theta$ à $\varepsilon$~; LAML égale à la formule de la p.~19
 recalculée en clair par \code{determinant()} et \code{eigen()}, à
 $10^{-9}$ près, ce qui confronte aussi la forme close de
 $\ln\lvert K^{\mathsf T}K\rvert_+$ à un calcul par valeurs propres~; non-convergence quand les décès sont à un seul âge
-extrême), les leviers et les degrés de liberté effectifs, la réponse de
+extrême, en appel direct de \code{lisser\_poisson()}, $C = 1 < z = 2$), les leviers et les degrés de liberté effectifs, la réponse de
 travail aux cellules exposées sans décès (jeu à huit cellules exposées
 sans décès, $z = 4$~: $\hat\lambda$ intérieur, égal à 371\,297,92 à
 $10^{-4}$ près en relatif~; cette tolérance dépasse d'un facteur~10 le
@@ -14150,7 +14319,33 @@ décroissance relative et décrément égal au seuil inclus, décrément infini,
 sans division du pas~; seule vérification de la branche «~poursuite après
 un pas raccourci~», qu'aucun jeu n'exerce), la règle de la borne
 (\code{lambda\_a\_la\_borne}, $\hat\lambda$ égal à la borne déclarée),
-l'interpolation à $z$ cellules exposées~; le recoupement B1 ($\lambda =
+l'interpolation à $z$ cellules exposées~; la condition d'existence du
+maximum (issue~\#247~; section~\ref{sec:lissage-poisson})~:
+\code{decompte\_maximum()} contre un test direct du cône des polynômes
+de récession, exhaustif sur les 17\,236 configurations à $n \le 8$
+cellules (première et dernière exposées, au moins $z$ cellules exposées,
+$n > z$), $z = 1$ à~4, sans désaccord, et sur des exemples écrits à la
+main~; les quatre cas obligatoires (décès au seul âge extrême, $z = 2$~;
+un âge intérieur, $z = 3$~; deux âges intérieurs consécutifs, $z = 3$~;
+les deux âges extrêmes, $z = 3$~; $C = 1$, 2, 2 et~2), chacun sous
+\code{declare} et sous \code{laml}, refusés par
+\code{lissage\_maximum\_inexistant} avec leur message exact et leur
+\code{decompte}, sans aucun appel de \code{lisser\_poisson()} (contrôlé
+par une trace à son entrée, dont l'effet est vérifié sur un cas
+produit)~; le refus sur le segment F seul et sur les deux segments
+(message au pluriel, \code{segments} et \code{decompte} de longueur~2)~;
+deux témoins produits sous les deux critères (un âge intérieur, $z = 2$,
+$C = 2$~; un âge extrême et un âge intérieur, $z = 3$, $C = 3$)~; l'ordre
+des refus (un plan qui relève de
+\code{lissage\_interpolation\_deces\_nul} et de $C < z$ reçoit le
+premier)~; \code{lissage\_non\_convergent} à maximum existant ($C = z =
+4$, âges 20 à~90, décès aux seuls âges 21 et~24 du segment H)~: sous
+\code{declare}, $\lambda = 1$, plafond de 100 itérations atteint, message
+exact~; sous \code{laml}, sur $[1, 10^4]$, échec au $\lambda = 1$ de la
+grille~; constat de mesure sous R~4.3.3, et comportement spécifié, non
+défaut connu~: avec un plafond relevé, l'algorithme converge en 107
+itérations vers un maximum dégénéré, $\hat m$ nul en flottant sur 54 des
+71 âges~; le recoupement B1 ($\lambda =
 10^{12}$~: valeurs ajustées contre la régression de Poisson polynomiale
 de \code{stats::glm()}, à $10^{-6}$ près en relatif)~; les catalogues et
 les constantes~; chaque refus propre à la variante levé seul, avec son
@@ -14253,12 +14448,12 @@ ici (E3.4).
 \catalogue{fonctions-lissage}{REGLE\_FORCE\_LISSAGE} & constante & --- & texte de la règle de la force, $\mu = -\ln(1 - q)$, recopié dans les paramètres \\
 \catalogue{fonctions-lissage}{HYPOTHESE\_LISSAGE} & constante & --- & texte de l'hypothèse de \code{wh\_quadratique}, recopié dans les paramètres (section~\ref{sec:lissage-quadratique}) \\
 \catalogue{fonctions-lissage}{REFERENCE\_METHODE\_LISSAGE} & constante & --- & identité de la source de \code{wh\_quadratique}~: Lignes directrices mortalité, chap.~3, IV.2.a (p.~31-32) et IV.2.d (p.~33), SHA-256 du PDF~; écarts documentés \\
-\catalogue{fonctions-lissage}{HYPOTHESE\_LISSAGE\_POISSON} & constante & --- & texte de l'hypothèse de \code{wh\_poisson}, règles non tirées de la source comprises (section~\ref{sec:lissage-poisson}) \\
+\catalogue{fonctions-lissage}{HYPOTHESE\_LISSAGE\_POISSON} & constante & --- & texte de l'hypothèse de \code{wh\_poisson}~: condition d'existence du maximum, $C \ge z$ (issue~\#247), départ de l'algorithme de la source, règles non tirées de la source comprises (section~\ref{sec:lissage-poisson}) \\
 \catalogue{fonctions-lissage}{REFERENCE\_METHODE\_LISSAGE\_POISSON} & constante & --- & identité de la source de \code{wh\_poisson}~: Biessy, arXiv:2306.06932 v5, SHA-256, sections lues \\
 \catalogue{fonctions-lissage}{STATUTS\_LISSAGE} & constante & --- & statut de chaque grandeur sous \code{wh\_quadratique} (\code{grandeur}, \code{statut}~; section~\ref{sec:lissage-quadratique}) \\
 \catalogue{fonctions-lissage}{STATUTS\_LISSAGE\_POISSON} & constante & --- & statut de chaque grandeur sous \code{wh\_poisson} (section~\ref{sec:lissage-poisson}), mention d'indépendance de nature \code{credibilite} comprise sur les deux bornes de crédibilité (issues~\#329 et~\#359) \\
 \catalogue{fonctions-lissage}{CONSTANTES\_LISSAGE} & constante & --- & \code{data.frame} (\code{constante}, \code{valeur}, \code{origine}) à zéro ligne~: aucune constante numérique sous \code{wh\_quadratique} \\
-\catalogue{fonctions-lissage}{EPSILON\_DEPART\_LISSAGE} & constante & --- & $10^{-8}$~: plancher des décès au départ de l'algorithme de \code{wh\_poisson} \\
+\catalogue{fonctions-lissage}{EPSILON\_DEPART\_LISSAGE} & constante & --- & $10^{-8}$~: valeur de $\varepsilon$, plancher des décès au départ $\theta_0 = \ln(\max(D, \varepsilon)/E^c)$ de l'algorithme de la source, qui ne la fixe pas (règle de \code{WH} 2.0.0~; \code{wh\_poisson}) \\
 \catalogue{fonctions-lissage}{EPSILON\_DEVIANCE\_LISSAGE} & constante & --- & $10^{-8}$~: seuil relatif d'arrêt sur la déviance pénalisée (\code{wh\_poisson}) \\
 \catalogue{fonctions-lissage}{ITERATIONS\_MAX\_LISSAGE} & constante & --- & 100 (\code{integer})~: plafond d'itérations (\code{wh\_poisson}) \\
 \catalogue{fonctions-lissage}{DEMI\_PAS\_MAX\_LISSAGE} & constante & --- & 30 (\code{integer})~: plafond de divisions du pas par deux (\code{wh\_poisson}) \\
@@ -14273,10 +14468,11 @@ ici (E3.4).
 \catalogue{fonctions-lissage}{deviance\_penalisee()} & interne & $\theta$, $D$, $E^c$, cellules exposées, $\lambda$, $z$ & $2\sum[D\ln(D/m) - (D - m)] + \lambda S(\theta)$, $S$ par la fonction de $S$ du module~; éventuellement non finie (section~\ref{sec:lissage-poisson}) \\
 \catalogue{fonctions-lissage}{iteration\_pirls()} & interne & $\theta$, $D$, $E^c$, cellules exposées, bloc de pénalité & une itération de Newton de \code{wh\_poisson} (réponse de travail, QR des moindres carrés augmentés)~; signale un itéré non fini ou un rang perdu \\
 \catalogue{fonctions-lissage}{log\_det\_penalite()} & interne & $n$, $z$ & $\ln \lvert K^{\mathsf T} K \rvert_+$ par la forme close exacte, évaluée par \code{lgamma()} et \code{log()} en $O(z)$ (\code{wh\_poisson}~; issue~\#249) \\
+\catalogue{fonctions-lissage}{decompte\_maximum()} & interne & indicateurs des cellules exposées et des cellules avec décès d'un segment, dans l'ordre des âges & décompte $C$ (\code{integer}) des blocs de cellules exposées avec décès, entier, sans arithmétique flottante~; le maximum de \code{wh\_poisson} existe si et seulement si $C \ge z$ (résultat exact, section~\ref{sec:lissage-poisson}~; issue~\#247) \\
 \catalogue{fonctions-lissage}{arret\_pirls()} & interne & déviances pénalisées de l'itéré et du candidat, nombre de divisions du pas, décrément de Newton du pas complet, seuil & \code{TRUE} si et seulement si la déviance ne décroît plus de la tolérance relative de \code{wh\_poisson} et, après un pas raccourci, le décrément est fini et au plus le seuil (règle d'arrêt, section~\ref{sec:lissage-poisson}~; issue~\#249) \\
 \catalogue{fonctions-lissage}{lisser\_poisson()} & interne & $D$, $E^c$, $\lambda$, $z$, âges d'un segment & maximum de la vraisemblance de Poisson pénalisée à $\lambda$ fixé (départ, itérations, recherche linéaire, arrêt), puis $\hat\theta$, variances, leviers, $\nu$, LAML, déviance pénalisée, résidus~; ou l'échec (\code{non\_convergent}, \code{rang\_deficient}) (section~\ref{sec:lissage-poisson}) \\
 \catalogue{fonctions-lissage}{choisir\_lambda\_poisson()} & interne & $D$, $E^c$, $z$, âges, intervalle de $\lambda$ & $\hat\lambda$ par la LAML~: grille à froid, extrémités aux bornes déclarées, Brent si le meilleur point est intérieur, la borne sinon~; ajustement retenu et borne atteinte, ou l'échec et son $\lambda$ \\
-\catalogue{fonctions-lissage}{lisser\_segments\_poisson()} & interne & cellules, segments, décomptes, paramètres de l'étape & suite de \code{calculer\_lissage()} sous \code{wh\_poisson}~: refus \code{lissage\_interpolation\_}\allowbreak\code{deces\_nul}, \code{lissage\_systeme\_}\allowbreak\code{rang\_deficient}, \code{lissage\_non\_}\allowbreak\code{convergent}, puis table lissée et bornes, segments, avertissements \\
+\catalogue{fonctions-lissage}{lisser\_segments\_poisson()} & interne & cellules, segments, décomptes, paramètres de l'étape & suite de \code{calculer\_lissage()} sous \code{wh\_poisson}~: refus, dans l'ordre, \code{lissage\_interpolation\_}\allowbreak\code{deces\_nul}, \code{lissage\_maximum\_}\allowbreak\code{inexistant} (avant toute itération~; issue~\#247), \code{lissage\_systeme\_}\allowbreak\code{rang\_deficient}, \code{lissage\_non\_}\allowbreak\code{convergent}, puis table lissée et bornes, segments, avertissements \\
 \catalogue{fonctions-lissage}{calculer\_lissage()} & interne & table d'exposition, résultat de l'étape \code{brut}, segmentation, convention retenue, paramètres de l'étape & fonction d'étape \code{lissage}~: paramètres, résultat (\code{table\_lissee}, \code{segments}, dont la dimension de l'espace non pénalisé de chaque segment, issue~\#242), diagnostics, avertissements~; refus en cours d'étape (section~\ref{sec:lissage-etape})~; ne refait aucun contrôle de \code{valider\_plan()} \\
 \end{longtable}
 }
