@@ -524,6 +524,48 @@ AJOUT_LAML_249 <- paste(" ; terme ln |K'K|+ (constant en lambda) par forme close
                         "de [2 ln j! - ln (2j)! - ln (2j + 1)! + somme sur k de -j \u00e0 j de ln(n + k)] (r\u00e9sultat",
                         "exact ; valeur calcul\u00e9e par lgamma et log, \u00e0 quelques unit\u00e9s de dernier rang pr\u00e8s)")
 CHEMIN_HYPOTHESE_249 <- "etapes/lissage/parametres/hypothese"
+# Transition #247 (B39, étape (5) ; ADR 0017, annotation du 26/11/2026, point
+# 15.6 ; remesure (0') d'actuary-approfondi, § 4 ; M606) : hypothèse du
+# lissage de wh_poisson (R16 et R17), condition d'existence du maximum
+# insérée après « aucun refus D > E^i. » et attribution de theta_0 corrigée
+# (départ ln(max(D, epsilon) / E^c) passé dans l'algorithme de la source) ;
+# aucune valeur double (C = 64 et 68 >= z = 3). Composition avec #249 :
+# l'hypothèse, déclarée aussi par transition_249(), est déclarée par les deux
+# à la même valeur finale (hypothese_lissage_b39()), appliquée une fois
+# (aligner_reference()). À clore par la régénération unique (R) de B39, avec
+# transition_247(), hypothese_lissage_b39() et les constantes *_247.
+SUBST_HYPOTHESE_247 <- list(
+  c(paste("aucun refus D > E^i. Algorithme de la source (annexe D, algorithme 1) : it\u00e9rations de Newton",
+          "poursuivies"),
+    paste("aucun refus D > E^i. Existence du maximum (r\u00e9sultat exact, contr\u00f4l\u00e9e avant les",
+          "it\u00e9rations) : theta^ existe, unique, si et seulement si C >= z, C somme sur les blocs (suites",
+          "maximales de cellules expos\u00e9es cons\u00e9cutives qui comptent toutes des d\u00e9c\u00e8s) d'un",
+          "co\u00fbt L s'il contient la premi\u00e8re ou la derni\u00e8re cellule expos\u00e9e, L + 1 si L est",
+          "impair et L s'il est pair sinon ; refus lissage_maximum_inexistant si C < z. Algorithme de la source",
+          "(annexe D, algorithme 1) : d\u00e9part theta_0 = ln(max(D, epsilon) / E^c) o\u00f9 E^c > 0 ;",
+          "it\u00e9rations de Newton poursuivies")),
+  c(paste("reprises du code de WH 2.0.0 : d\u00e9part theta_0 = ln(max(D, EPSILON_DEPART_LISSAGE) / E^c) o\u00f9",
+          "E^c > 0 et theta_0 = 0 aux cellules sans exposition ;"),
+    paste("reprises du code de WH 2.0.0 : valeur epsilon = EPSILON_DEPART_LISSAGE et theta_0 = 0 aux cellules",
+          "sans exposition ;")))
+# Hypothèse du lissage après #249 (SUBST_HYPOTHESE_249) et #247
+# (SUBST_HYPOTHESE_247) : chaque fragment remplacé doit figurer une fois
+# exactement dans la référence (`id` : plan, pour le message).
+hypothese_lissage_b39 <- function(ref, id) {
+  h <- ref[[CHEMIN_HYPOTHESE_249]]
+  for (sb in c(list(SUBST_HYPOTHESE_249), SUBST_HYPOTHESE_247)) {
+    if (length(h) != 1L || lengths(regmatches(h, gregexpr(sb[1L], h, fixed = TRUE))) != 1L)
+      stop(sprintf("hypothese_lissage_b39(%s) : fragment de l'hypoth\u00e8se absent ou r\u00e9p\u00e9t\u00e9 (r\u00e9f\u00e9rence d\u00e9j\u00e0 r\u00e9g\u00e9n\u00e9r\u00e9e ?)", id))
+    h <- sub(sb[1L], sb[2L], h, fixed = TRUE)
+  }
+  Encoding(h) <- "UTF-8"
+  h
+}
+transition_247 <- function(id) {
+  ref <- lire_reference(file.path(DOSSIER_REFERENCES, paste0(id, ".tsv")))$valeurs
+  list(issue = "#247", plans = id, changements = list(
+    list(chemin = CHEMIN_HYPOTHESE_249, nature = "valeur de chaîne", valeurs = hypothese_lissage_b39(ref, id))))
+}
 # Statuts du lissage après #242 et #249 : texte de segments/laml, s'il
 # existe (wh_poisson ; absent sous wh_quadratique, R15), complété par
 # AJOUT_LAML_249, puis `statut` inséré après segments/ddl_effectifs.
@@ -852,20 +894,17 @@ APRES_R17_249 <- list(
 APRES_R16_249[["validation/resultat/cellules/qx_table"]] <- APRES_R16_249[["lissage/resultat/table_lissee/qx"]]
 APRES_R16_249[["validation/parametres/ddl_effectifs/ddl_effectifs"]] <- APRES_R16_249[["lissage/resultat/segments/ddl_effectifs"]]
 APRES_R16_249[["validation/parametres/ddl_effectifs/ddl_effectifs_retenus"]] <- APRES_R16_249[["lissage/resultat/segments/ddl_effectifs"]]
-# Transition #249 du plan `id` : hypothèse (substitution unique), statuts du
+# Transition #249 du plan `id` : hypothèse (hypothese_lissage_b39(), valeur
+# finale après #249 et #247), statuts du
 # lissage (même déclaration que #242, `statut` : statut de la ligne ajoutée
 # par #242), doubles de `apres` (vecteurs entiers) et, sous R16, lignes
 # (statistique, grandeur) de la table statistiques de la validation
 # (positions lues dans la référence).
 transition_249 <- function(id, statut, apres, statistiques = NULL) {
   ref <- lire_reference(file.path(DOSSIER_REFERENCES, paste0(id, ".tsv")))$valeurs
-  h <- ref[[CHEMIN_HYPOTHESE_249]]
-  if (length(h) != 1L || lengths(regmatches(h, gregexpr(SUBST_HYPOTHESE_249[1L], h, fixed = TRUE))) != 1L)
-    stop(sprintf("transition_249(%s) : fragment de l'hypoth\u00e8se absent ou r\u00e9p\u00e9t\u00e9 (r\u00e9f\u00e9rence d\u00e9j\u00e0 r\u00e9g\u00e9n\u00e9r\u00e9e ?)", id))
   if (!"segments/laml" %in% ref[[paste0(STATUTS_242, "grandeur")]])
     stop(sprintf("transition_249(%s) : segments/laml absent des statuts de la r\u00e9f\u00e9rence (erreur de programmation)", id))
-  h <- sub(SUBST_HYPOTHESE_249[1L], SUBST_HYPOTHESE_249[2L], h, fixed = TRUE)
-  Encoding(h) <- "UTF-8"
+  h <- hypothese_lissage_b39(ref, id)
   ch <- c(list(list(chemin = CHEMIN_HYPOTHESE_249, nature = "valeur de chaîne", valeurs = h),
                list(chemin = paste0(STATUTS_242, "statut"), nature = "valeur de chaîne",
                     valeurs = statuts_lissage_b39(ref, statut))),
@@ -914,7 +953,8 @@ transition_242 <- function(id, statut) {
 TRANSITIONS_EN_COURS <- c(TRANSITIONS_EN_COURS, list(
   transition_242("R15", STATUT_DIM_242_A), transition_242("R16", STATUT_DIM_242_B), transition_242("R17", STATUT_DIM_242_B),
   transition_249("R16", STATUT_DIM_242_B, APRES_R16_249, STATISTIQUES_R16_249),
-  transition_249("R17", STATUT_DIM_242_B, APRES_R17_249)))
+  transition_249("R17", STATUT_DIM_242_B, APRES_R17_249),
+  transition_247("R16"), transition_247("R17")))
 # Transition #218 de la correction de theta_80 (B30, constat C1 de la revue
 # finale, c35eb9d) close par la seconde régénération (R′) de R1 à R17
 # (exécution 44698750703, sur c35eb9d) : transition_218c(), apres_218c() et
