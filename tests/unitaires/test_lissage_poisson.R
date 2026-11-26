@@ -113,6 +113,86 @@ verifier("A5 LAML de lisser_poisson() = formule de Biessy, p. 19, recalculée en
   }, 0)))
   if (all(e <= 1e-9)) TRUE else sprintf("écart relatif max %.3g", max(e))
 })
+# ln |K'K|+ par forme close (#249, point 1 ; ADR 0017, annotation du
+# 26/11/2026, point 9.5) : valeurs exactes de la remesure (0') d'actuary-
+# approfondi (det(K K') entier par Bareiss) ; balayage contre un déterminant
+# entier exact recalculé ici : élimination de Bareiss en arithmétique modulaire
+# (deux nombres premiers p < 2^26 : tout produit < 2^52, exact en double ; la
+# division exacte de Bareiss devient le produit par l'inverse modulaire),
+# reconstruction par les restes chinois (det < p1 p2, borne lue sur
+# determinant() en flottant), contrôle par un troisième nombre premier.
+PREMIERS_249 <- c(67108859, 67108837, 67108819)
+mulmod <- function(a, b, p) (a * b) %% p
+invmod <- function(a, p) {
+  r <- 1; b <- a %% p; e <- p - 2
+  while (e > 0) { if (e %% 2 == 1) r <- mulmod(r, b, p); b <- mulmod(b, b, p); e <- e %/% 2 }
+  r
+}
+det_bareiss_mod <- function(M, p) {
+  M <- M %% p; m <- nrow(M); prec <- 1
+  for (k in seq_len(m - 1L)) {
+    if (M[k, k] == 0) stop(sprintf("pivot nul modulo %d (choisir un autre nombre premier)", p))
+    i <- (k + 1L):m
+    M[i, i] <- mulmod((mulmod(M[i, i], M[k, k], p) - outer(M[i, k], M[k, i]) %% p) %% p, invmod(prec, p), p)
+    prec <- M[k, k]
+  }
+  M[m, m]
+}
+det_entier_exact <- function(n, z) {
+  K <- diff(diag(n), differences = z)
+  M <- tcrossprod(K)
+  approx <- as.numeric(determinant(M, logarithm = FALSE)$modulus)
+  if (approx >= prod(PREMIERS_249[1:2]) / 2) stop("déterminant hors de la portée des restes chinois")
+  r <- vapply(PREMIERS_249, function(p) det_bareiss_mod(M, p), 0)
+  p1 <- PREMIERS_249[1]; p2 <- PREMIERS_249[2]
+  x <- r[1] + p1 * mulmod((r[2] - r[1]) %% p2, invmod(p1 %% p2, p2), p2)
+  if (x %% PREMIERS_249[3] != r[3]) stop("restes chinois incohérents avec le troisième nombre premier")
+  x
+}
+verifier("log_det_penalite() (#249, point 1) : forme close aux quatre couples de la remesure (0') d'actuary-approfondi, (71, 3), (71, 4), (101, 4), (121, 4) : écart relatif <= 1e-14 aux valeurs exactes (ln det(K K') entier par Bareiss) (résultat exact ; valeur calculée par lgamma et log)", {
+  v <- c(ldp(71, 3), ldp(71, 4), ldp(101, 4), ldp(121, 4))
+  ref <- c(29.298770437202322, 47.613856784815574, 53.254915623305017, 56.146230935553966)
+  e <- abs(v - ref) / ref
+  if (all(e <= 1e-14)) TRUE else sprintf("écart relatif max %.3g", max(e))
+})
+verifier("log_det_penalite() (#249, point 1) : balayage n de z + 1 à 20, z = 1 à 4 (70 couples) contre det(K K') entier exact (Bareiss modulaire, restes chinois) : round(exp(forme close)) identique au déterminant entier et écart relatif à log(det) <= 1e-14 ; nombres premiers contrôlés (résultat exact)", {
+  premiers <- all(vapply(PREMIERS_249, function(p) all(p %% 2:floor(sqrt(p)) != 0), NA))
+  cas <- do.call(rbind, lapply(1:4, function(z) cbind(n = (z + 1):20, z = z)))
+  ko <- character(0)
+  for (i in seq_len(nrow(cas))) {
+    n <- cas[i, "n"]; z <- cas[i, "z"]
+    d <- det_entier_exact(n, z); f <- ldp(n, z)
+    if (!identical(round(exp(f)), d) || abs(f - log(d)) > 1e-14 * abs(log(d)))
+      ko <- c(ko, sprintf("(%d, %d) : det %.17g, exp(forme close) %.17g", n, z, d, exp(f)))
+  }
+  if (premiers && nrow(cas) == 70L && !length(ko)) TRUE
+  else paste(c(if (!premiers) "nombre non premier", sprintf("%d couples", nrow(cas)), ko), collapse = " ; ")
+})
+# Règle d'arrêt des itérations de wh_poisson (#249, point 2) : table de
+# vérité d'arret_pirls() (dev = 100, seuil 1e-6 ; borne de déviance
+# (1 - EPSILON_DEVIANCE_LISSAGE) dev incluse, décrément égal au seuil inclus).
+verifier("arret_pirls() (#249, point 2) : table de vérité ; arrêt si et seulement si dev_n >= (1 - EPSILON_DEVIANCE_LISSAGE) dev et (j = 0 ou décrément fini <= seuil) ; décrément non lu sans division du pas (NA admis) (valeur calculée à la main)", {
+  ap <- function(...) tablexp:::arret_pirls(...)
+  b <- (1 - tablexp:::EPSILON_DEVIANCE_LISSAGE) * 100
+  s <- 1e-6
+  cas <- list(
+    list(dev_n = 100, j = 0L, dec = NA_real_, attendu = TRUE),
+    list(dev_n = b, j = 0L, dec = NA_real_, attendu = TRUE),
+    list(dev_n = 99, j = 0L, dec = NA_real_, attendu = FALSE),
+    list(dev_n = 100, j = 3L, dec = 1e-7, attendu = TRUE),
+    list(dev_n = 100, j = 3L, dec = s, attendu = TRUE),
+    list(dev_n = 100, j = 3L, dec = 1e-5, attendu = FALSE),
+    list(dev_n = 100, j = 3L, dec = Inf, attendu = FALSE),
+    list(dev_n = 100, j = 3L, dec = NaN, attendu = FALSE),
+    list(dev_n = 100, j = 3L, dec = NA_real_, attendu = FALSE),
+    list(dev_n = 99, j = 3L, dec = 1e-7, attendu = FALSE),
+    list(dev_n = 99, j = 3L, dec = 1e-5, attendu = FALSE))
+  ko <- Filter(Negate(is.null), lapply(cas, function(c) {
+    r <- ap(100, c$dev_n, c$j, c$dec, s)
+    if (identical(r, c$attendu)) NULL else sprintf("dev_n %.17g, j %d, décrément %g : %s", c$dev_n, c$j, c$dec, format(r))
+  }))
+  if (!length(ko)) TRUE else paste(unlist(ko), collapse = " ; ")
+})
 verifier("A leviers m^_i V_ii : 0 exactement aux cellules sans exposition, > 0 ailleurs ; ddl_effectifs identical() à leur somme ; ddl dans ]z, n+] et décroissants en lambda (identité mathématique)", {
   r <- lp(D0, E0, 1e3, 2, X, ldp(N, 2))
   nu <- vapply(c(1, 1e2, 1e4, 1e6), function(l) lp(D0, E0, l, 2, X, ldp(N, 2))$ddl_effectifs, 0)
@@ -132,13 +212,19 @@ verifier("A décès à un seul âge intérieur (49), z = 2 : maximum fini, statu
   d <- numeric(N); d[20] <- 10
   identical(lp(d, E, 1e3, 2, X, ldp(N, 2))$statut, "produite")
 })
-verifier("A réponse de travail theta - 1 aux cellules exposées sans décès (réserve R-a d'actuary-approfondi) : jeu DS (8 cellules sans décès), z = 4, lambda = 1e-6 : statut produite (non_convergent avant la règle : m arrondi à 0, D / m = 0 / 0) ; LAML sur [1e-6, 1e8] : lambda^ intérieur (borne NA), 371 297,92 à 1e-6 près en relatif (valeur d'actuary-approfondi) ; un seul âge intérieur avec décès, z = 3, reste non_convergent (valeur calculée à la main)", {
+verifier("A réponse de travail theta - 1 aux cellules exposées sans décès (réserve R-a d'actuary-approfondi) : jeu DS (8 cellules sans décès), z = 4, lambda = 1e-6 : statut produite (non_convergent avant la règle : m arrondi à 0, D / m = 0 / 0) ; LAML sur [1e-6, 1e8] : lambda^ intérieur (borne NA), 371 297,92 à 1e-4 près en relatif (valeur d'actuary-approfondi ; tolérance au-dessus du plancher de bruit de lambda^, #249) ; un seul âge intérieur avec décès, z = 3, reste non_convergent (valeur calculée à la main)", {
+  # Tolérance 1e-4 (#249, point 1) : le profil de la LAML est plat ; un
+  # décalage constant de la LAML (sans effet en arithmétique exacte) de 1e-9 à
+  # 1e-6 déplace lambda^ de 2,0e-6 à 5,5e-6 en relatif (mesuré le 26/11/2026,
+  # R 4.3.3), et la forme close de ln |K'K|+ le déplace de 2,0e-6
+  # (371 297,919 -> 371 297,170) : plancher de bruit de l'ordre de 1e-5 ; 1e-4
+  # le dépasse d'un facteur 10 et reste sous la classe optimisation (1e-3).
   r <- lp(DS, E, 1e-6, 4, X, ldp(N, 4))
   ch <- tablexp:::choisir_lambda_poisson(DS, E, 4, X, c(1e-6, 1e8), ldp(N, 4))
   d <- numeric(N); d[20] <- 10
   tous(list(if (identical(r$statut, "produite")) TRUE else sprintf("statut %s", r$statut),
             if (is.null(ch$echec) && is.na(ch$borne)) TRUE else "lambda^ non intérieur ou échec",
-            if (isTRUE(proche(ch$ajustement$lambda, 371297.92, rel = 1e-6, abs = 0))) TRUE
+            if (isTRUE(proche(ch$ajustement$lambda, 371297.92, rel = 1e-4, abs = 0))) TRUE
             else sprintf("lambda^ = %.17g", ch$ajustement$lambda),
             if (identical(lp(d, E, 1e3, 3, X, ldp(N, 3))$statut, "non_convergent")) TRUE else "z = 3 : statut produit"))
 })

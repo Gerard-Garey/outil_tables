@@ -23,9 +23,10 @@
 #    résidus de conservation d'un segment, par QR des moindres carrés
 #    augmentés (ADR 0017, point 9.1) ;
 #  - deviance_penalisee(), iteration_pirls(), log_det_penalite(),
-#    lisser_poisson(), choisir_lambda_poisson() : variante (b) (#225) :
-#    déviance pénalisée, itération de Newton (PIRLS) par QR des moindres
-#    carrés augmentés, ln |K'K|+, maximum de la vraisemblance pénalisée d'un
+#    arret_pirls(), lisser_poisson(), choisir_lambda_poisson() : variante
+#    (b) (#225) : déviance pénalisée, itération de Newton (PIRLS) par QR des
+#    moindres carrés augmentés, ln |K'K|+ (forme close, #249), règle d'arrêt
+#    des itérations (#249), maximum de la vraisemblance pénalisée d'un
 #    segment à lambda fixé (leviers, ddl effectifs, LAML, variances a
 #    posteriori), choix de lambda par la LAML (grille, puis Brent) ;
 #  - calculer_lissage() : fonction d'étape `lissage`.
@@ -112,7 +113,9 @@ HYPOTHESE_LISSAGE_POISSON <- paste(
   "exposition ; réponse de travail z = theta aux cellules sans exposition ; divisions du pas par deux tant que la",
   "déviance pénalisée croît ou n'est pas finie. Règles de l'outil, non tirées de la source : réponse de",
   "travail theta - 1 aux cellules exposées sans décès (D / m pris nul, valeur exacte pour m > 0, conservée",
-  "quand m est arrondi à 0) ; à l'épuisement des divisions du pas, arrêt au dernier itéré si la diminution",
+  "quand m est arrondi à 0) ; arrêt après un pas raccourci seulement si le décrément de Newton du pas complet",
+  "d'(W + P)d est au plus EPSILON_DEVIANCE_LISSAGE |dev_P| + epsilon machine x somme des D, poursuite sinon ;",
+  "à l'épuisement des divisions du pas, arrêt au dernier itéré si la diminution",
   "de la déviance pénalisée prédite par le pas de Newton (décrément d'(W + P)d) est au plus",
   "EPSILON_DEVIANCE_LISSAGE |dev_P| + epsilon machine x somme des D, refus lissage_non_convergent sinon ; rang",
   "numérique du système perdu : refus lissage_systeme_rang_deficient à la première itération ou au maximum,",
@@ -220,7 +223,10 @@ STATUTS_LISSAGE_POISSON <- local({
     c("segments/laml",
       paste("approximation de Laplace de la vraisemblance marginale (Biessy, § 5.4, p. 19), exacte dans le seul cas",
             "normal ; valeur calculée au maximum approché, approximation numérique ; log-vraisemblance de la source",
-            "(§ 4.1), sans le terme - somme des ln D! (constant en lambda)")),
+            "(§ 4.1), sans le terme - somme des ln D! (constant en lambda) ; terme ln |K'K|+ (constant en lambda)",
+            "par forme close exacte, somme sur j de 0 à z - 1 de [2 ln j! - ln (2j)! - ln (2j + 1)! + somme sur k",
+            "de -j à j de ln(n + k)] (résultat exact ; valeur calculée par lgamma et log, à quelques unités de",
+            "dernier rang près)")),
     c("segments/deviance_penalisee",
       "valeur de la déviance pénalisée en theta^ calculé (minimum approché), approximation numérique"),
     c("segments/residu_conservation_0", residu),
@@ -450,14 +456,30 @@ iteration_pirls <- function(theta, D, Ec, pond, A) {
   list(fini = TRUE, rang = Q$rank, theta = qr.coef(Q, c(r * zk, numeric(nrow(A)))), racine_m = r)
 }
 
-# ln |K'K|+ (spécification de forme, § 2) : somme des logarithmes des n - z
-# plus grandes valeurs propres de K'K, K = diff(diag(n), differences = z)
-# (eigen(symmetric = TRUE, only.values = TRUE), valeurs décroissantes) ; ne
-# dépend que de n et z. ln |P|+ = (n - z) ln lambda + ce terme. Rend un
-# double.
+# ln |K'K|+, K = diff(diag(n), differences = z) (#249, point 1 ; ADR 0017,
+# annotation du 26/11/2026, point 9.5) : forme close exacte, ln det(K K') =
+# somme sur j de 0 à z - 1 de [2 ln j! - ln (2j)! - ln (2j + 1)! + somme sur
+# k de -j à j de ln(n + k)], évaluée par lgamma() et log() (à quelques
+# unités de dernier rang près ; ne dépend que de n et z ; coût O(z)), au
+# lieu de la somme des logarithmes des n - z plus grandes valeurs propres
+# par eigen() (erreur remesurée le 26/11/2026 : -1,35e-6 à n = 71,
+# z = 4). ln |P|+ = (n - z) ln lambda + ce terme. Rend un double.
 log_det_penalite <- function(n, z) {
-  s <- eigen(crossprod(diff(diag(n), differences = z)), symmetric = TRUE, only.values = TRUE)$values
-  sum(log(s[seq_len(n - z)]))
+  sum(vapply(0:(z - 1), function(j) 2 * lgamma(j + 1) - lgamma(2 * j + 1) - lgamma(2 * j + 2) +
+                                      sum(log(n + (-j):j)), 0))
+}
+
+# Règle d'arrêt d'une itération de wh_poisson (#249, point 2 ; règle de
+# l'outil) : dev, dev_n déviances pénalisées de l'itéré et du candidat
+# accepté ; j nombre de divisions du pas faites ; decrement : décrément de
+# Newton du pas complet d'(W + P)d (lu seulement si j > 0) ; seuil =
+# EPSILON_DEVIANCE_LISSAGE |dev| + .Machine$double.eps x somme des D. Arrêt
+# si et seulement si dev_n >= (1 - EPSILON_DEVIANCE_LISSAGE) dev et, après
+# un pas raccourci (j > 0), decrement fini et au plus seuil : une
+# déviance qui ne décroît plus après des demi-pas n'arrête que si le pas
+# complet ne prédit plus de diminution résoluble. Rend TRUE ou FALSE.
+arret_pirls <- function(dev, dev_n, j, decrement, seuil) {
+  dev_n >= (1 - EPSILON_DEVIANCE_LISSAGE) * dev && (j == 0L || (is.finite(decrement) && decrement <= seuil))
 }
 
 # Maximum de la vraisemblance de Poisson pénalisée d'un segment à lambda
@@ -473,8 +495,10 @@ log_det_penalite <- function(n, z) {
 # épuisement, arrêt au dernier itéré si le décrément de Newton d'(W + P)d,
 # d pas complet, est fini et au plus EPSILON_DEVIANCE_LISSAGE |dev_P| +
 # .Machine$double.eps x somme des D (diminution non résoluble : convergence
-# numérique, règle de l'outil), sinon non convergence ; poursuite si et
-# seulement si dev_new < (1 - EPSILON_DEVIANCE_LISSAGE) dev_old ; plafond
+# numérique, règle de l'outil), sinon non convergence ; arrêt selon
+# arret_pirls() (dev_new >= (1 - EPSILON_DEVIANCE_LISSAGE) dev_old et, après
+# des divisions du pas, même condition sur le décrément ; #249, point 2),
+# poursuite sinon ; plafond
 # ITERATIONS_MAX_LISSAGE itérations. Rang numérique perdu : à la première
 # itération (depuis theta_0) ou au maximum, rang_deficient (lambda trop grand
 # pour la tolérance de rang de qr()) ; à une itération suivante, non
@@ -498,6 +522,12 @@ lisser_poisson <- function(D, Ec, lambda, z, x, log_det_p, epsilon = EPSILON_DEP
   dev <- deviance_penalisee(theta, D, Ec, pond, lambda, z)
   plancher <- .Machine$double.eps * sum(D)
   echec <- function(statut, k) list(statut = statut, iterations = k)
+  # Décrément de Newton du pas complet d'(W + P)d depuis theta (it : itération
+  # de Newton depuis theta).
+  decrement_newton <- function(it, theta) {
+    pas <- it$theta - theta
+    sum((it$racine_m * pas)^2) + lambda * somme_differences_carrees(pas, z)
+  }
   k <- 0L
   repeat {
     if (k >= ITERATIONS_MAX_LISSAGE) return(echec("non_convergent", k))
@@ -510,8 +540,7 @@ lisser_poisson <- function(D, Ec, lambda, z, x, log_det_p, epsilon = EPSILON_DEP
     numerique <- FALSE
     while (!is.finite(dev_n) || dev_n > dev) {
       if (j >= DEMI_PAS_MAX_LISSAGE) {
-        pas <- it$theta - theta
-        decrement <- sum((it$racine_m * pas)^2) + lambda * somme_differences_carrees(pas, z)
+        decrement <- decrement_newton(it, theta)
         if (is.finite(decrement) && decrement <= EPSILON_DEVIANCE_LISSAGE * abs(dev) + plancher) {
           numerique <- TRUE
           break
@@ -524,10 +553,11 @@ lisser_poisson <- function(D, Ec, lambda, z, x, log_det_p, epsilon = EPSILON_DEP
     }
     if (numerique) break
     k <- k + 1L
-    continuer <- dev_n < (1 - EPSILON_DEVIANCE_LISSAGE) * dev
+    arret <- arret_pirls(dev, dev_n, j, if (j > 0L) decrement_newton(it, theta) else NA_real_,
+                         EPSILON_DEVIANCE_LISSAGE * abs(dev) + plancher)
     theta <- nouveau
     dev <- dev_n
-    if (!continuer) break
+    if (arret) break
   }
   m <- numeric(n)
   m[pond] <- exp(theta[pond]) * Ec[pond]
