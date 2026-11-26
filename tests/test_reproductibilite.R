@@ -566,9 +566,22 @@ transition_247 <- function(id) {
   list(issue = "#247", plans = id, changements = list(
     list(chemin = CHEMIN_HYPOTHESE_249, nature = "valeur de chaîne", valeurs = hypothese_lissage_b39(ref, id))))
 }
+# Transition #249, point 3 (B39, étape (5) ; ADR 0017, annotation du
+# 26/11/2026, point 15 ; remesure (0'), § 3, point 3) : plancher de bruit
+# ajouté au statut de segments/parametre_lissage (STATUTS_LISSAGE_POISSON,
+# ligne présente sous critere_lissage = laml seulement : R16), après
+# « (classe optimisation) » ; porté par statuts_lissage_b39(), donc déclaré
+# par transition_242() et transition_249() à la même valeur.
+FRAGMENT_PARAMETRE_249 <- "(classe optimisation) ;"
+AJOUT_PARAMETRE_249 <- paste(" ; plancher de bruit : la LAML est plate au voisinage de son maximum et son bruit",
+                             "d'arrondi d\u00e9place lambda^ au-del\u00e0 de la tol\u00e9rance de Brent (1e-6 en ln",
+                             "lambda), de l'ordre de 1e-5 en relatif sur un jeu simul\u00e9 de 71 \u00e2ges par segment",
+                             "(constat de mesure : jusqu'\u00e0 2,1e-5 sous permutation des lignes de l'entr\u00e9e)")
 # Statuts du lissage après #242 et #249 : texte de segments/laml, s'il
 # existe (wh_poisson ; absent sous wh_quadratique, R15), complété par
-# AJOUT_LAML_249, puis `statut` inséré après segments/ddl_effectifs.
+# AJOUT_LAML_249 ; texte de segments/parametre_lissage, s'il existe (laml,
+# R16), complété par AJOUT_PARAMETRE_249 après « (classe optimisation) » ;
+# puis `statut` inséré après segments/ddl_effectifs.
 statuts_lissage_b39 <- function(ref, statut) {
   gr <- ref[[paste0(STATUTS_242, "grandeur")]]
   st <- ref[[paste0(STATUTS_242, "statut")]]
@@ -577,6 +590,13 @@ statuts_lissage_b39 <- function(ref, statut) {
     if (grepl("par forme close exacte", st[l], fixed = TRUE))
       stop("statuts_lissage_b39() : texte de #249 d\u00e9j\u00e0 pr\u00e9sent ; r\u00e9f\u00e9rence d\u00e9j\u00e0 r\u00e9g\u00e9n\u00e9r\u00e9e ? retirer transition_249()")
     st[l] <- paste0(st[l], AJOUT_LAML_249)
+  }
+  m <- match("segments/parametre_lissage", gr)
+  if (!is.na(m)) {
+    if (lengths(regmatches(st[m], gregexpr(FRAGMENT_PARAMETRE_249, st[m], fixed = TRUE))) != 1L ||
+        grepl("plancher de bruit", st[m], fixed = TRUE))
+      stop("statuts_lissage_b39() : statut de segments/parametre_lissage inattendu (r\u00e9f\u00e9rence d\u00e9j\u00e0 r\u00e9g\u00e9n\u00e9r\u00e9e ?)")
+    st[m] <- sub(FRAGMENT_PARAMETRE_249, paste0("(classe optimisation)", AJOUT_PARAMETRE_249, " ;"), st[m], fixed = TRUE)
   }
   st <- append(st, statut, after = k)
   Encoding(st) <- "UTF-8"
