@@ -44,7 +44,7 @@
 % Date fixe, mise a jour a la main a chaque modification du document
 % (docs/latex/CONVENTIONS.md, section 1) : jamais \today, qui ferait
 % dependre le PDF du jour de compilation.
-\newcommand{\datedoc}{24/11/2026}
+\newcommand{\datedoc}{26/11/2026}
 \newcommand{\versiondoc}{0.1}
 \newcommand{\statutdoc}{Projet}
 % Titre court utilise dans le pied de page (fancyhdr).
@@ -1910,7 +1910,12 @@ chaque commit de référence et dans l'en-tête de chaque fichier de référence
 pour les grandeurs consignées~; la version de la glibc y figure depuis la
 régénération du 24/10/2026 (ligne «~glibc (libm)~»), à côté de
 \code{fiche\$plateforme\$bibliotheque\_c}, consignée par la fiche elle-même
-(section~\ref{sec:fiche}).
+(section~\ref{sec:fiche}). Depuis l'issue~\#243, la batterie de
+reproductibilité relève aussi l'identifiant et les écarts de la plateforme
+d'exécution pour choisir, plan par plan, le régime de comparaison (strict
+sur la plateforme de référence, constat ailleurs~;
+section~\ref{sec:non-regression}, «~Régime de comparaison~»)~; les lignes
+«~plateforme consignée~» n'y entrent pas.
 
 \begin{encadre}
 \small
@@ -2370,7 +2375,14 @@ terminées par LF, écrit octet par octet~:
     \code{fiche\$empreintes/resultat} et \code{fiche\$empreintes/code}, qui
     disent de quel résultat et de quel code la référence a été produite sur
     la plateforme de référence), commit calculé, exécution et adresse, mode,
-    date UTC, empreinte des données en rappel~;
+    date UTC, empreinte des données en rappel. La batterie en lit les
+    seules lignes \code{plateforme~:}, pour choisir le régime de
+    comparaison du plan («~Régime de comparaison~», ci-dessous), sans
+    jamais les comparer~: elles ne peuvent faire échouer un plan, et ne
+    peuvent en relâcher la comparaison que hors de la plateforme de
+    référence~; les lignes \code{plateforme consignée~:} et celles de la
+    fiche ne sont pas lues (ADR 0009, point~7.1, amendé par l'annotation
+    du 26/11/2026, (f)~6)~;
   \item un \textbf{corps} d'une ligne par vecteur atomique,
     \code{chemin<TAB>type<TAB>}\allowbreak\code{longueur<TAB>valeurs}, dans l'ordre de
     parcours de l'objet~; le chemin joint les noms par \code{/}
@@ -2441,7 +2453,11 @@ produite hors de la CI.
     nulles, de même signe, sont égales à la tolérance $\tau$ de la grandeur
     si $|a - b| \le \tau \max(|a|, |b|)$~; tout autre cas est un écart.
     Cette règle, symétrique et relative, est propre aux références~;
-    \code{proche()} reste celle des tests unitaires.
+    \code{proche()} reste celle des tests unitaires. Les éléments de six
+    chemins de différences, déclarés dans \code{ECHELLES\_ABSOLUES}, en
+    sont exceptés~: ils relèvent d'une \emph{classe absolue à une échelle
+    déclarée} («~Règle absolue à une échelle déclarée~», ci-dessous~; ADR
+    0009, annotation du 26/11/2026, (b)).
 \end{enumerate}
 
 \noindent
@@ -2482,7 +2498,9 @@ valeur (visa d'\code{actuary} du 09/11/2026). Un double reçoit sa tolérance de
 table \code{TOLERANCES} (tableau~\ref{tab:tolerances}), dont chaque valeur
 est l'une des cinq classes de \code{CLASSES\_TOLERANCE} (exacte,
 $10^{-14}$, $10^{-12}$, $10^{-10}$, \code{optimisation} $= 10^{-3}$~;
-\code{tests/reference/outils\_reference.R}), et dont les clés sont
+\code{tests/reference/outils\_reference.R}~; les deux classes absolues,
+\code{abs\_1e-10} et \code{abs\_1e-12}, sont dans une constante distincte,
+\code{CLASSES\_ABSOLUES}, ci-dessous), et dont les clés sont
 cherchées parmi les suffixes du chemin, segment par segment, le
 \textbf{suffixe le plus long} l'emportant (\code{cles\_de},
 \code{tolerance\_de}, \code{tests/reference/outils\_reference.R}).
@@ -2491,7 +2509,7 @@ cherchées parmi les suffixes du chemin, segment par segment, le
 point~(a))~: \code{<étape>/resultat/<table>/<colonne>},
 \code{<étape>/parametres/<nom>}, \code{<étape>/diagnostics/\ldots},
 \code{<étape>/<paramètre>} pour l'écho du plan dans
-\code{fiche/plan/etapes/<étape>/}, et \code{fiche/\ldots} pour les autres
+\code{fiche/plan/etapes/}\allowbreak\code{<étape>/}, et \code{fiche/\ldots} pour les autres
 doubles de la fiche (écho du plan hors des étapes, hypothèses du brut).
 Aucune clé n'est un nom nu~: deux colonnes de même nom dans deux tables ou
 deux étapes (le \code{taux} de Poisson et celui de \code{kaplan\_meier},
@@ -2608,7 +2626,7 @@ point~(a)~4).
 \code{tests/reference/outils\_reference.R}~; avis d'\code{actuary},
 ADR 0009, point 3.4, seconde annotation, complément du 18/10/2026,
 point~(f), seconde annotation du 19/10/2026, point~(a), annotation du
-07/11/2026, point~(a), et seconde annotation du 07/11/2026, points~(a) et~(b)~; classe $10^{-10}$~: décision du mainteneur du 08/11/2026, ADR 0009, seconde annotation du 08/11/2026, (a)~; clés de R13 et de R14~: avis d'\code{actuary}, ADR 0009, annotation du 09/11/2026~; clés de l'issue~\#178~: avis de forme d'\code{architect} accepté (décision M363), ADR 0009, annotation du 10/11/2026, (b)~; 27 clés exactes des dénombrements retirées par l'issue~\#199~: ADR 0009, seconde annotation du 10/11/2026, (e)~; classe \code{optimisation} et clés des étapes \code{lissage} et \code{coherence\_regularite}~: ADR 0009, annotation du 12/11/2026, et avis d'\code{actuary-approfondi} du 12/11/2026~; clés de l'écart minimal détectable (issue~\#218)~: avis d'\code{actuary} du 19/11/2026, ADR 0009, annotation du 19/11/2026, classe conservée après la correction du calcul de $\theta_{80}$ (troisième annotation du 19/11/2026, (d))~; 196 clés, dont 63 exactes, 42 à $10^{-14}$, 75 à $10^{-12}$, 5 à $10^{-10}$ et 11 \code{optimisation}, au lieu de 191 avant l'issue~\#218, dont 60, 42, 75, 3 et~11, et de 148 avant les étapes du lissage, dont 41, 33, 71 et~3).
+07/11/2026, point~(a), et seconde annotation du 07/11/2026, points~(a) et~(b)~; classe $10^{-10}$~: décision du mainteneur du 08/11/2026, ADR 0009, seconde annotation du 08/11/2026, (a)~; clés de R13 et de R14~: avis d'\code{actuary}, ADR 0009, annotation du 09/11/2026~; clés de l'issue~\#178~: avis de forme d'\code{architect} accepté (décision M363), ADR 0009, annotation du 10/11/2026, (b)~; 27 clés exactes des dénombrements retirées par l'issue~\#199~: ADR 0009, seconde annotation du 10/11/2026, (e)~; classe \code{optimisation} et clés des étapes \code{lissage} et \code{coherence\_regularite}~: ADR 0009, annotation du 12/11/2026, et avis d'\code{actuary-approfondi} du 12/11/2026~; clés de l'écart minimal détectable (issue~\#218)~: avis d'\code{actuary} du 19/11/2026, ADR 0009, annotation du 19/11/2026, classe conservée après la correction du calcul de $\theta_{80}$ (troisième annotation du 19/11/2026, (d))~; trois clés de \code{coherence\_regularite} reclassées de $10^{-14}$ à $10^{-10}$ (issue~\#243)~: avis d'\code{actuary-approfondi} du 26/11/2026, ADR 0009, annotation du 26/11/2026, (d)~; 196 clés, dont 63 exactes, 39 à $10^{-14}$, 75 à $10^{-12}$, 8 à $10^{-10}$ et 11 \code{optimisation}, au lieu de 63, 42, 75, 5 et~11 avant l'issue~\#243, de 191 avant l'issue~\#218, dont 60, 42, 75, 3 et~11, et de 148 avant les étapes du lissage, dont 41, 33, 71 et~3~; les six chemins d'\code{ECHELLES\_ABSOLUES} gardent ici leur classe relative, qui ne sert qu'à la complétude et aux éléments non couverts, jamais de repli pour un élément couvert).
 Chaque clé s'écrit \code{<étape>/<partie>}~; la colonne «~Grandeurs~» les
 groupe par étape, «~les quatre bornes~» désignant \code{borne\_inf\_exacte},
 \code{borne\_sup\_exacte}, \code{borne\_inf\_asymptotique} et
@@ -2627,10 +2645,10 @@ groupe par étape, «~les quatre bornes~» désignant \code{borne\_inf\_exacte},
 \textcolor{financeblue}{\textbf{Justification}} \\
 \endhead
 exacte & \code{donnees/}~: \code{diagnostics/releves/poids\_exclusions/evenements} (sommes d'entiers, R13~; seule exception à la règle des dénombrements, issue~\#199)~; \code{exposition/}~: \code{resultat/exposition/exposition\_jours}, \code{diagnostics/exposition\_jours}, \code{diagnostics/exposition\_imputee\_jours} (somme de différences de jours entiers, R14), \code{parametres/delai\_declaration}~; \code{brut/}~: \code{parametres/niveau}, \code{parametres/tolerance\_effectif}, \code{niveau}~; \code{positionnement/}~: \code{plage\_ages} et \code{niveau} (paramètres et écho du plan), \code{resultat/cellules/qx\_table} et \code{resultat/table\_positionnee/qx\_reference}~; \code{homogeneite/}~: \code{plage\_ages}, \code{tranches\_age} et \code{replications} (paramètres et écho du plan), \code{resultat/monte\_carlo/replications} et, recopies des constantes du package (issue~\#218), \code{parametres/} \code{niveau\_ecart\_minimal}, \code{puissance\_ecart\_minimal} et \code{seuil\_ecart\_minimal}~; \code{validation/}~: \code{plage\_ages}, \code{tranches\_age}, \code{niveau}, \code{replications} (paramètres et écho du plan), \code{parametres/n\_max\_wilcoxon\_exact}, \code{parametres/n\_max\_runs\_exact}, \code{resultat/cellules/qx\_table} et \code{resultat/monte\_carlo/replications}~; \code{importance\_exclusions/}~: \code{niveau} (paramètre et écho du plan), \code{resultat/retraits/exposition\_jours\_retiree}, \code{resultat/cellules\_niveau\_a} et \code{\_b/exposition\_jours\_retiree}~; \code{fiche/}~: \code{plan/delai\_declaration}, \code{hypotheses\_brut/niveau}, \code{hypotheses\_brut/tolerance\_effectif}~; \code{lissage/}~: \code{plage\_ages}, \code{ordre\_difference}, \code{niveau}, \code{parametre\_lissage} et \code{intervalle\_lissage} (paramètres et écho du plan), \code{parametres/constantes/valeur}~; \code{coherence\_regularite/}~: \code{plage\_ages} et \code{ordres} (paramètres et écho du plan), \code{resultat/regularite/ordre}, \code{resultat/ages/qx}, \code{resultat/ordre\_segments/g\_superieure} et \code{g\_inferieure} (recopies de \code{qx}) & doubles à valeur entière ou déclarée, ou recopiée sans opération d'une table reçue (\code{qx\_table}, \code{qx\_reference})~: aucun bruit possible \\
-$10^{-14}$ & \code{donnees/diagnostics/releves/poids\_exclusions/}~: \code{exposition\_centrale}, \code{exposition\_initiale} (sommes de valeurs reçues, R13)~; \code{exposition/resultat/exposition/}~: \code{exposition\_centrale}, \code{exposition\_initiale} (déclarée, sommée par cellule, R13), \code{complement\_initial\_cellule}, \code{complement\_initial\_fenetre}~; \code{brut/resultat/}~: \code{poisson/exposition\_centrale}, \code{poisson/taux}, \code{binomial/exposition\_initiale}, \code{binomial/taux}, \code{kaplan\_meier\_sauts/age\_exact}, \code{kaplan\_meier\_sauts/}\allowbreak\code{variance\_log\_survie\_cellule}~; \code{positionnement/}~: \code{resultat/cellules/exposition\_centrale}, \code{diagnostics/exposition\_hors\_plage}~; \code{homogeneite/}~: \code{resultat/segments/} \code{exposition\_centrale}, \code{attendus} et \code{rapport\_observes\_attendus}, \code{diagnostics/exposition\_hors\_plage}~; \code{validation/}~: \code{resultat/cellules/} \code{exposition\_centrale} et \code{taux\_brut}, \code{diagnostics/exposition\_hors\_plage}~; \code{importance\_exclusions/resultat/}~: \code{retraits/exposition\_centrale\_retiree}, \code{cellules\_niveau\_a} et \code{\_b/} \code{exposition\_centrale\_retiree}, \code{exposition\_centrale\_conservee}, \code{taux\_conserves} et \code{attendus\_comparateur\_1}, \code{smr\_comparateur\_1/} \code{rapport\_variance} et \code{exposition\_centrale\_sans\_exposition\_retenue}, \code{smr\_comparateur\_2/exposition\_centrale\_hors\_plage}~; \code{lissage/}~: \code{diagnostics/exposition\_centrale\_hors\_plage}, \code{diagnostics/exposition\_initiale\_hors\_plage}, \code{resultat/table\_lissee/poids}~; \code{coherence\_regularite/resultat/}~: \code{ages/delta1}, \code{ages/delta2}, \code{ordre\_segments/ecart}, \code{regularite/} \code{regularite}, \code{r\_estime} et \code{regularite\_r} & arithmétique IEEE de base, ordre des opérations fixé par le code \\
-$10^{-12}$ & \code{brut/resultat/}~: \code{poisson/} les quatre bornes, \code{probabilite} et ses quatre bornes (\code{probabilite\_borne\_\ldots}), \code{binomial/} les quatre bornes, \code{kaplan\_meier/} \code{taux}, \code{variance}, \code{borne\_inf\_asymptotique} et \code{borne\_sup\_asymptotique}, \code{kaplan\_meier\_sauts/survie\_cellule}~; \code{positionnement/resultat/}~: \code{smr/} \code{attendus}, \code{smr} et les quatre bornes, \code{cellules/} \code{taux\_table} et \code{attendus}, \code{table\_positionnee/} \code{qx} et les quatre bornes~; \code{homogeneite/resultat/tests/}~: \code{p\_exacte}, \code{p\_monte\_carlo} et \code{erreur\_monte\_carlo}~; \code{validation/resultat/}~: \code{cellules/} \code{taux\_table}, \code{smr\_positionnement} et \code{taux\_positionne} (présentes sous la seule relation \code{positionnee}), \code{attendus}, \code{probabilite\_brute}, \code{residu\_reponse}, \code{residu\_pearson}, \code{residu\_deviance}, \code{fluctuation\_inf\_exacte}, \code{fluctuation\_sup\_exacte}, \code{fluctuation\_inf\_asymptotique} et \code{fluctuation\_sup\_asymptotique}, \code{statistiques/valeur}, \code{sous\_groupes/} \code{attendus}, \code{smr}, \code{borne\_inf\_exacte}, \code{borne\_sup\_exacte}, \code{p\_inferieure}, \code{p\_superieure}, \code{p\_centrale}, \code{p\_inferieure\_asymptotique}, \code{p\_superieure\_asymptotique} et \code{p\_centrale\_asymptotique} (approximation normale par \code{pnorm}, issue~\#178~; \code{NA} dans R8 à R10, donc exercées par les seuls tests unitaires)~; \code{importance\_exclusions/resultat/}~: \code{smr\_comparateur\_1/} et \code{smr\_comparateur\_2/} \code{attendus}, \code{smr} et les quatre bornes, \code{smr\_comparateur\_2/} \code{attendus\_conserves} et \code{smr\_conserves}~; \code{lissage/resultat/segments/}~: \code{fidelite} et \code{critere} (sous~(a) seule, jamais itérés)~; \code{validation/parametres/ddl\_effectifs/}~: \code{ddl\_effectifs} et \code{ddl\_effectifs\_retenus} (option~($\delta$), ci-dessous) & fonctions spéciales (\code{qgamma}, \code{qbeta}) et fonctions mathématiques de la bibliothèque du système (\code{exp}, \code{log}, \code{log1p}, \code{expm1}), dont la variante peut dépendre du processeur (sans écart mesuré sur trois modèles munis de FMA, non mesurée sans FMA~; ADR 0009, annotation du 19/10/2026, conséquence 3)~; pour \code{homogeneite/}\allowbreak\code{resultat/}\allowbreak\code{tests/}\allowbreak\code{p\_exacte}, conditionnement en $\pi = E_g / E_{\text{strate}}$~; la différence $O - A$ n'intervient que dans la frontière, tenue à \code{TOLERANCE\_}\allowbreak\code{RESIDU\_NUL}~$\times A_1$ près, et non dans la valeur, donc sans annulation (avis d'\code{actuary} du 08/11/2026)~; à réexaminer ($10^{-10}$) si un jeu de référence atteint environ $10^6$ décès par strate en queue lointaine \\
-$10^{-10}$ & \code{homogeneite/resultat/}~: \code{tests/} \code{statistique} et \code{p\_asymptotique}, \code{segments/z}, \code{ecart\_minimal/} \code{theta\_80\_superieur} et \code{theta\_80\_inferieur} (issue~\#218) & annulation dans $U = O - A$, différence de deux grandeurs proches (écart relatif de $U$ de l'ordre de $\varepsilon A / |U|$), puis $T = U^{\top}V^{-}U$ par élimination sans soustraction de $V$ réduite (depuis l'issue~\#334, section~\ref{sec:homogeneite}~; jusque-là, résolution d'un système linéaire par \code{solve()}, LAPACK de référence de la plateforme), $z = U/\sqrt{v}$, $v$ formée par sommes hors diagonale, et \code{pchisq()} (décision du mainteneur du 08/11/2026, sur avis d'\code{actuary}~; ADR 0009, seconde annotation du 08/11/2026, (a))~; $\theta_{80}$, racine par \code{uniroot()} en $u = \log\theta$ de $\lambda_s = \lambda_{80}$, $\lambda_s$ étant la même quantité que cette statistique appliquée à $\delta_s(\theta)$, calculée sans soustraction depuis le 19/11/2026 (section~\ref{sec:homogeneite}), reste dans sa classe, avec deux termes d'erreur, tous deux relatifs sur $\theta_{80}$~: (1)~l'erreur de résolution, au plus $(4|\log\theta| + 1)\,\varepsilon$, $\varepsilon$ = \code{.Machine\$double.eps} étant la tolérance de \code{uniroot()} (critère d'arrêt de \code{zeroin}, demi-largeur de l'encadrement au plus $2\varepsilon|u| + \mathrm{tol}/2$, lu dans les sources de R~4.3.3, fichier \code{src/}\allowbreak\code{library/}\allowbreak\code{stats/}\allowbreak\code{src/}\allowbreak\code{zeroin.c}~; la borne suppose l'arrêt sur ce critère et non au nombre maximal d'itérations de \code{uniroot()}~; dans ce dernier cas, la branche est à l'état \code{precision\_}\allowbreak\code{insuffisante}, sans signal ni avertissement, issue~\#339), soit au plus $9{,}1 \cdot 10^{-13}$ sur tout le domaine de la recherche ($|u| \le 1024$)~; (2)~la transmission de l'erreur de $\lambda_s$~: une erreur relative $\varepsilon$ de $\lambda_s$ se transmet à $\theta_{80}$ en $\varepsilon\,|\theta - 1|\,\bigl(1 + \pi(\theta - 1)\bigr)/(2\theta)$ à deux segments en strate unique ($\pi$, part de l'exposition centrale du segment dans la strate~; $\varepsilon\,|\theta - 1|/2$ au premier ordre), la résolution amortissant l'erreur (facteur inférieur à~1 pour toute valeur de $\pi$ dans $[0~; 1]$) si et seulement si $\theta_{80} \in \left]1/3~; 3\right[$, le maximum en $\pi$ étant atteint en $\pi = 1$ sur la branche~$+$ ($(\theta - 1)/2$) et en $\pi = 0$ sur la branche~$-$ ($(1 - \theta)/(2\theta)$)~; hors de cette plage, le facteur croît comme $\pi\theta/2$ quand $\theta \to \infty$ et comme $(1 - \pi)/(2\theta)$ quand $\theta \to 0$~; le calcul sans soustraction réduit l'erreur de $\lambda_s$, non ce facteur~: écart relatif des huit $\theta_{80}$ de R11 et R12 à une référence calculée en précision étendue (80 chiffres), $1{,}0 \cdot 10^{-15}$ au plus avant la correction et $1{,}4 \cdot 10^{-16}$ au plus après (remesure d'\code{actuary} du 20/11/2026 sur les références régénérées, $\lambda_{80}$ prise à sa valeur en double précision~; script hors dépôt, rapporté)~; réexamen si un plan de référence donne $\theta_{80}$ hors de $\left]1/3~; 3\right[$, si la tolérance de \code{uniroot()}, la variable de résolution ou la postcondition (\code{TOLERANCE\_}\allowbreak\code{ECART\_}\allowbreak\code{MINIMAL}) change, ou si un plan de référence porte un segment à l'état \code{precision\_}\allowbreak\code{insuffisante} (avis d'\code{actuary} du 19/11/2026~; ADR 0009, annotation du 19/11/2026, seconde annotation du 19/11/2026, et troisième annotation du 19/11/2026, point~(f)) \\
-\code{optimi}\allowbreak\code{sation} ($10^{-3}$) & \code{lissage/resultat/table\_lissee/}~: \code{qx}, \code{borne\_inf\_credibilite}, \code{borne\_sup\_credibilite}, \code{levier}~; \code{lissage/resultat/segments/}~: \code{parametre\_lissage}, \code{ddl\_effectifs}, \code{regularite}, \code{laml}, \code{deviance\_penalisee}, \code{residu\_conservation\_0}, \code{residu\_conservation\_1} & grandeurs issues d'un calcul itératif arrêté sur un critère ou d'une optimisation (Whittaker-Henderson~(b), $\hat\lambda$ argmax d'une LAML plate)~: une perturbation de l'ordre de l'arrondi déplace le point d'arrêt~; valeur fixée par mesure (ci-dessous~; ADR 0017, point~8~; ADR 0009, annotation du 12/11/2026) \\
+$10^{-14}$ & \code{donnees/diagnostics/releves/poids\_exclusions/}~: \code{exposition\_centrale}, \code{exposition\_initiale} (sommes de valeurs reçues, R13)~; \code{exposition/resultat/exposition/}~: \code{exposition\_centrale}, \code{exposition\_initiale} (déclarée, sommée par cellule, R13), \code{complement\_initial\_cellule}, \code{complement\_initial\_fenetre}~; \code{brut/resultat/}~: \code{poisson/exposition\_centrale}, \code{poisson/taux}, \code{binomial/exposition\_initiale}, \code{binomial/taux}, \code{kaplan\_meier\_sauts/age\_exact}, \code{kaplan\_meier\_sauts/}\allowbreak\code{variance\_log\_survie\_cellule}~; \code{positionnement/}~: \code{resultat/cellules/exposition\_centrale}, \code{diagnostics/exposition\_hors\_plage}~; \code{homogeneite/}~: \code{resultat/segments/} \code{exposition\_centrale}, \code{attendus} et \code{rapport\_observes\_attendus}, \code{diagnostics/exposition\_hors\_plage}~; \code{validation/}~: \code{resultat/cellules/} \code{exposition\_centrale} et \code{taux\_brut}, \code{diagnostics/exposition\_hors\_plage}~; \code{importance\_exclusions/resultat/}~: \code{retraits/exposition\_centrale\_retiree}, \code{cellules\_niveau\_a} et \code{\_b/} \code{exposition\_centrale\_retiree}, \code{exposition\_centrale\_conservee}, \code{taux\_conserves} et \code{attendus\_comparateur\_1}, \code{smr\_comparateur\_1/} \code{rapport\_variance} et \code{exposition\_centrale\_sans\_exposition\_retenue}, \code{smr\_comparateur\_2/exposition\_centrale\_hors\_plage}~; \code{lissage/}~: \code{diagnostics/exposition\_centrale\_hors\_plage}, \code{diagnostics/exposition\_initiale\_hors\_plage}, \code{resultat/table\_lissee/poids}~; \code{coherence\_regularite/resultat/}~: \code{ages/delta1}, \code{ages/delta2} et \code{ordre\_segments/ecart} (classe de complétude~: leurs éléments sont jugés par la règle absolue, classe \code{abs\_1e-12}) & arithmétique IEEE de base, ordre des opérations fixé par le code \\
+$10^{-12}$ & \code{brut/resultat/}~: \code{poisson/} les quatre bornes, \code{probabilite} et ses quatre bornes (\code{probabilite\_borne\_\ldots}), \code{binomial/} les quatre bornes, \code{kaplan\_meier/} \code{taux}, \code{variance}, \code{borne\_inf\_asymptotique} et \code{borne\_sup\_asymptotique}, \code{kaplan\_meier\_sauts/survie\_cellule}~; \code{positionnement/resultat/}~: \code{smr/} \code{attendus}, \code{smr} et les quatre bornes, \code{cellules/} \code{taux\_table} et \code{attendus}, \code{table\_positionnee/} \code{qx} et les quatre bornes~; \code{homogeneite/resultat/tests/}~: \code{p\_exacte}, \code{p\_monte\_carlo} et \code{erreur\_monte\_carlo}~; \code{validation/resultat/}~: \code{cellules/} \code{taux\_table}, \code{smr\_positionnement} et \code{taux\_positionne} (présentes sous la seule relation \code{positionnee}), \code{attendus}, \code{probabilite\_brute}, \code{residu\_reponse}, \code{residu\_pearson}, \code{residu\_deviance}, \code{fluctuation\_inf\_exacte}, \code{fluctuation\_sup\_exacte}, \code{fluctuation\_inf\_asymptotique} et \code{fluctuation\_sup\_asymptotique}, \code{statistiques/valeur}, \code{sous\_groupes/} \code{attendus}, \code{smr}, \code{borne\_inf\_exacte}, \code{borne\_sup\_exacte}, \code{p\_inferieure}, \code{p\_superieure}, \code{p\_centrale}, \code{p\_inferieure\_asymptotique}, \code{p\_superieure\_asymptotique} et \code{p\_centrale\_asymptotique} (approximation normale par \code{pnorm}, issue~\#178~; \code{NA} dans R8 à R10, donc exercées par les seuls tests unitaires), la ligne \code{smr}/\code{ecart} de \code{statistiques/valeur} étant seule jugée par la règle absolue (classe \code{abs\_1e-10})~; \code{importance\_exclusions/resultat/}~: \code{smr\_comparateur\_1/} et \code{smr\_comparateur\_2/} \code{attendus}, \code{smr} et les quatre bornes, \code{smr\_comparateur\_2/} \code{attendus\_conserves} et \code{smr\_conserves}~; \code{lissage/resultat/segments/}~: \code{fidelite} et \code{critere} (sous~(a) seule, jamais itérés)~; \code{validation/parametres/ddl\_effectifs/}~: \code{ddl\_effectifs} et \code{ddl\_effectifs\_retenus} (option~($\delta$), ci-dessous) & fonctions spéciales (\code{qgamma}, \code{qbeta}) et fonctions mathématiques de la bibliothèque du système (\code{exp}, \code{log}, \code{log1p}, \code{expm1}), dont la variante peut dépendre du processeur (sans écart mesuré sur trois modèles munis de FMA, non mesurée sans FMA~; ADR 0009, annotation du 19/10/2026, conséquence 3)~; pour \code{homogeneite/}\allowbreak\code{resultat/}\allowbreak\code{tests/}\allowbreak\code{p\_exacte}, conditionnement en $\pi = E_g / E_{\text{strate}}$~; la différence $O - A$ n'intervient que dans la frontière, tenue à \code{TOLERANCE\_}\allowbreak\code{RESIDU\_NUL}~$\times A_1$ près, et non dans la valeur, donc sans annulation (avis d'\code{actuary} du 08/11/2026)~; à réexaminer ($10^{-10}$) si un jeu de référence atteint environ $10^6$ décès par strate en queue lointaine \\
+$10^{-10}$ & \code{homogeneite/resultat/}~: \code{tests/} \code{statistique} et \code{p\_asymptotique}, \code{segments/z}, \code{ecart\_minimal/} \code{theta\_80\_superieur} et \code{theta\_80\_inferieur} (issue~\#218)~; \code{coherence\_regularite/resultat/regularite/}~: \code{regularite}, \code{r\_estime} et \code{regularite\_r} (issue~\#243) & pour \code{coherence\_}\allowbreak\code{regularite}~: agrégats ($S_z$, somme des carrés des différences d'ordre~$z$~; $r$ et $S^r$), non des différences élément par élément, donc sous la règle relative~; écarts relatifs mesurés sous permutation des lignes de l'entrée de R15 jusqu'à $9{,}65 \cdot 10^{-13}$ (vingt-trois permutations, \emph{constat de simulation}), que $10^{-12}$ ne couvrirait que 1,04~fois~: la règle «~dix fois l'écart maximal~» donne $10^{-10}$ (ADR 0009, annotation du 26/11/2026, (d)~1, sur la remesure d'\code{actuary-}\allowbreak\code{approfondi}). Pour \code{homogeneite}~: annulation dans $U = O - A$, différence de deux grandeurs proches (écart relatif de $U$ de l'ordre de $\varepsilon A / |U|$), puis $T = U^{\top}V^{-}U$ par élimination sans soustraction de $V$ réduite (depuis l'issue~\#334, section~\ref{sec:homogeneite}~; jusque-là, résolution d'un système linéaire par \code{solve()}, LAPACK de référence de la plateforme), $z = U/\sqrt{v}$, $v$ formée par sommes hors diagonale, et \code{pchisq()} (décision du mainteneur du 08/11/2026, sur avis d'\code{actuary}~; ADR 0009, seconde annotation du 08/11/2026, (a))~; $\theta_{80}$, racine par \code{uniroot()} en $u = \log\theta$ de $\lambda_s = \lambda_{80}$, $\lambda_s$ étant la même quantité que cette statistique appliquée à $\delta_s(\theta)$, calculée sans soustraction depuis le 19/11/2026 (section~\ref{sec:homogeneite}), reste dans sa classe, avec deux termes d'erreur, tous deux relatifs sur $\theta_{80}$~: (1)~l'erreur de résolution, au plus $(4|\log\theta| + 1)\,\varepsilon$, $\varepsilon$ = \code{.Machine\$double.eps} étant la tolérance de \code{uniroot()} (critère d'arrêt de \code{zeroin}, demi-largeur de l'encadrement au plus $2\varepsilon|u| + \mathrm{tol}/2$, lu dans les sources de R~4.3.3, fichier \code{src/}\allowbreak\code{library/}\allowbreak\code{stats/}\allowbreak\code{src/}\allowbreak\code{zeroin.c}~; la borne suppose l'arrêt sur ce critère et non au nombre maximal d'itérations de \code{uniroot()}~; dans ce dernier cas, la branche est à l'état \code{precision\_}\allowbreak\code{insuffisante}, sans signal ni avertissement, issue~\#339), soit au plus $9{,}1 \cdot 10^{-13}$ sur tout le domaine de la recherche ($|u| \le 1024$)~; (2)~la transmission de l'erreur de $\lambda_s$~: une erreur relative $\varepsilon$ de $\lambda_s$ se transmet à $\theta_{80}$ en $\varepsilon\,|\theta - 1|\,\bigl(1 + \pi(\theta - 1)\bigr)/(2\theta)$ à deux segments en strate unique ($\pi$, part de l'exposition centrale du segment dans la strate~; $\varepsilon\,|\theta - 1|/2$ au premier ordre), la résolution amortissant l'erreur (facteur inférieur à~1 pour toute valeur de $\pi$ dans $[0~; 1]$) si et seulement si $\theta_{80} \in \left]1/3~; 3\right[$, le maximum en $\pi$ étant atteint en $\pi = 1$ sur la branche~$+$ ($(\theta - 1)/2$) et en $\pi = 0$ sur la branche~$-$ ($(1 - \theta)/(2\theta)$)~; hors de cette plage, le facteur croît comme $\pi\theta/2$ quand $\theta \to \infty$ et comme $(1 - \pi)/(2\theta)$ quand $\theta \to 0$~; le calcul sans soustraction réduit l'erreur de $\lambda_s$, non ce facteur~: écart relatif des huit $\theta_{80}$ de R11 et R12 à une référence calculée en précision étendue (80 chiffres), $1{,}0 \cdot 10^{-15}$ au plus avant la correction et $1{,}4 \cdot 10^{-16}$ au plus après (remesure d'\code{actuary} du 20/11/2026 sur les références régénérées, $\lambda_{80}$ prise à sa valeur en double précision~; script hors dépôt, rapporté)~; réexamen si un plan de référence donne $\theta_{80}$ hors de $\left]1/3~; 3\right[$, si la tolérance de \code{uniroot()}, la variable de résolution ou la postcondition (\code{TOLERANCE\_}\allowbreak\code{ECART\_}\allowbreak\code{MINIMAL}) change, ou si un plan de référence porte un segment à l'état \code{precision\_}\allowbreak\code{insuffisante} (avis d'\code{actuary} du 19/11/2026~; ADR 0009, annotation du 19/11/2026, seconde annotation du 19/11/2026, et troisième annotation du 19/11/2026, point~(f)) \\
+\code{optimi}\allowbreak\code{sation} ($10^{-3}$) & \code{lissage/resultat/table\_lissee/}~: \code{qx}, \code{borne\_inf\_credibilite}, \code{borne\_sup\_credibilite}, \code{levier}~; \code{lissage/resultat/segments/}~: \code{parametre\_lissage}, \code{ddl\_effectifs}, \code{regularite}, \code{laml}, \code{deviance\_penalisee}, \code{residu\_conservation\_0}, \code{residu\_conservation\_1} (ces deux résidus~: classe de complétude, leurs éléments étant jugés par la règle absolue, classe \code{abs\_1e-10}) & grandeurs issues d'un calcul itératif arrêté sur un critère ou d'une optimisation (Whittaker-Henderson~(b), $\hat\lambda$ argmax d'une LAML plate)~: une perturbation de l'ordre de l'arrondi déplace le point d'arrêt~; valeur fixée par mesure (ci-dessous~; ADR 0017, point~8~; ADR 0009, annotation du 12/11/2026) \\
 \end{longtable}
 }
 
@@ -2662,26 +2680,328 @@ après et une régénération sous visa. \emph{Limites écrites}~: hors de la
 plateforme de référence (\emph{hypothèse}, non mesurée), un écart d'une
 unité au dernier rang sur \code{-expm1} suffirait à faire échouer
 \code{qx\_table} (classe exacte) et le \code{smr} de la validation sous
-\code{lissee}~; la décision revient alors au mainteneur, entre comparaison
-stricte sur la plateforme de référence seule, retrait de la validation
-\code{lissee} de R16 et retour sur~($\delta$) (ADR 0009, même annotation,
-(d)~4)~; les grandeurs nulles par construction (résidus de conservation)
-ont, sous perturbation, un écart relatif d'ordre~1~: la tolérance
-relative n'y a pas de sens, elles sont classées \code{optimisation} avec
-cette limite, et une règle absolue est proposée par l'issue~\#243
-((d)~5).\par}
+\code{lissee}~; des trois options que l'annotation ouvrait au mainteneur
+(comparaison stricte sur la plateforme de référence seule, retrait de la
+validation \code{lissee} de R16, retour sur~($\delta$)~; ADR 0009, même
+annotation, (d)~4), il a retenu la première, avec un relevé hors de la
+plateforme de référence (décision D11 de M604~; ADR 0009, annotation du
+26/11/2026, (f)~; «~Régime de comparaison~», ci-dessous)~; les grandeurs
+nulles par construction (résidus de conservation) ont, sous
+perturbation, un écart relatif d'ordre~1~: la tolérance relative n'y a
+pas de sens~; elles restent classées \code{optimisation} pour la
+complétude, mais leurs éléments sont jugés, depuis l'issue~\#243, par la
+règle absolue à une échelle déclarée (ci-dessous~; annotation du
+12/11/2026, (d)~5, et annotation du 26/11/2026, (b)).\par}
 
 \medskip
 \noindent
 Les tolérances des quatre premières classes restent plusieurs ordres de grandeur sous le plus petit
 changement significatif estimé par \code{actuary} (un jour d'exposition dans
 la cellule la plus exposée, un événement de plus~; ADR 0009, point 3.4). La classe \code{optimisation} n'est pas sous ce seuil~: un jour d'exposition, et même un événement de plus dans une cellule, peuvent déplacer un taux lissé de moins de $10^{-3}$ en relatif (constat d'\code{actuary} du 12/11/2026 sur R16)~; un tel changement des données n'est pas décelé par les chemins \code{lissage/*}, mais l'est par ceux des étapes amont (dénombrements exacts, expositions à $10^{-14}$) et de la validation \code{lissee} ($10^{-12}$).
+
+\medskip
+\noindent
+{\sloppy\textbf{Règle absolue à une échelle déclarée} (issue~\#243~;
+ADR 0009, annotation du 26/11/2026, (a) à (e)~; décisions M429 et M604,
+D11~(a)). \emph{Motif}~: la règle relative est le modèle d'erreur d'un
+produit ou d'un quotient, non celui d'une différence. Pour une différence
+de termes voisins, l'erreur absolue est bornée par l'échelle des
+opérandes, non par la valeur du résultat~; une grandeur nulle par
+construction (résidu de conservation du lissage) n'en est que le cas
+limite. Sous la règle relative, à signe égal, ces grandeurs ne passent la
+comparaison qu'au bit près, quelle que soit leur classe. La déclaration
+se fait \emph{par chemin}, comme \code{TOLERANCES}, et non par plan~:
+«~nul par construction~» dépend du plan, «~différence~» n'en dépend pas
+(la ligne \code{smr}/\code{ecart} de
+\code{validation/resultat/statistiques/valeur} vaut $-123{,}494$ dans R8,
+$-112{,}943$ dans R9, 0 dans R10, $1{,}244$ dans R15,
+$-2{,}48 \cdot 10^{-7}$ dans R16 et $-1{,}65 \cdot 10^{-9}$ dans R17).
+\emph{Déclaration}~: la table \code{ECHELLES\_ABSOLUES}
+(\code{tests/reference/outils\_reference.R}), de cinq colonnes
+(\code{cle}, \code{selection}, \code{echelle}, \code{facteur},
+\code{classe}) et six lignes (tableau~\ref{tab:echelles-absolues}), et les
+deux classes absolues de \code{CLASSES\_ABSOLUES}, \code{abs\_1e-10}
+($\tau = 10^{-10}$) et \code{abs\_1e-12} ($\tau = 10^{-12}$), distinctes
+des classes relatives de même valeur, que le nom d'une classe relative,
+retrouvé par sa valeur, ne permettrait pas de distinguer. Une ligne couvre
+un chemin si sa clé en est un suffixe, segment par segment~; sans
+sélection, elle couvre tous les éléments du vecteur, et l'échelle $S_i$
+est la valeur, à la même ligne~$i$, d'une colonne sœur de la même table~;
+avec sélection, des égalités \code{colonne=valeur} séparées par «~;~»,
+sur des colonnes sœurs de type chaîne, désignent un élément et un seul,
+et l'échelle, écrite dans la même grammaire, un autre élément du même
+vecteur. Ces textes sont découpés, jamais évalués.\par}
+
+{\small
+\rowcolors{2}{tablerow}{white}
+\begin{longtable}{@{}>{\raggedright\arraybackslash}p{4.2cm}>{\raggedright\arraybackslash}p{3.0cm}>{\raggedright\arraybackslash}p{3.3cm}p{1.4cm}p{1.8cm}@{}}
+\caption{Déclarations de la règle absolue (\code{ECHELLES\_ABSOLUES},
+\code{tests/reference/outils\_reference.R}~; ADR 0009, annotation du
+26/11/2026, (b)~2 et (c)~1). La clé est qualifiée par l'étape~; «~tous~»~:
+sélection vide, échelle lue dans la colonne sœur nommée, à la même
+ligne.}
+\label{tab:echelles-absolues}\\
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Clé}} &
+\textcolor{financeblue}{\textbf{Éléments couverts}} &
+\textcolor{financeblue}{\textbf{Échelle $S$}} &
+\textcolor{financeblue}{\textbf{Facteur}} &
+\textcolor{financeblue}{\textbf{Classe}} \\
+\endfirsthead
+\rowcolor{tableheader}
+\textcolor{financeblue}{\textbf{Clé}} &
+\textcolor{financeblue}{\textbf{Éléments couverts}} &
+\textcolor{financeblue}{\textbf{Échelle $S$}} &
+\textcolor{financeblue}{\textbf{Facteur}} &
+\textcolor{financeblue}{\textbf{Classe}} \\
+\endhead
+\code{lissage/resultat/}\allowbreak\code{segments/}\allowbreak\code{residu\_conservation\_0} & tous & \code{evenements} ($\sum D$ du segment) & 1 & \code{abs\_1e-10} \\
+\code{lissage/resultat/}\allowbreak\code{segments/}\allowbreak\code{residu\_conservation\_1} & tous & \code{evenements} & 120 & \code{abs\_1e-10} \\
+\code{validation/resultat/}\allowbreak\code{statistiques/valeur} & la ligne \code{statistique=smr;}\allowbreak\code{grandeur=ecart} ($O - A$) & la ligne \code{statistique=smr;}\allowbreak\code{grandeur=observes} ($O$) & 1 & \code{abs\_1e-10} \\
+\code{coherence\_regularite/}\allowbreak\code{resultat/ages/delta1} & tous & \code{qx} ($g_x$) & 2 & \code{abs\_1e-12} \\
+\code{coherence\_regularite/}\allowbreak\code{resultat/ages/delta2} & tous & \code{qx} ($g_x$) & 4 & \code{abs\_1e-12} \\
+\code{coherence\_regularite/}\allowbreak\code{resultat/}\allowbreak\code{ordre\_segments/ecart} & tous & \code{g\_superieure} & 2 & \code{abs\_1e-12} \\
+\end{longtable}
+}
+
+\noindent
+{\sloppy\emph{Règle}, élément par élément, $a$ du côté de la référence,
+$b$ du côté obtenu, pour un élément couvert de classe~$\tau$~: s'ils sont
+identiques (au sens du point~3 ci-dessus), «~identique~»~; sinon, si $a$
+et $b$ sont finis et $|a - b| \le \tau \cdot \text{facteur} \cdot S_i$,
+«~sous tolérance~», \textbf{quels que soient les signes et la présence
+d'un zéro}~; sinon, «~écart~». $S_i$ est lue du côté de la référence, qui
+fait foi. La position des valeurs non finies reste un écart structurel.
+Les éléments non couverts du même vecteur (les 61~autres lignes de
+\code{statistiques/valeur}, qui en compte 62 dans R15 à R17) et tous les
+autres chemins gardent la règle relative sous la classe de leur clé. La
+classe relative d'une clé déclarée reste dans \code{TOLERANCES} pour la
+complétude et pour les éléments non couverts~; elle n'est \textbf{jamais
+un repli} pour un élément couvert. Le verdict d'un vecteur est le plus
+défavorable de ceux de ses éléments. \emph{Invariants de la déclaration},
+contrôlés par la batterie indépendamment de toute donnée~: (i)~toute clé
+est une clé de \code{TOLERANCES}~; (ii)~toute classe est une classe de
+\code{CLASSES\_ABSOLUES}~; (iii)~tout facteur est fini et strictement
+positif~; (iv)~aucun couple (clé, sélection) n'est répété, et sélection
+et échelle respectent la grammaire~; (v)~chaque ligne couvre au moins un
+chemin d'au moins un fichier de \code{tests/reference/} (aucune
+déclaration morte)~; (vi)~les six clés, leurs facteurs et leurs classes,
+et les deux classes absolues, sont fixés par un test. \emph{Invariants
+de l'échelle}, contrôlés à chaque comparaison, du côté de la référence
+(propriétés du fichier commité, donc les mêmes sur toute plateforme)~:
+(vii)~la colonne sœur existe, de type \code{double} ou \code{integer}, de
+la longueur du vecteur couvert~; (viii)~$S_i$ est finie et strictement
+positive pour tout élément couvert de valeur de référence finie~;
+(ix)~une sélection désigne exactement un élément, et son échelle
+exactement un autre élément du même vecteur~; (x)~pour un plan qui porte
+\code{residu\_conservation\_1}, la borne supérieure de
+\code{etapes/lissage/parametres/plage\_ages} est au plus 120. Une
+violation de (vii) à (x) donne au vecteur le verdict «~déclaration
+d'échelle invalide~», qui met le plan en échec avec la raison imprimée~:
+jamais de repli silencieux sur la règle relative, jamais un élément
+ignoré.\par}
+
+\medskip
+\noindent
+{\sloppy\emph{Facteurs} (\textbf{majoration heuristique}, non borne
+démontrée)~: la borne de l'erreur d'arrondi de la différence, exprimée
+en multiples de~$S$. Quand l'échelle est un opérande, la somme des
+valeurs absolues des coefficients~: 2 pour
+$\Delta^1_x = g_{x+1} - g_x$ et pour l'écart de deux taux
+(\code{ordre\_segments/ecart}), 4 pour
+$\Delta^2_x = g_{x+2} - 2 g_{x+1} + g_x$~; pour $\Delta^1$ et $\Delta^2$,
+l'échelle est $g_x$, le plus petit des opérandes quand la table croît, si
+bien que $\text{facteur} \cdot S$ sous-estime un peu la somme des
+opérandes, ce que la marge absorbe (non mesuré séparément). Quand
+l'échelle est un total observé dont le total calculé est de l'ordre~: 1
+pour \code{residu\_conservation\_0} ($\sum \hat m = \sum D$ à la
+convergence) et pour la ligne \code{smr}/\code{ecart} ($A = O /
+\mathrm{SMR}$, approximation absorbée par la marge)~; 120 pour le moment
+d'ordre~1, par $\sum x D \le 120 \sum D$ pour des âges au plus égaux à
+120 (invariant~(x)). \emph{Classes}~: la plus petite classe décimale au
+moins égale à dix fois l'écart maximal mesuré rapporté à
+$\text{facteur} \cdot S$, une classe par famille, fixée par son cas le
+plus défavorable (\code{residu\_conservation\_0} pour
+\code{abs\_1e-10}, \code{ordre\_segments/ecart} pour
+\code{abs\_1e-12})~; statut~: \textbf{constat de simulation} sur
+vingt-trois permutations des lignes de l'entrée de R15 et de R16
+(graines 22028701 à 22028703 et 22028711 à 22028730), non borne
+démontrée~: la permutation tient lieu de changement de plateforme, elle
+n'en est pas un, et elle est sans effet sur R17 (entrée d'agrégats). Les
+marges $\tau \cdot \text{facteur} / \max(|a - b| / S)$, sur le pire des
+deux plans, sont de 93 (\code{residu\_conservation\_0}), 143
+(\code{residu\_conservation\_1}), 198 (ligne \code{smr}/\code{ecart}),
+33 ($\Delta^1$), 598 ($\Delta^2$) et 24 (\code{ordre\_segments/ecart}),
+et de 104 au moins pour les trois clés reclassées à $10^{-10}$ (mesure
+\code{tests/mesures/}\allowbreak\code{regle\_absolue\_permutation.R},
+hors CI, sur les références régénérées de R15 et R16, hors plateforme de
+référence~; les marges de la décision, 64, 124 et 132 pour les trois
+premières, avaient été mesurées avant la régénération~; les trois
+dernières sont inchangées). \emph{Condition de réexamen}~: une mesure qui
+porte un écart au-delà du dixième de $\tau \cdot \text{facteur} \cdot S$
+sur un élément déclaré (marge inférieure à~10) rouvre la classe par
+annotation de l'ADR 0009, jamais par un ajustement au commit.\par}
+
+\medskip
+\noindent
+{\sloppy\emph{Portée}. Le critère devient plus permissif pour ces seuls
+éléments~: la bande de la ligne \code{smr}/\code{ecart} est
+$10^{-10} \cdot O$, soit $4{,}2 \cdot 10^{-7}$ décès pour $O = 4\,208$,
+plus de six ordres de grandeur sous un décès de plus~; celle de
+\code{residu\_conservation\_0}, $10^{-10} \sum D$, soit
+$1{,}7 \cdot 10^{-7}$ et $2{,}5 \cdot 10^{-7}$ pour les segments de
+1\,667 et 2\,541 décès. L'élargissement de R8 à R10, où la ligne
+\code{smr}/\code{ecart} n'est pas nulle par construction, est la
+conséquence assumée de la déclaration par chemin. Sous
+Whittaker-Henderson~(b), le résidu commité est déjà de l'ordre de la
+bande~: dans R16, \code{residu\_conservation\_0} du segment de
+2\,541 décès vaut $0{,}98\,\tau S$, la ligne \code{smr}/\code{ecart}
+$0{,}59\,\tau S$, et \code{residu\_conservation\_1} du même segment
+$0{,}26\,\tau \cdot 120 \cdot S$ (lecture de
+\code{tests/reference/R16.tsv}). Pour ces éléments, la comparaison ne
+juge plus que l'ordre de grandeur du résidu de convergence~; elle ne
+prouve pas la nullité, qui reste portée par les tests unitaires
+(conservation à $10^{-8} \sum D$ près, \code{tests/unitaires/}\allowbreak\code{test\_lissage\_poisson.R},
+critère~A1), et elle borne le résidu obtenu par
+$|b| \le |a| + \tau \cdot \text{facteur} \cdot S$. Un changement du
+régime de convergence se lit ailleurs, sur
+\code{segments/iterations} (\code{integer}, exact) et sur les chemins de
+classe \code{optimisation}. Sur la plateforme de référence, où toutes
+les grandeurs de R1 à R17 sont identiques au bit près, la règle ne
+change aucun verdict~: «~identique~» précède toute règle.\par}
+
+\medskip
+\noindent
+{\sloppy\textbf{Régime de comparaison~: strict sur la plateforme de
+référence, constat ailleurs} (issue~\#243~; ADR 0009, annotation du
+26/11/2026, (f) et (g)~3~; décision D11 de M604, M606). La validation
+\code{lissee} de R16 et R17 hérite du bruit de $\hat\lambda$, que la
+classe \code{optimisation} absorbe sur les chemins \code{lissage/*} mais
+non sur ceux de la validation, restés à $10^{-12}$ ou exacts
+(option~($\delta$), ci-dessus)~: sous permutation des lignes de
+l'entrée, après la règle absolue et le reclassement des trois clés,
+R16 reste en écart sur onze chemins de \code{etapes/validation/}, et
+R15 sur les quatre recopies exactes de~$q$ (\emph{constat de
+simulation}, même mesure). La comparaison a donc deux régimes. Le
+\textbf{régime strict} est celui par défaut~; le \textbf{régime de
+constat} s'applique à un plan, par la fonction pure
+\code{regime\_comparaison} (\code{tests/reference/outils\_reference.R}),
+si et seulement si (i)~la plateforme d'exécution n'est pas la
+plateforme de référence (défauts non vides au relevé de
+\code{tests/controles/plateforme.R}, le prédicat même de l'étape
+«~Plateforme (mode strict)~» du job «~Tests (R 4.3.3)~»), (ii)~l'en-tête
+du fichier commité porte au moins une ligne \code{plateforme~:} et
+(iii)~ces lignes diffèrent du relevé de l'exécution. Toute
+indétermination vaut régime strict~: la relaxation demande deux preuves
+indépendantes que l'exécution est ailleurs. Une plateforme conforme dont
+l'en-tête nomme une autre plateforme (bascule en cours) reste en régime
+strict, avec une mention imprimée et sans échec nouveau. Options
+écartées~: l'égalité des en-têtes seule (une dérive de format ou un
+changement d'image sans bascule mettrait la CI en régime de constat), la
+conformité seule (elle relâcherait un fichier sans en-tête de
+plateforme), un interrupteur déclaré (le régime se constate, il ne se
+configure pas).\par}
+
+\medskip
+\noindent
+{\sloppy\emph{Portée, par plan}~: la table
+\code{CONSTATS\_HORS\_PLATEFORME}, de vingt-six lignes (plan, chemin
+complet exact, sans préfixe)~: pour R15, les quatre recopies exactes de
+$q$ (\code{etapes/coherence\_regularite/resultat/}\allowbreak\code{ages/qx},
+\code{\ldots/ordre\_segments/g\_superieure} et
+\code{g\_inferieure}, \code{etapes/validation/resultat/}\allowbreak\code{cellules/qx\_table})~;
+pour R16 et R17, les mêmes onze chemins de \code{etapes/validation/}
+calculés à partir de la table lissée (\code{parametres/ddl\_effectifs/}
+\code{ddl\_effectifs} et \code{ddl\_effectifs\_retenus}~;
+\code{resultat/cellules/} \code{qx\_table}, \code{taux\_table},
+\code{attendus}, \code{residu\_reponse}, \code{residu\_pearson} et
+\code{residu\_deviance}~; \code{resultat/statistiques/valeur}~;
+\code{resultat/sous\_groupes/} \code{attendus} et \code{smr}). La
+déclaration est par plan parce qu'elle est une propriété du fichier de
+référence, non de la grandeur~: \code{validation/resultat/}\allowbreak\code{cellules/qx\_table}
+figure aussi dans R8 à R10, où il recopie une table de référence, sans
+lissage. Les chemins sont énumérés, non le sous-arbre, pour garder le
+défaut strict. \emph{Invariants}, contrôlés par la batterie~: tout plan
+est un plan de référence~; tout chemin est un chemin \code{double} du
+fichier de son plan~; complétude pour R16 et R17~: tout \code{double} de
+\code{etapes/validation/} du fichier qui porte au moins une valeur finie
+est soit déclaré, soit l'un des onze chemins indépendants de la table
+lissée de \code{VALIDATION\_HORS\_TABLE\_LISSEE} (six échos du plan,
+exposition hors plage, \code{exposition\_centrale}, \code{taux\_brut} et
+\code{probabilite\_brute} des cellules, nombre de réplications)~; les
+plans déclarés et les nombres de lignes (4, 11 et~11) sont fixés par un
+test.\par}
+
+\medskip
+\noindent
+{\sloppy\emph{Verdict}~: en régime de constat, un vecteur \code{double}
+dont le chemin est déclaré pour son plan et dont le verdict, après les
+règles relative et absolue, serait «~écart~» par des paires de valeurs
+finies reçoit le verdict \textbf{«~constat hors plateforme de
+référence~»} si, dans la même comparaison, au moins un \code{double} de
+\code{etapes/lissage/resultat/} a au moins un élément différent
+(\textbf{condition de cause}, établie par une différence de valeur et non
+par un verdict~: quand le lissage du plan est reproduit au bit près, la
+validation n'hérite de rien, et l'écart relève de la règle ordinaire).
+Ce verdict ne s'applique jamais à un écart structurel (chemin manquant
+ou en trop, type, longueur, position des valeurs non finies ou
+manquantes), à une entrée différente, à un \code{double} sans tolérance
+déclarée, à une déclaration d'échelle invalide, ni à un chemin d'un
+autre type~: entiers et chaînes, donc tout texte de verdict ou de
+statut, restent exacts partout. Il ne remplace ni «~identique~» ni
+«~sous tolérance~». Il est compté à part et \textbf{n'est pas borné}~:
+le plan n'est pas en échec par lui, la batterie ne juge pas ces
+chemins, elle les relève, et l'écrit («~NON JUGÉ hors plateforme de
+référence sur $n$ chemin(s)~: le critère de non-régression est celui de
+la CI~»). Un constat n'est jamais une comparaison réussie.
+\emph{Où le régime s'applique}~: \code{comparer\_references} reçoit les
+déclarations d'échelle et les chemins de constat, vides par défaut,
+donc strict~; seule la batterie calcule le régime, une fois par plan,
+d'après l'en-tête du fichier commité, et passe les chemins du plan à
+ses deux comparaisons de l'objet recalculé à ce fichier (la comparaison
+ordinaire et, sous transition, celle du test «~seul écart~», sur la
+référence alignée, «~Règles durables~», ci-dessous). Tout autre appel
+(témoins de la comparaison, contrôle de permutation) reste strict, hors
+les témoins du régime, qui passent des chemins de constat à dessein~; \code{produire\_references.R}, dans tous ses modes, et
+\code{comparer\_references.R} ne passent jamais de chemins de
+constat~: la régénération et le tableau avant / après sont toujours
+stricts.\par}
+
+\medskip
+\noindent
+{\sloppy\emph{Limites}. Les trois résidus de la validation
+(\code{residu\_reponse}, \code{residu\_pearson},
+\code{residu\_deviance}) dépassent leur classe $10^{-12}$ sous
+permutation dans R8, R9, R10 et R15 (\emph{constat de simulation} de la
+remesure d'\code{actuary-approfondi} du 26/11/2026, rapporté par
+l'annotation, (i)~1~; pour R15, la mesure ci-dessus le retrouve sur les
+vingt-trois permutations)~: ni la règle absolue ni le régime de constat
+ne les couvrent, et ces plans peuvent encore échouer sur ces chemins
+hors de la plateforme de référence~; leur échelle est l'objet de
+l'issue~\#385. Aucune plateforme réellement différente n'a exercé ces
+règles~: marges et inventaire viennent d'une perturbation de
+substitution, et la réserve sur la bibliothèque mathématique du système
+(ADR 0008) n'est pas levée. Hors de la plateforme de référence, la
+batterie ne protège la validation de R16 et R17 que si leur lissage y
+est reproduit au bit près~; dès qu'un \code{double} du lissage diffère,
+les onze chemins sont relevés, non jugés, vecteur entier (les lignes de
+\code{statistiques/valeur} qui ne dépendent pas de la table lissée
+comprises).\par}
+
+\medskip
+\noindent
 \textbf{Impression}, pour chaque plan, dans la batterie comme dans le
-workflow~: une ligne de bilan (grandeurs comparées, identiques, à écart sous
-tolérance, en écart, écarts structurels)~; l'écart relatif maximal observé
-par classe, toujours imprimé, même nul~; une ligne par grandeur dont l'écart
-n'est pas nul, avec sa position et les valeurs avant et après en
-\code{\%.17g}. Ces lignes sont la matière du tableau avant / après~;
+workflow~: le régime de la comparaison (strict, ou constat avec le
+nombre de chemins déclarés pour le plan)~; une ligne de bilan (grandeurs
+comparées, identiques, à écart sous tolérance, en écart, sans tolérance
+déclarée, écarts structurels, constats hors plateforme de référence,
+déclarations d'échelle invalides)~; l'écart relatif maximal observé par
+classe relative et, pour chaque classe absolue, le maximum de
+$|a - b| / (\text{facteur} \cdot S)$ sur les éléments couverts, toujours
+imprimés, même nuls (cinq lignes et deux lignes)~; une ligne par grandeur
+dont l'écart n'est pas nul, avec sa position et les valeurs avant et
+après en \code{\%.17g}, et, pour une grandeur jugée par la règle
+absolue, $S$, le facteur et sa classe. Ces lignes sont la matière du tableau avant / après~;
 \code{comparer\_references.R} produit la même impression à partir de deux
 fichiers.
 
@@ -2703,7 +3023,24 @@ liste dans le commit qui crée son fichier, et un plan listé dont le fichier
 existe fait échouer la batterie (succès inattendu). La liste est vide,
 chaque plan du tableau~\ref{tab:plans-reference} ayant son fichier~; hors
 de cette liste, un fichier manquant est un échec, de
-même qu'un fichier sans plan (référence orpheline). Des témoins, sur des
+même qu'un fichier sans plan (référence orpheline)~; seuls les fichiers des
+plans de référence sont lus, si bien qu'un fichier orphelin, même
+illisible, n'arrête pas la batterie et n'est nommé que par le test des
+références orphelines, et qu'un fichier de plan illisible est nommé par
+un test propre. Le régime de comparaison de chaque plan
+(«~Régime de comparaison~», ci-dessus) est calculé une fois, d'après les
+lignes \code{plateforme~:} du fichier commité et le relevé de la
+plateforme d'exécution, et imprimé avec la raison~; la batterie imprime
+ensuite, par plan, le régime et le nombre de grandeurs identiques, sous
+tolérance, en constat et en écart. \textbf{Verrou}~: quand la variable
+d'environnement \code{TABLEXP\_IMAGE} est définie (même vide) ou que
+\code{GITHUB\_ACTIONS} vaut \code{true}, c'est-à-dire quand l'exécution
+se déclare sur l'image de référence ou sur la CI, un test exige que
+chaque plan soit en régime strict et qu'aucune comparaison n'ait reçu de
+chemin de constat~; il ne peut que faire échouer, jamais relâcher, et il
+est sans objet sur un poste, où la batterie l'imprime comme tel, si bien
+que la batterie compte un test de plus sur la CI que sur un poste. Des
+témoins, sur des
 copies temporaires et jamais sur \code{tests/reference/}, vérifient que la
 comparaison échoue quand elle le doit (valeur altérée au-delà de sa
 tolérance, grandeur retirée ou ajoutée, type ou longueur changés, empreinte
@@ -2719,7 +3056,24 @@ code \code{NA}, en majuscules ou de longueur~2 est gardée et relevée en
 écart~; qu'une empreinte des données altérée n'est pas remplacée et reste
 «~entrée différente~»~; qu'une ligne \code{@empreinte} altérée reste un
 écart~; que l'en-tête porte les deux valeurs réelles, et qu'en changer la
-valeur dans l'en-tête ne change pas la comparaison.
+valeur dans l'en-tête ne change pas la comparaison. Pour la règle absolue
+et le régime de comparaison (ADR 0009, annotation du 26/11/2026, (g)~2 et
+(g)~3), des témoins sur des copies temporaires vérifient qu'un élément
+déclaré altéré de $0{,}9\,\tau \cdot \text{facteur} \cdot S$ passe et
+qu'il échoue à $1{,}1\,\tau \cdot \text{facteur} \cdot S$, qu'un
+changement de signe ou un zéro contre une valeur non nulle sous la borne
+passent, qu'une autre ligne du même vecteur reste sous la règle relative,
+et qu'une sélection vide ou ambiguë, une échelle absente, nulle, négative
+ou non finie, une plage d'âges au-delà de 120, une clé absente de
+\code{TOLERANCES}, une classe inconnue ou une déclaration morte sont
+relevées~; ils parcourent la table de vérité de
+\code{regime\_comparaison} et vérifient, sur une copie de R16, qu'en
+régime strict une altération d'un chemin déclaré au-delà de sa classe
+fait échouer le plan, qu'en régime de constat elle devient un constat
+quand un \code{double} du lissage est altéré sous sa tolérance, mais
+reste un écart quand le lissage est identique au bit près, et qu'un
+chemin non déclaré, un écart structurel ou une entrée différente
+échouent toujours.
 
 \medskip
 \textbf{Production}, par le workflow \code{.github/workflows/references.yml},
