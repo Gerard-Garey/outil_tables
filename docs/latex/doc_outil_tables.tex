@@ -14447,7 +14447,7 @@ ici (E3.4).
 \catalogue{fonctions-lissage}{ETAT\_BRUT\_INFERIEUR} & constante & --- & \code{"effectif\_inferieur\_}\allowbreak\code{aux\_evenements"}~: état \code{binomial} refusé sur la plage \\
 \catalogue{fonctions-lissage}{REGLE\_FORCE\_LISSAGE} & constante & --- & texte de la règle de la force, $\mu = -\ln(1 - q)$, recopié dans les paramètres \\
 \catalogue{fonctions-lissage}{HYPOTHESE\_LISSAGE} & constante & --- & texte de l'hypothèse de \code{wh\_quadratique}, recopié dans les paramètres (section~\ref{sec:lissage-quadratique}) \\
-\catalogue{fonctions-lissage}{REFERENCE\_METHODE\_LISSAGE} & constante & --- & identité de la source de \code{wh\_quadratique}~: Lignes directrices mortalité, chap.~3, IV.2.a (p.~31-32) et IV.2.d (p.~33), SHA-256 du PDF~; écarts documentés \\
+\catalogue{fonctions-lissage}{REFERENCE\_METHODE\_LISSAGE} & constante & --- & identité de la source de \code{wh\_quadratique}~: Lignes directrices mortalité de la Commission d'agrément, version approuvée, insérée en tant que recommandation dans les règles professionnelles de l'Institut des actuaires par le Conseil d'administration du 20 juin 2006 (issue~\#248), chap.~3, IV.2.a (p.~31-32) et IV.2.d (p.~33), SHA-256 du PDF~; écarts documentés \\
 \catalogue{fonctions-lissage}{HYPOTHESE\_LISSAGE\_POISSON} & constante & --- & texte de l'hypothèse de \code{wh\_poisson}~: condition d'existence du maximum, $C \ge z$ (issue~\#247), départ de l'algorithme de la source, règles non tirées de la source comprises (section~\ref{sec:lissage-poisson}) \\
 \catalogue{fonctions-lissage}{REFERENCE\_METHODE\_LISSAGE\_POISSON} & constante & --- & identité de la source de \code{wh\_poisson}~: Biessy, arXiv:2306.06932 v5, SHA-256, sections lues \\
 \catalogue{fonctions-lissage}{STATUTS\_LISSAGE} & constante & --- & statut de chaque grandeur sous \code{wh\_quadratique} (\code{grandeur}, \code{statut}~; section~\ref{sec:lissage-quadratique}) \\
@@ -18216,7 +18216,10 @@ x_{\sup}]$~:
   \item \textbf{C1, croissance} (II.1)~: $\delta_1(x) = g_{x+1} - g_x$,
     inégalité $g_x \le g_{x+1}$, égalité admise (colonnes \code{delta1},
     \code{croissance}, \code{NA} au dernier âge)~;
-  \item \textbf{C2, croissance des différences premières} (II.1)~:
+  \item \textbf{C2, croissance des différences premières} (II.1,
+    p.~37, vérification présentée comme facultative~: «~Il peut également
+    être intéressant de vérifier si les différences premières des taux de
+    décès augmentent avec l'âge~»)~:
     $\delta_2(x) = (g_{x+2} - g_{x+1}) - (g_{x+1} - g_x)$ (\code{diff()}
     d'ordre~2), inégalité $\delta_2(x) \ge 0$ (colonnes \code{delta2},
     \code{differences\_croissantes}, \code{NA} aux deux derniers âges)~;
@@ -18230,7 +18233,8 @@ x_{\sup}]$~:
     (\code{ETATS\_ORDRE\_SEGMENTS}), sans refus (M415). Pour les sexes, la
     propriété n'est attendue que «~si les groupes constitués par les hommes
     et les femmes ont des distributions comparables vis-à-vis des autres
-    critères~» (p.~38)~; un défaut appelle une explication~;
+    critères influant sur le risque de mortalité~» (p.~38)~; un défaut
+    appelle une explication~;
   \item \textbf{C4, régularité} (III.1)~: $S_z = \sum_{x = x_{\inf}}^{x_{\sup}
     - z} (\Delta^z g_x)^2$, sans poids, sur $m_z = x_{\sup} - x_{\inf} - z
     + 1$ termes (colonne \code{termes}), pour chaque $z$ de \code{ordres},
@@ -18284,7 +18288,8 @@ avertissement.\par}
 table du résultat, grandeur et nature de table)~: C1 et C3, résultats
 exacts sur les valeurs enregistrées, comparaison en double précision, un
 écart de l'ordre de la précision de construction de la table n'établissant
-pas le sens~; C2, descriptif, erreur d'arrondi de l'ordre de
+pas le sens~; C2, descriptif, vérification présentée comme facultative
+par les Lignes directrices (II.1, p.~37), erreur d'arrondi de l'ordre de
 $2u(\lvert g_x\rvert + 2\lvert g_{x+1}\rvert + \lvert g_{x+2}\rvert)$,
 $u = 2^{-53}$, plus l'erreur de construction~; C3 sur une table de
 référence~: choix de l'outil, non prescrit par II.3~; C4, descriptif,
@@ -18293,19 +18298,27 @@ flottante.
 
 \medskip
 \noindent
-\textbf{Portée.} Les Lignes directrices écrivent, pour la régularité et
-la fidélité~: «~sauf erreur de construction manifeste, les résultats de
-ces tests ne permettront pas de rejeter la table construite, ils
-donneront, en revanche, des éléments d'appréciation de sa qualité~»
-(chap.~4, III, p.~38)~; pour la cohérence des taux, elles prescrivent la
-vérification («~il faut~», II, p.~36-37) sans règle de rejet~; pour
-l'ordre entre segments, un défaut appelle à «~rechercher des
-explications~» (II.3, p.~37). L'outil restitue valeurs et âges en défaut,
-sans verdict~; l'appréciation revient à l'actuaire. Ces citations sont
-celles de la mention \code{coherence\_portee} du rapport figé
-(section~\ref{sec:rapport-fige}), lues sur le rendu des pages par
-\code{regulatory-approfondi} (spécification de l'issue~\#144, §~0) et
-retrouvées aux p.~36 à~38 du texte extrait du même PDF le 12/11/2026.
+\textbf{Portée.} Texte de la mention \code{coherence\_portee} du rapport
+figé (section~\ref{sec:rapport-fige}), visé par le mainteneur le
+26/11/2026 (issue~\#248), reproduit tel quel~: Pour les critères de
+régularité et de fidélité, les Lignes directrices écrivent~: «~sauf
+erreur de construction manifeste, les résultats de ces tests ne
+permettront pas de rejeter la table construite, ils donneront, en
+revanche, des éléments d'appréciation de sa qualité~» (chap.~4, III,
+p.~38). Pour la cohérence des taux, elles prescrivent la vérification de
+la croissance des taux avec l'âge («~il faut s'assurer que les taux
+obtenus sont cohérents entre eux~», chap.~4, II, p.~36~; II.1, p.~37) et
+de l'ordre entre segments («~il faut vérifier~», II.3, p.~37), sans règle
+de rejet~; la croissance des différences premières n'est présentée que
+comme une vérification utile («~Il peut également être intéressant de
+vérifier~», II.1, p.~37). Pour l'ordre entre segments, un défaut appelle
+à «~rechercher des explications~» (II.3, p.~37). L'outil restitue les
+valeurs et les âges où une inégalité n'est pas vérifiée, sans verdict ni
+seuil~; l'appréciation revient à l'actuaire. Ces citations, lues d'abord
+sur le rendu des pages par \code{regulatory-approfondi} (spécification
+de l'issue~\#144, §~0), ont été contrôlées par \code{regulatory} sur le
+rendu des p.~1 et 36 à~38 du même PDF (SHA-256
+\code{70ba7463\ldots6835}~; issue~\#248).
 
 \medskip
 \noindent
@@ -19324,7 +19337,7 @@ reproduites ici, E3.4).
 \catalogue{fonctions-validation}{resoudre\_branche\_ecart\_minimal()} & interne & $\lambda_s$ du segment, signe de la branche, $\lambda_{80}$, seuil, indicateur des pivots, nombre maximal d'itérations (1\,000 par défaut) & $\theta_{80}$ d'une branche et son état (\code{produite}, \code{non\_atteint}, \code{precision\_}\allowbreak\code{insuffisante})~: contrôles dans l'ordre~: pivots (avant toute évaluation de $\lambda_s$), limite \code{NA}, \code{NaN} ou $-\infty$, \code{non\_atteint}, puis, limite $+\infty$ comprise, encadrement par doublement jusqu'à $|u| = 1024$ au plus et \code{uniroot()} sur $\lambda_s$ tronquée au plus grand double, sous \code{check.conv = TRUE}~; pivots, limite indéterminée, $\lambda_s(\pm 1024)$ au plus $\lambda_{80}$ (garde défensive inaccessible), non-convergence ou postcondition non tenue~: \code{precision\_}\allowbreak\code{insuffisante}, sans signal~; toute autre erreur relancée (forme F339, section~\ref{sec:homogeneite}) \\
 \catalogue{fonctions-validation}{ecart\_minimal\_homogeneite()} & interne & objet du score du test global, état du test, états des lignes globales des segments, $S$ & $\theta_{80}^{+}$, $\theta_{80}^{-}$ et leurs états par segment, $\lambda_{80}$~; chaque segment référence de sa composante connexe, $\lambda_s$ calculée sans soustraction par l'élimination partagée avec le test, sur la matrice $W$ du test global (issue~\#334), état du test global transmis aux deux branches s'il n'est pas \code{produite}, branche \code{precision\_}\allowbreak\code{insuffisante} quand une part d'exposition s'arrondit à~0 dans une strate où le segment et un autre segment sont exposés (issue~\#333), résolution en $\log\theta$, chaque branche par la fonction de la ligne précédente~; \code{precision\_}\allowbreak\code{insuffisante} est un état, jamais un arrêt (section~\ref{sec:homogeneite}) \\
 \catalogue{fonctions-validation}{calculer\_homogeneite()} & interne & table d'exposition, segmentation, découpage, convention, plage, tranches, $B$, graine & fonction d'étape \code{homogeneite}~: paramètres, résultat (\code{tests}, \code{segments}, \code{ecart\_minimal}, \code{monte\_carlo}), diagnostics, avertissements (dont \code{ecart\_minimal\_}\allowbreak\code{detectable})~; lignes saines agrégées par (segment, cellule), à la première occurrence du couple, avant tout score (issue~\#335)~; décomptes d'événements rangés en \code{integer} avant tout tirage (refus \code{denombrement\_hors\_plage}, issue~\#348)~; exposition agrégée non finie ou de somme au-delà de \code{LIMITE\_SOMMES\_}\allowbreak\code{DOUBLE}, ou variance du score non définie~: erreur de programmation, inatteignable sous \code{construire\_table()} (issue~\#353)~; ne contrôle aucun paramètre \\
-\catalogue{fonctions-validation}{REFERENCE\_METHODE\_COHERENCE\_REGULARITE} & constante & --- & identité de la source de l'étape \code{coherence\_regularite}~: Lignes directrices, chap.~4, II (p.~36-38) et III.1 (p.~38), SHA-256 du PDF \\
+\catalogue{fonctions-validation}{REFERENCE\_METHODE\_COHERENCE\_REGULARITE} & constante & --- & identité de la source de l'étape \code{coherence\_regularite}~: Lignes directrices mortalité de la Commission d'agrément, version approuvée, insérée en tant que recommandation dans les règles professionnelles de l'Institut des actuaires par le Conseil d'administration du 20 juin 2006 (issue~\#248), chap.~4, II (p.~36-38) et III.1 (p.~38), SHA-256 du PDF \\
 \catalogue{fonctions-validation}{MENTION\_CONVENTION\_TABLE\_REFERENCE} & constante & --- & convention d'âge restituée pour une table de référence évaluée~: «~non portée par la table de référence~» \\
 \catalogue{fonctions-validation}{NOM\_TABLE\_CONSTRUITE} & constante & --- & nom restitué de la table construite, sans nom d'étape productrice \\
 \catalogue{fonctions-validation}{ETATS\_REGULARITE} & constante & --- & états d'une ligne de régularité (C5)~: \code{produite}, \code{differences\_nulles}, \code{r\_hors\_domaine} \\
@@ -25445,14 +25458,20 @@ E5.5 & messages qui disent ce qui manque, sans rien corriger & \ref{sec:refus}, 
     l'original)~; section~\ref{sec:constats-simulation}, défauts
     paramétrés.
   \item {\sloppy Institut des actuaires, Commission d'agrément, \emph{Lignes
-    directrices mortalité}, version approuvée, 2006, chap.~4, III.2.a
+    directrices mortalité}, version approuvée, insérée en tant que
+    recommandation dans les règles professionnelles de l'Institut des
+    actuaires par le Conseil d'administration du 20 juin 2006 (p.~1/40),
+    chap.~4, III.2.a
     (\url{https://www.institutdesactuaires.com/global/gene/link.php?doc_id=173&fg=1}~;
     SHA-256 \code{70ba7463b840bb4fd378dd05c7dad662}\allowbreak\code{13239d0bb033ea126b7b0b4669d26835}~;
     cité d'après \code{docs/recherche/}\allowbreak\code{2026-11-05-sources-v1.md},
     §~2.3, lecture du 05/11/2026)~; section~\ref{sec:validation-statistiques},
     S11~; chap.~3, IV.2.a (p.~31 et 32/40) et IV.2.d (p.~33/40), lus sur
     le même PDF (corps de l'issue~\#223, lecture sur l'image~; texte
-    extrait de ces pages relu le 12/11/2026)~; section~\ref{sec:lissage-quadratique}.\par}
+    extrait de ces pages relu le 12/11/2026)~; section~\ref{sec:lissage-quadratique}~;
+    chap.~4, II (p.~36-38) et III.1 (p.~38), citations contrôlées par
+    \code{regulatory} sur le rendu des p.~1 et 36 à~38 du même PDF
+    (issue~\#248)~; section~\ref{sec:coherence-regularite}.\par}
   \item M.~Matsumoto, T.~Nishimura, \emph{Mersenne Twister: a
     623-dimensionally equidistributed uniform pseudo-random number generator},
     \emph{ACM Transactions on Modeling and Computer Simulation}, 8, 1998,
