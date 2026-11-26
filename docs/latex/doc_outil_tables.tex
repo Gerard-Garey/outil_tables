@@ -13733,18 +13733,50 @@ ne redonnent pas le total des événements est une erreur de programmation.\par}
     $\theta^{\mathsf T} P \theta$, qui bruite la LAML aux grands $\lambda$
     (mesure d'\code{actuary}, spécification de forme)~; recherche linéaire~:
     pas divisé par deux, au plus \code{DEMI\_PAS\_MAX\_LISSAGE} fois, tant
-    que $\mathrm{dev}_P$ croît ou n'est pas finie~; poursuite si et
-    seulement si $\mathrm{dev}_P$ décroît d'au moins
-    \code{EPSILON\_DEVIANCE\_LISSAGE} en relatif («~$<$~» au lieu du
-    «~$\le$~» de la source, pour arrêter à l'égalité), au plus
-    \code{ITERATIONS\_MAX\_LISSAGE} itérations. Après convergence, QR à
+    que $\mathrm{dev}_P$ croît ou n'est pas finie~; règle d'arrêt
+    (\code{arret\_pirls()})~: arrêt si et seulement si $\mathrm{dev}_P$ ne
+    décroît plus d'au moins \code{EPSILON\_DEVIANCE\_LISSAGE} en relatif,
+    soit $\mathrm{dev}_P^{\text{nouv}} \ge (1 -
+    \code{EPSILON\_DEVIANCE\_LISSAGE})\,\mathrm{dev}_P$ («~$<$~» au lieu du
+    «~$\le$~» de la source pour la poursuite, pour arrêter à l'égalité),
+    et, si le pas a été raccourci (au moins une division par deux), si de
+    plus le décrément de Newton du pas complet $d$ depuis l'itéré,
+    $d^{\mathsf T}(W + P)\,d$, est fini et au plus
+    \code{EPSILON\_DEVIANCE\_LISSAGE}~$\lvert\mathrm{dev}_P\rvert$ plus
+    l'epsilon machine fois $\sum D$~; poursuite sinon (issue~\#249,
+    point~2~; ADR 0017, point~9.5)~; au plus
+    \code{ITERATIONS\_MAX\_LISSAGE} itérations. Une déviance qui ne
+    décroît plus après des demi-pas n'arrête donc l'algorithme que si le pas
+    complet ne prédit plus de diminution résoluble. La branche «~poursuite
+    après un pas raccourci~» n'est exercée par aucun jeu de test~: elle est
+    vérifiée par la table de vérité d'\code{arret\_pirls()}
+    (section~\ref{sec:lissage-verifications}). Après convergence, QR à
     $\hat\theta$~: $V = (W + P)^{-1}$ par \code{chol2inv()}, leviers $m_x
     V_{xx}$ (0 exactement aux cellules sans exposition), $\nu$ leur somme,
     $\ln\lvert W + P\rvert$ par la diagonale du facteur triangulaire,
     $\ln\lvert P\rvert_+ = (n - z)\ln\lambda + \ln\lvert K^{\mathsf T}
-    K\rvert_+$ (\code{log\_det\_penalite()}~: somme des logarithmes des
-    $n - z$ plus grandes valeurs propres de $K^{\mathsf T}K$, par
-    \code{eigen()}).
+    K\rvert_+$ (\code{log\_det\_penalite()}), ce dernier terme, constant
+    en $\lambda$ et égal à $\ln\det(KK^{\mathsf T})$, par la forme close
+    \[
+      \ln\lvert K^{\mathsf T} K\rvert_+ = \sum_{j=0}^{z-1}\Bigl[2\ln j! -
+      \ln (2j)! - \ln (2j+1)! + \sum_{k=-j}^{j} \ln(n + k)\Bigr],
+    \]
+    évaluée par \code{lgamma()} et \code{log()} en $O(z)$ opérations
+    (issue~\#249, point~1~; ADR 0017, point~9.5). La forme close est
+    vérifiée exactement, en entiers, contre $\det(KK^{\mathsf T})$ calculé
+    par l'élimination de Bareiss, sur les 70 couples $z = 1$ à~4, $n$ de
+    $z + 1$ à~20, par les tests (section~\ref{sec:lissage-verifications}),
+    et sur 1\,190 couples ($n \le 300$) par l'avis
+    d'\code{actuary-approfondi} du 15/11/2026 (constat rapporté)~; la
+    dernière étape de la preuve écrite (déterminant de Gram de la base
+    binomiale par les normes des polynômes de Tchebychev discrets) n'est
+    pas vérifiée sur une source (ADR 0017, point~9.5). Elle remplace la
+    somme des logarithmes des $n - z$ plus grandes valeurs propres de
+    $K^{\mathsf T}K$ par \code{eigen()}, approximation numérique dont
+    l'erreur atteignait $-1{,}35 \cdot 10^{-6}$ à $(n, z) = (71, 4)$ et
+    $-7{,}30 \cdot 10^{-6}$ à $(101, 4)$~: le motif est l'exactitude de la
+    LAML, non la précision de $\hat\lambda$, une constante ajoutée à la
+    LAML ne déplaçant pas son maximiseur en arithmétique exacte.
   \item \textbf{Règles non tirées de la source} (décision D12~; nommées
     dans l'hypothèse)~: reprises du code de \code{WH} 2.0.0~: le départ
     $\theta_0$ et sa valeur 0 aux cellules sans exposition, la réponse de
@@ -13752,7 +13784,11 @@ ne redonnent pas le total des événements est une erreur de programmation.\par}
     divisions du pas~; propres à l'outil~: la réponse de travail $\theta - 1$
     aux cellules exposées sans décès ($D/m$ pris nul, valeur exacte pour
     $m > 0$, conservée quand $m$ s'arrondit à~0~; réserve R-a
-    d'\code{actuary-approfondi})~; à l'épuisement des divisions du pas,
+    d'\code{actuary-approfondi})~; après un pas raccourci, arrêt seulement
+    si le décrément de Newton du pas complet $d^{\mathsf T}(W + P)\,d$ est
+    au plus \code{EPSILON\_DEVIANCE\_LISSAGE}~$\lvert\mathrm{dev}_P\rvert$
+    plus l'epsilon machine fois $\sum D$, poursuite sinon
+    (issue~\#249, point~2)~; à l'épuisement des divisions du pas,
     arrêt au dernier itéré si la diminution de $\mathrm{dev}_P$ prédite
     par le pas de Newton est au plus
     \code{EPSILON\_DEVIANCE\_LISSAGE}~$\lvert\mathrm{dev}_P\rvert$ plus
@@ -13888,9 +13924,18 @@ ne redonnent pas le total des événements est une erreur de programmation.\par}
     transformation exacte, hypothèse même de l'estimateur d'entrée~;
     \code{segments/parametre\_lissage} (sous \code{laml} seulement)~:
     maximiseur local d'un critère approché, unimodalité non établie,
-    approximation numérique de précision fixée par mesure~;
-    \code{segments/laml}~: approximation de Laplace, valeur au maximum
-    approché~; \code{segments/deviance\_penalisee}, \code{segments/regularite}
+    approximation numérique de précision fixée par mesure (classe
+    \code{optimisation})~; plancher de bruit (issue~\#249, point~3), texte
+    du statut~: «~la LAML est plate au voisinage de son maximum et son bruit
+    d'arrondi déplace lambda\^{} au-delà de la tolérance de Brent (1e-6 en ln
+    lambda), de l'ordre de 1e-5 en relatif sur un jeu simulé de 71 âges par
+    segment (constat de mesure~: jusqu'à 2,1e-5 sous permutation des lignes
+    de l'entrée)~»~; \code{segments/laml}~: approximation de Laplace, valeur
+    au maximum approché, sans le terme $-\sum \ln D!$, constant en
+    $\lambda$~; terme $\ln\lvert K^{\mathsf T}K\rvert_+$, constant en
+    $\lambda$, par la forme close ci-dessus (résultat exact~; valeur
+    calculée par \code{lgamma()} et \code{log()}, à quelques unités de
+    dernier rang près)~; \code{segments/deviance\_penalisee}, \code{segments/regularite}
     ($S(\hat\theta)$, échelle $\ln\mu$)~: approximation numérique et
     descriptif~; résidus~: nuls à la convergence près.
   \item \textbf{Références}~: G.~Biessy, \emph{Whittaker-Henderson Smoothing
@@ -14078,9 +14123,32 @@ du score~; première itération de Newton égale au «~WH original~» de
 Biessy quand toutes les cellules ont des décès~; insensibilité de
 $\hat\theta$ à $\varepsilon$~; LAML égale à la formule de la p.~19
 recalculée en clair par \code{determinant()} et \code{eigen()}, à
-$10^{-9}$ près~; non-convergence quand les décès sont à un seul âge
+$10^{-9}$ près, ce qui confronte aussi la forme close de
+$\ln\lvert K^{\mathsf T}K\rvert_+$ à un calcul par valeurs propres~; non-convergence quand les décès sont à un seul âge
 extrême), les leviers et les degrés de liberté effectifs, la réponse de
-travail aux cellules exposées sans décès, la règle de la borne
+travail aux cellules exposées sans décès (jeu à huit cellules exposées
+sans décès, $z = 4$~: $\hat\lambda$ intérieur, égal à 371\,297,92 à
+$10^{-4}$ près en relatif~; cette tolérance dépasse d'un facteur~10 le
+plancher de bruit de $\hat\lambda$, la LAML étant plate au voisinage de
+son maximum~: un décalage constant de la LAML, sans effet en arithmétique
+exacte, de $10^{-9}$ à $10^{-6}$ déplace $\hat\lambda$ d'au plus
+$5{,}5 \cdot 10^{-6}$ en relatif, et le passage à la forme close de
+$\ln\lvert K^{\mathsf T}K\rvert_+$ de $2{,}0 \cdot 10^{-6}$~; elle reste
+sous la classe \code{optimisation}, $10^{-3}$~; issue~\#249), la
+forme close de \code{log\_det\_penalite()} aux quatre couples $(n, z)$
+$(71, 3)$, $(71, 4)$, $(101, 4)$ et $(121, 4)$, à $10^{-14}$ près en
+relatif des valeurs exactes $\ln\det(KK^{\mathsf T})$ (29,298770437202322~;
+47,613856784815574~; 53,254915623305017~; 56,146230935553966), et sur les
+70 couples $z = 1$ à~4, $n$ de $z + 1$ à~20, contre $\det(KK^{\mathsf T})$
+entier exact (élimination de Bareiss en arithmétique modulaire sur deux
+nombres premiers inférieurs à $2^{26}$, restes chinois, contrôle par un
+troisième nombre premier~: l'exponentielle arrondie de la forme close est
+identique à l'entier, à $10^{-14}$ près en relatif sur le logarithme), la
+table de vérité d'\code{arret\_pirls()} (onze cas~: bornes de la
+décroissance relative et décrément égal au seuil inclus, décrément infini,
+\code{NaN} ou \code{NA} après un pas raccourci conduisant à la poursuite, décrément non lu
+sans division du pas~; seule vérification de la branche «~poursuite après
+un pas raccourci~», qu'aucun jeu n'exerce), la règle de la borne
 (\code{lambda\_a\_la\_borne}, $\hat\lambda$ égal à la borne déclarée),
 l'interpolation à $z$ cellules exposées~; le recoupement B1 ($\lambda =
 10^{12}$~: valeurs ajustées contre la régression de Poisson polynomiale
@@ -14204,7 +14272,8 @@ ici (E3.4).
 \catalogue{fonctions-lissage}{lisser\_quadratique()} & interne & $\hat q$, poids, $h$, $z$, âges d'un segment & rang du système, puis $g$, leviers, $\nu$, $F$, $S$, $M$ et les deux résidus de conservation~; à rang numérique perdu, le rang seul, l'appelant refusant (section~\ref{sec:lissage-quadratique}) \\
 \catalogue{fonctions-lissage}{deviance\_penalisee()} & interne & $\theta$, $D$, $E^c$, cellules exposées, $\lambda$, $z$ & $2\sum[D\ln(D/m) - (D - m)] + \lambda S(\theta)$, $S$ par la fonction de $S$ du module~; éventuellement non finie (section~\ref{sec:lissage-poisson}) \\
 \catalogue{fonctions-lissage}{iteration\_pirls()} & interne & $\theta$, $D$, $E^c$, cellules exposées, bloc de pénalité & une itération de Newton de \code{wh\_poisson} (réponse de travail, QR des moindres carrés augmentés)~; signale un itéré non fini ou un rang perdu \\
-\catalogue{fonctions-lissage}{log\_det\_penalite()} & interne & $n$, $z$ & $\ln \lvert K^{\mathsf T} K \rvert_+$, somme des logarithmes des $n - z$ plus grandes valeurs propres (\code{wh\_poisson}) \\
+\catalogue{fonctions-lissage}{log\_det\_penalite()} & interne & $n$, $z$ & $\ln \lvert K^{\mathsf T} K \rvert_+$ par la forme close exacte, évaluée par \code{lgamma()} et \code{log()} en $O(z)$ (\code{wh\_poisson}~; issue~\#249) \\
+\catalogue{fonctions-lissage}{arret\_pirls()} & interne & déviances pénalisées de l'itéré et du candidat, nombre de divisions du pas, décrément de Newton du pas complet, seuil & \code{TRUE} si et seulement si la déviance ne décroît plus de la tolérance relative de \code{wh\_poisson} et, après un pas raccourci, le décrément est fini et au plus le seuil (règle d'arrêt, section~\ref{sec:lissage-poisson}~; issue~\#249) \\
 \catalogue{fonctions-lissage}{lisser\_poisson()} & interne & $D$, $E^c$, $\lambda$, $z$, âges d'un segment & maximum de la vraisemblance de Poisson pénalisée à $\lambda$ fixé (départ, itérations, recherche linéaire, arrêt), puis $\hat\theta$, variances, leviers, $\nu$, LAML, déviance pénalisée, résidus~; ou l'échec (\code{non\_convergent}, \code{rang\_deficient}) (section~\ref{sec:lissage-poisson}) \\
 \catalogue{fonctions-lissage}{choisir\_lambda\_poisson()} & interne & $D$, $E^c$, $z$, âges, intervalle de $\lambda$ & $\hat\lambda$ par la LAML~: grille à froid, extrémités aux bornes déclarées, Brent si le meilleur point est intérieur, la borne sinon~; ajustement retenu et borne atteinte, ou l'échec et son $\lambda$ \\
 \catalogue{fonctions-lissage}{lisser\_segments\_poisson()} & interne & cellules, segments, décomptes, paramètres de l'étape & suite de \code{calculer\_lissage()} sous \code{wh\_poisson}~: refus \code{lissage\_interpolation\_}\allowbreak\code{deces\_nul}, \code{lissage\_systeme\_}\allowbreak\code{rang\_deficient}, \code{lissage\_non\_}\allowbreak\code{convergent}, puis table lissée et bornes, segments, avertissements \\
