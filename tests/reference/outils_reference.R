@@ -430,12 +430,19 @@ CLASSES_ABSOLUES <- c("abs_1e-10" = 1e-10, "abs_1e-12" = 1e-12)
 # l'élément désigné par `echelle`). Règle : |a - b| <= tau x facteur x S_i,
 # S lue du côté de la référence, quels que soient les signes et la présence
 # d'un zéro ((b) 3). Les colonnes sont découpées par strsplit(), jamais
-# évaluées. Facteurs ((c) 1) : somme des valeurs absolues des coefficients
-# de la différence quand l'échelle est un opérande ; 1 quand l'échelle est
-# le total des opérandes ; 120 pour le moment d'ordre 1 (Sigma x D <= 120
-# Sigma D pour des âges au plus égaux à 120 : invariant (x),
-# AGE_MAXIMAL_MOMENT). Toute modification est annotée dans l'ADR 0009, datée,
-# avec l'avis d'actuary (point 9.3).
+# évaluées. Facteurs ((c) 1) : borne de l'erreur d'arrondi de la différence,
+# exprimée en multiples de S. Chaque opérande qui porte une erreur d'arrondi
+# compte pour |coefficient| x |opérande| / S. Différences de taux calculés,
+# dont l'échelle est un opérande et dont les autres opérandes sont du même
+# ordre : somme des |coefficients| (2 pour delta1 et ordre_segments/ecart, 4
+# pour delta2). Différence entre un total calculé et un total observé pris
+# pour échelle : 1, le total calculé étant de l'ordre de S (Sigma m = Sigma D
+# à la convergence pour residu_conservation_0 ; A = O / SMR pour la ligne
+# smr/ecart, approximation absorbée par la marge, (c) 4). 120 pour le moment
+# d'ordre 1 (Sigma x D <= 120 Sigma D pour des âges au plus égaux à 120 :
+# invariant (x), AGE_MAXIMAL_MOMENT). Statut : majoration heuristique, non
+# borne démontrée ; tau est un constat de mesure ((c) 3). Toute modification
+# est annotée dans l'ADR 0009, datée, avec l'avis d'actuary (point 9.3).
 ECHELLES_ABSOLUES <- data.frame(
   cle = c("lissage/resultat/segments/residu_conservation_0",
           "lissage/resultat/segments/residu_conservation_1",

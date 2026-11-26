@@ -137,7 +137,7 @@ for (id in names(PLANS)) {
     gs <- rs$grandeurs; gc <- rc$grandeurs
     ecart_s <- gs$chemin[!admis(gs$verdict)]
     ecart_c <- gc$chemin[!(admis(gc$verdict) | gc$verdict == VERDICT_CONSTAT)]
-    cause <- sum(gs$type == "double" & startsWith(gs$chemin, PREFIXE_CAUSE_CONSTAT) & gs$verdict != "identique")
+    cause <- sum(gs$type == "double" & startsWith(gs$chemin, PREFIXE_CAUSE_CONSTAT) & gs$n_differents > 0L)
     cat(sprintf("%s, graine %d (%.1f s) : neutralisés : %s ; structure : %d ; entrée différente : %s\n", id, graine,
                 proc.time()[["elapsed"]] - t0, paste(attr(g, "neutralises"), collapse = ", "), length(rs$structure),
                 rs$entree$differente))

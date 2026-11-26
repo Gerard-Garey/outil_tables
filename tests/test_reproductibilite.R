@@ -1042,9 +1042,39 @@ verifier("TOLERANCES : 27 clés des dénombrements de #199 retirées, 196 clés 
 # (b) 4 ; #243) : invariants de la déclaration, indépendants de toute donnée,
 # sauf (v), qui lit les fichiers commités. Rend les défauts (character(0) si
 # conforme) ; `references` : liste nommée des références lues.
-REFERENCES_LUES <- local({
-  f <- list.files(DOSSIER_REFERENCES, pattern = "\\.tsv$", full.names = TRUE)
-  stats::setNames(lapply(f, lire_reference), sub("\\.tsv$", "", basename(f)))
+# Seuls les fichiers des plans de plans_reference() sont lus (tous les usages
+# de REFERENCES_LUES portent sur des identifiants de plan) : un fichier
+# orphelin, même malformé, n'arrête pas la batterie, il est nommé par le test
+# « aucune référence orpheline ». Une lecture qui échoue est consignée dans
+# `erreurs` (rapportée par verifier()), non propagée.
+lire_references_plans <- function(dossier, plans = plans_reference()) {
+  ids <- names(plans)[file.exists(file.path(dossier, paste0(names(plans), ".tsv")))]
+  lues <- list(); erreurs <- character(0)
+  for (id in ids) {
+    r <- tryCatch(lire_reference(file.path(dossier, paste0(id, ".tsv"))), error = function(e) e)
+    if (inherits(r, "error")) erreurs[[id]] <- conditionMessage(r) else lues[[id]] <- r
+  }
+  list(lues = lues, erreurs = erreurs)
+}
+.LECTURE_REFERENCES <- lire_references_plans(DOSSIER_REFERENCES)
+REFERENCES_LUES <- .LECTURE_REFERENCES$lues
+verifier("références des plans de plans_reference() : chaque fichier commité est lisible (lecture stricte)", {
+  e <- .LECTURE_REFERENCES$erreurs
+  if (length(e)) sprintf("%s : %s", names(e), e) else TRUE
+})
+verifier("témoin : un orphelin malformé (CRLF, sans LF final) n'arrête pas la lecture des plans ; seul le test des orphelines le nomme", {
+  d <- tempfile("references_"); dir.create(d); on.exit(unlink(d, recursive = TRUE))
+  file.copy(file.path(DOSSIER_REFERENCES, "R1.tsv"), file.path(d, "R1.tsv"))
+  writeBin(charToRaw("# x\r\nsans LF final"), file.path(d, "R99.tsv"))
+  lu <- lire_references_plans(d)
+  o <- references_orphelines(d)
+  # Un plan dont le fichier est malformé est signalé nommément, sans arrêt.
+  writeBin(charToRaw("# x\r\nsans LF final"), file.path(d, "R2.tsv"))
+  lu2 <- lire_references_plans(d)
+  if (!identical(names(lu$lues), "R1") || length(lu$erreurs)) "l'orphelin a été lu ou a produit une erreur"
+  else if (!identical(o, "R99.tsv")) "l'orphelin n'est pas nommé par references_orphelines()"
+  else if (!identical(names(lu2$erreurs), "R2") || !grepl("R2.tsv", lu2$erreurs[["R2"]], fixed = TRUE)) "plan malformé non nommé"
+  else TRUE
 })
 defauts_echelles <- function(echelles = ECHELLES_ABSOLUES, tolerances = TOLERANCES, references = REFERENCES_LUES,
                              classes = CLASSES_ABSOLUES) {

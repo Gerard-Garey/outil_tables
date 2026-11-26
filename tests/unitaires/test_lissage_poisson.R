@@ -581,6 +581,13 @@ verifier("F ordre des refus (#247) : âges 40 et 60 seuls observés, z = 2, H sa
   if (!isTRUE(ok)) return(ok)
   if (identical(tablexp:::decompte_maximum(c(TRUE, TRUE), c(FALSE, TRUE)), 1L)) TRUE else "C différent de 1"
 })
+# Comportement spécifié, non défaut connu : le plafond ITERATIONS_MAX_LISSAGE
+# (100) est une constante déclarée et le refus lissage_non_convergent est
+# prescrit (#247). Mesure d'actuary (26/11/2026, R 4.3.3, plafond relevé hors
+# dépôt) : PIRLS converge sur ce jeu en 107 itérations, vers un optimum où
+# theta descend à -88 606,7 et où m s'annule en flottant sur 54 des 71 âges
+# (C = z, cas limite : maximum fini mais dégénéré). Relever le plafond
+# produirait une table à taux nuls ; ce n'est pas une correction.
 verifier("F lissage_non_convergent à maximum existant (#247 ; cas de la remesure (0'), § 4) : âges 20 à 90, H décès 10 aux âges 21 et 24 (C = 4), F décès à tous les âges, z = 4, lambda = 1 déclaré : segment H, plafond de 100 itérations (lisser_poisson() : 100 itérations) ; message exact (constat de mesure, R 4.3.3)", {
   a <- 20:90
   eh <- round(1000 * exp(-0.01 * (a - 20)), 3)
