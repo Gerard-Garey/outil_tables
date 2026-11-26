@@ -4956,9 +4956,10 @@ l'étape \code{positionnement} (\code{etapes\$positionnement}, \code{NULL}
 en son absence~; rien ne passe hors de l'objet~;
 section~\ref{sec:validation-etape}), ou, sous la relation \code{lissee},
 sans table de référence, la table construite et les degrés de liberté
-effectifs par segment rendus par \code{table\_construite()}, passés en
-valeur, et l'ordre des différences du lissage
-(\code{etapes\$lissage\$parametres\$ordre\_difference}, issue~\#239)~; l'étape
+effectifs par segment, avec la dimension de l'espace non pénalisé de
+chaque segment, rendus par \code{table\_construite()}, passés en
+valeur~; elle ne lit aucun paramètre de l'étape \code{lissage}
+(issue~\#242~; ADR 0017, point~5.7)~; l'étape
 \code{coherence\_regularite} lit la table construite, en valeur, les
 tables de référence qu'elle cite, la segmentation du plan et la
 convention retenue de l'étape \code{exposition}~; l'étape
@@ -5008,19 +5009,30 @@ exactement les âges de la plage, croissants)~; une colonne facultative
 \code{levier}, si elle est présente, \code{double} fini, positif ou nul,
 présente si et seulement si la table \code{segments} du résultat porte une
 colonne \code{ddl\_effectifs}, dont chaque valeur est alors identique à la
-somme des leviers de son segment (ADR 0017, point~5.5). Les colonnes propres
+somme des leviers de son segment (ADR 0017, point~5.5)~; la colonne
+\code{dimension\_non\_penalisee} de la table \code{segments}, présente
+avec les deux précédentes~: les trois colonnes \code{levier},
+\code{ddl\_effectifs} et \code{dimension\_non\_penalisee} sont présentes
+toutes trois ou absentes toutes trois, et, si elles sont présentes,
+\code{dimension\_non\_penalisee} est \code{integer}, sans \code{NA}, et
+$0 \le d_s \le n_s$, $d_s$ sa valeur et $n_s$ le nombre de cellules du
+segment $s$ dans la grille (issue~\#242~; ADR 0017, point~5.7~(ii)~;
+la table positionnée, sans aucune des trois, reste admise). Les colonnes propres
 au producteur suivent les colonnes communes et ne sont lues par aucun
 lecteur au titre du contrat~; \code{levier}, colonne facultative du
 contrat, n'en fait pas partie~: la validation sous la relation
 \code{lissee} l'exige et en lit les valeurs (ADR 0017, point~5.5,
 décision M417~; section~\ref{sec:validation-etape}). La table construite
 est passée aux lecteurs en valeur, avec la plage de l'étape et les degrés
-de liberté effectifs, sans qu'aucun lecteur ne connaisse le nom de l'étape
-productrice~; seules la cohérence entre une relation de validation et son
+de liberté effectifs (table \code{segments} du résultat restreinte aux
+clés de segmentation, à \code{ddl\_effectifs} et à
+\code{dimension\_non\_penalisee}, dans cet ordre, ou \code{NULL} si elle
+ne porte pas ces colonnes), sans qu'aucun lecteur ne connaisse le nom de l'étape
+productrice~; seule la cohérence entre une relation de validation et son
 producteur (\code{lissage\_absent},
-section~\ref{sec:validation-etape}) et la lecture de l'ordre des
-différences du lissage sous la relation \code{lissee} (écart admis pour
-cette version, issue~\#242~; ADR 0017, point~5.6) nomment celui-ci. Une table qui ne tient pas ce contrat est une
+section~\ref{sec:validation-etape}) nomme celui-ci~: depuis l'issue~\#242,
+la validation sous la relation \code{lissee} ne lit plus aucun paramètre
+de l'étape \code{lissage} (ADR 0017, point~5.7). Une table qui ne tient pas ce contrat est une
 \textbf{erreur de programmation}, jamais un refus~: elle ne peut naître que
 d'un défaut du producteur, non des données. La table construite n'est pas
 la table finale~: elle reste dans le \code{resultat} de son étape, et
@@ -7104,7 +7116,7 @@ locales.\par}
 \catalogue{fonctions-construire-table}{table\_citee()} & interne & tables reçues, clé & objet \code{table\_reference} de la clé, comparée en UTF-8 comme au contrôle des tables reçues~; erreur de programmation si la clé est absente (le contrôle des tables reçues l'a exclu)~; table citée par chaque étape qui lit une table, lue par \code{controler\_entrees()} \\
 \catalogue{fonctions-construire-table}{controler\_plan\_roles()} & interne & données, rôles, plan, provenance & première couche du contrôle des entrées, dans cet ordre~: \code{valider\_plan()} puis \code{canoniser\_plan()}, \code{controler\_roles()} sur la segmentation canonique, qui appelle \code{deduire\_recette()} et rend la recette, présence de la grille d'inventaires puis des paramètres conditionnels selon la recette (lignes ci-dessus), \code{resoudre\_convention()} si l'étape \code{exposition} est au plan, contrôle des étapes et des estimateurs admis sous la recette (module \code{donnees}, section~\ref{sec:recettes}), \code{controler\_provenance()}~; rend le plan canonique et les valeurs validées \code{p} (transition retenue, début, fin, borne $B$, période, délai et, si le plan la porte, grille d'inventaires, par la fonction sans contrôle du module \code{donnees}), \code{recette} et \code{conv} (\code{NULL} sans \code{exposition})~; appelée par \code{controler\_entrees()} et par \code{rejouer\_fiche()} (étape~6) (section~\ref{sec:execution}~; issue~\#82) \\
 \catalogue{fonctions-construire-table}{controler\_entrees()} & interne & données, rôles, plan, provenance, tables de référence & seconde couche~: \code{controler\_plan\_roles()}, puis le contrôle des tables reçues (section~\ref{sec:tables-reference-recues}), la convention retenue de l'étape \code{lissage} si elle est au plan (fonction de contrôle du module \code{lissage}) et, pour chaque étape du plan qui lit une table (\code{validation} seulement si elle en cite une, non sous \code{lissee}), la lecture de sa table (\code{table\_citee()}) et ses contrôles d'entrée (section~\ref{sec:validation-etape})~; rend les valeurs de la première couche, la valeur de \code{fiche\$tables\_reference} et la table citée par étape~; appelée une fois par \code{construire\_table()}, seule (section~\ref{sec:execution}~; issue~\#82) \\
-\catalogue{fonctions-construire-table}{table\_construite()} & interne & étapes exécutées, segmentation, nom de l'étape productrice & table construite, plage d'âges de l'étape et ddl effectifs par segment (\code{NULL} si la table \code{segments} du résultat n'en porte pas)~; contrat commun contrôlé, toute violation étant une erreur de programmation~; appelée par \code{construire\_table()} juste après l'étape productrice (section~\ref{sec:execution}) \\
+\catalogue{fonctions-construire-table}{table\_construite()} & interne & étapes exécutées, segmentation, nom de l'étape productrice & table construite, plage d'âges de l'étape et ddl effectifs par segment, avec la dimension de l'espace non pénalisé (\code{NULL} si la table \code{segments} du résultat n'en porte pas)~; contrat commun contrôlé, dont la présence conjointe des trois colonnes facultatives et $0 \le d_s \le n_s$ (issue~\#242), toute violation étant une erreur de programmation~; appelée par \code{construire\_table()} juste après l'étape productrice (section~\ref{sec:execution}) \\
 \catalogue{fonctions-construire-table}{construire\_table()} & exportée & données, rôles, plan, provenance, tables de référence & objet \code{construction} (section~\ref{sec:objet-resultat})~; table construite contrôlée après l'étape productrice~; empreinte du résultat posée avant \code{execution} \\
 \catalogue{fonctions-construire-table}{texte\_lu()} & interne & valeur lue & «~absente~» (\code{NULL}), la chaîne (chaîne unique sans attribut, \code{NA} écrit «~NA~») ou «~illisible (type de longueur n)~», longueur lue sans la classe si celle-ci est d'encodage \code{bytes} (issue~\#128), pour un message ou le bilan du rejeu~; sortie brute, citée par \code{sans\_controle()} chez l'appelant dans un message ou une cellule du bilan, brute dans les \code{details} (issue~\#142) \\
 \catalogue{fonctions-construire-table}{sans\_controle()} & interne & texte & valeur citée selon la règle unique des refus (section~\ref{sec:refus}~: \code{<U+XXXX>}, \code{<xx>}, repère \code{bytes}, marque UTF-8~; issue~\#94)~; messages de refus du rejeu et cellules du bilan du rejeu (issue~\#142) \\
@@ -12802,7 +12814,7 @@ une \code{variance}, 5~\code{valeur\_h0} et 3~\code{niveau} dans
 (nature inconnue, \code{variance} sans objet ou d'objet numérique, objet
 donné à une autre nature, chaîne vide, \code{NA} ou nombre)~; sur les
 deux bornes de crédibilité de \code{STATUTS\_LISSAGE\_POISSON}, et sur
-aucune de ses dix autres lignes (clé \code{grandeur} seule), en fin de
+aucune de ses onze autres lignes (clé \code{grandeur} seule), en fin de
 statut, texte égal à celui de \code{mention\_independance("credibilite")}~;
 la source unique (C1-a)~: la chaîne fixe «~unités d'observation
 indépendantes~; sous l'unité contrat~» figure une seule fois dans les
@@ -13619,7 +13631,13 @@ ne redonnent pas le total des événements est une erreur de programmation.\par}
     \code{segments/ddl\_effectifs}, trace de
     $(W + h K^{\mathsf T} K)^{-1} W$, définition des degrés de liberté
     effectifs du cas normal (Biessy, §~5.1, p.~15), approximation
-    numérique~; \code{fidelite}, \code{regularite}, \code{critere}~:
+    numérique~; \code{segments/dimension\_non\_penalisee}, résultat
+    exact~: dimension du noyau de la pénalité $S$ (polynômes de degré au
+    plus $z - 1$ en l'âge, échelle $q$), égale à l'ordre des différences
+    $z$~; entier, sans calcul flottant~; lue par la validation (relation
+    \code{lissee}) pour reconnaître, par la structure, un segment où le
+    lissage interpole (nombre de cellules pondérées, de levier $> 0$, égal
+    à cette dimension~; issue~\#242)~; \code{fidelite}, \code{regularite}, \code{critere}~:
     descriptifs~; résidus de conservation~: nuls en arithmétique exacte,
     valeur calculée~: approximation numérique, interprétés comme
     conservation des décès et de l'âge moyen au décès sous la pondération
@@ -13817,7 +13835,10 @@ ne redonnent pas le total des événements est une erreur de programmation.\par}
     numérique, aucune propriété fréquentiste revendiquée~; leviers et
     \code{segments/ddl\_effectifs}, trace de $(W + P)^{-1} W$ à la
     convergence, définition du cas normal transposée, approximation
-    numérique~; bornes de crédibilité~: ci-dessus, statut terminé, après
+    numérique~; \code{segments/dimension\_non\_penalisee}, résultat
+    exact, même texte que sous~(a) avec l'échelle $\ln\mu$ et des
+    cellules exposées (de levier $> 0$) au lieu de pondérées (polynômes de
+    degré au plus $z - 1$ en l'âge, $d_s = z$~; issue~\#242)~; bornes de crédibilité~: ci-dessus, statut terminé, après
     «~(aucun constat de simulation versé)~», par la mention d'indépendance
     des unités de nature \code{credibilite} (section~\ref{sec:validation-statistiques}~;
     issues~\#329 et~\#359, décision du mainteneur D-b~(a) du 25/11/2026)~:
@@ -13909,7 +13930,9 @@ ne redonnent pas le total des événements est une erreur de programmation.\par}
     \code{evenements} (dénombrements en \code{integer}, ADR 0009,
     point~9.6), \code{parametre\_lissage} ($h$), \code{ddl\_effectifs}
     ($\nu$, \code{double}~: non entier, ce n'est pas un dénombrement),
-    \code{fidelite} ($F$), \code{regularite} ($S$), \code{critere} ($M$),
+    \code{dimension\_non\_penalisee} ($d_s = z$, \code{integer}, posé à
+    partir du paramètre contrôlé \code{ordre\_difference}, sans calcul
+    flottant~; issue~\#242), \code{fidelite} ($F$), \code{regularite} ($S$), \code{critere} ($M$),
     \code{residu\_conservation\_0}, \code{residu\_conservation\_1},
     \code{etat} (\code{produite})~;
   \item \code{diagnostics}~: \code{cellules}, \code{cellules\_interpolees},
@@ -13939,7 +13962,8 @@ Sous \code{wh\_poisson}~:
   \item \code{resultat\$segments}~: clés, \code{cellules},
     \code{cellules\_ponderees} (exposées), \code{cellules\_interpolees},
     \code{evenements}, \code{parametre\_lissage} ($\lambda$ déclaré ou
-    $\hat\lambda$), \code{ddl\_effectifs}, \code{regularite}
+    $\hat\lambda$), \code{ddl\_effectifs}, \code{dimension\_non\_penalisee}
+    ($d_s = z$, \code{integer}), \code{regularite}
     ($S(\hat\theta)$, échelle $\ln\mu$), \code{laml} (sous les deux
     critères), \code{deviance\_penalisee}, \code{iterations}
     (\code{integer}), \code{residu\_conservation\_0} ($\sum(\hat m - D)$),
@@ -13996,7 +14020,11 @@ message, et leur ordre~; la structure de \code{etapes\$lissage}, la table
 lissée recalculée par \code{lisser\_quadratique()} sur les entrées de
 l'étape, le passage de la table par \code{table\_construite()}, les
 leviers (nuls sur une cellule interpolée, somme par segment
-\code{identical()} aux degrés de liberté effectifs), la conservation sur
+\code{identical()} aux degrés de liberté effectifs), la colonne
+\code{dimension\_non\_penalisee} de la table \code{segments}
+(\code{integer}, après \code{ddl\_effectifs}, valant $z$ dans chaque
+segment) et sa présence dans les degrés de liberté effectifs rendus par
+\code{table\_construite()} (issue~\#242), la conservation sur
 l'objet~; l'idempotence de \code{canoniser\_plan()} et l'aller-retour
 \code{ecrire\_plan()} / \code{lire\_plan()} d'un plan de lissage~; la
 section du rapport figé. \code{tests/unitaires/test\_parametres\_conditionnels.R}
@@ -14005,7 +14033,13 @@ gouvernant sur des catalogues fabriqués (invariants du catalogue, chaque
 refus avec son message), la canonisation «~sans condition~», la colonne
 \code{table\_construite} de \code{ETAPES}, le contrat de la table
 construite (une table fabriquée qui le viole est une erreur de
-programmation) et la liste blanche \code{ETAPES\_PLAGE\_AGES}.
+programmation~; pour la colonne \code{dimension\_non\_penalisee},
+issue~\#242, chaque violation levée seule avec sa cause~: colonne absente
+alors que \code{levier} et \code{ddl\_effectifs} sont présentes, présente
+sans elles, \code{double}, \code{NA}, négative, supérieure au nombre de
+cellules du segment~; 0 et ce nombre admis, et l'élément
+\code{ddl\_effectifs} rendu avec les clés, \code{ddl\_effectifs} et
+\code{dimension\_non\_penalisee}) et la liste blanche \code{ETAPES\_PLAGE\_AGES}.
 \code{tests/test\_reproductibilite.R} vérifie l'extraction de la grille
 (section~\ref{sec:exposition}) et le passage de la table positionnée des
 plans de référence par \code{table\_construite()}.\par}
@@ -14054,8 +14088,10 @@ de \code{stats::glm()}, à $10^{-6}$ près en relatif)~; les catalogues et
 les constantes~; chaque refus propre à la variante levé seul, avec son
 message, et leur ordre~; la structure de \code{etapes\$lissage} sous
 \code{declare} et \code{laml}, la table recalculée par
-\code{lisser\_poisson()}, le contrat de la table construite, la
-conservation sur l'objet, l'état \code{qx\_arrondi\_un}~; sous la relation
+\code{lisser\_poisson()}, la colonne \code{dimension\_non\_penalisee}
+(\code{integer}, après \code{ddl\_effectifs}, valant $z$), le contrat de
+la table construite (degrés de liberté effectifs rendus avec cette
+colonne~; issue~\#242), la conservation sur l'objet, l'état \code{qx\_arrondi\_un}~; sous la relation
 \code{lissee}, un SMR égal à~1 à $10^{-10}$ près par segment et un ddl
 nul exactement sous interpolation~; la canonisation, l'aller-retour du
 plan, le rejeu de la fiche (objet identique hors \code{execution}) et la
@@ -14172,7 +14208,7 @@ ici (E3.4).
 \catalogue{fonctions-lissage}{lisser\_poisson()} & interne & $D$, $E^c$, $\lambda$, $z$, âges d'un segment & maximum de la vraisemblance de Poisson pénalisée à $\lambda$ fixé (départ, itérations, recherche linéaire, arrêt), puis $\hat\theta$, variances, leviers, $\nu$, LAML, déviance pénalisée, résidus~; ou l'échec (\code{non\_convergent}, \code{rang\_deficient}) (section~\ref{sec:lissage-poisson}) \\
 \catalogue{fonctions-lissage}{choisir\_lambda\_poisson()} & interne & $D$, $E^c$, $z$, âges, intervalle de $\lambda$ & $\hat\lambda$ par la LAML~: grille à froid, extrémités aux bornes déclarées, Brent si le meilleur point est intérieur, la borne sinon~; ajustement retenu et borne atteinte, ou l'échec et son $\lambda$ \\
 \catalogue{fonctions-lissage}{lisser\_segments\_poisson()} & interne & cellules, segments, décomptes, paramètres de l'étape & suite de \code{calculer\_lissage()} sous \code{wh\_poisson}~: refus \code{lissage\_interpolation\_}\allowbreak\code{deces\_nul}, \code{lissage\_systeme\_}\allowbreak\code{rang\_deficient}, \code{lissage\_non\_}\allowbreak\code{convergent}, puis table lissée et bornes, segments, avertissements \\
-\catalogue{fonctions-lissage}{calculer\_lissage()} & interne & table d'exposition, résultat de l'étape \code{brut}, segmentation, convention retenue, paramètres de l'étape & fonction d'étape \code{lissage}~: paramètres, résultat (\code{table\_lissee}, \code{segments}), diagnostics, avertissements~; refus en cours d'étape (section~\ref{sec:lissage-etape})~; ne refait aucun contrôle de \code{valider\_plan()} \\
+\catalogue{fonctions-lissage}{calculer\_lissage()} & interne & table d'exposition, résultat de l'étape \code{brut}, segmentation, convention retenue, paramètres de l'étape & fonction d'étape \code{lissage}~: paramètres, résultat (\code{table\_lissee}, \code{segments}, dont la dimension de l'espace non pénalisé de chaque segment, issue~\#242), diagnostics, avertissements~; refus en cours d'étape (section~\ref{sec:lissage-etape})~; ne refait aucun contrôle de \code{valider\_plan()} \\
 \end{longtable}
 }
 
@@ -15097,10 +15133,14 @@ paramètres estimés sur ces données~:
     \sum_s \nu_s$ serait alors faux, d'où la somme restreinte, qui ne
     recalcule pas la matrice de lissage mais additionne des valeurs
     stockées (ADR 0017, point~5.5~(iii)). \textbf{Interpolation exacte}
-    (issue~\#239~; ADR 0017, point~5.6~; décision M420, (3))~: un segment
-    qui compte exactement $z$ cellules pondérées par le lissage (levier
-    $> 0$~; $z$, ordre des différences du lissage), retenues ou non, est
-    interpolé~: sous~(a), le polynôme de degré au plus $z-1$ qui passe par ses $z$ taux bruts annule $F$ et $S$, donc $M$, et il est le minimum unique (section~\ref{sec:lissage-quadratique})~; sous~(b), celui qui passe par les $\ln(D/E^c)$ de ses $z$ cellules exposées, toutes à décès positifs (sinon refus \code{lissage\_interpolation\_deces\_nul}), annule la pénalité et maximise chaque terme de la vraisemblance (section~\ref{sec:lissage-poisson}). Sous l'une et l'autre, chaque levier pondéré vaut~1 en arithmétique exacte (preuve écrite)~: pour une cellule pondérée $x$, soit $v$ le vecteur des valeurs, aux âges de la plage, du polynôme de degré au plus $z-1$ qui vaut~1 en $x$ et~0 aux $z-1$ autres cellules pondérées~; $Kv = 0$ et $Wv = w_x e_x$ ($W = \operatorname{Diag}(w)$ sous~(a), $\operatorname{Diag}(\hat m)$ sous~(b)), donc $(W + hK^{\mathsf T}K)\,v = w_x e_x$ ($\lambda$ au lieu de $h$ sous~(b)), d'où $v = w_x V e_x$ et $w_x V_{xx} = v_x = 1$.
+    (issue~\#239~; ADR 0017, points~5.6 et~5.7~; décision M420, (3))~: un
+    segment qui compte exactement $d_s$ cellules pondérées par le lissage
+    (levier $> 0$), retenues ou non, $d_s$ dimension de l'espace non
+    pénalisé du lissage dans le segment (dimension du noyau de la pénalité,
+    espace des valeurs qu'elle ne contraint pas~; colonne
+    \code{dimension\_non\_penalisee} de la table \code{segments} du
+    lissage, issue~\#242), égale à l'ordre des différences $z$ sous
+    Whittaker-Henderson, cas normal comme Poisson, est interpolé~: sous~(a), le polynôme de degré au plus $z-1$ qui passe par ses $z$ taux bruts annule $F$ et $S$, donc $M$, et il est le minimum unique (section~\ref{sec:lissage-quadratique})~; sous~(b), celui qui passe par les $\ln(D/E^c)$ de ses $z$ cellules exposées, toutes à décès positifs (sinon refus \code{lissage\_interpolation\_deces\_nul}), annule la pénalité et maximise chaque terme de la vraisemblance (section~\ref{sec:lissage-poisson}). Sous l'une et l'autre, chaque levier pondéré vaut~1 en arithmétique exacte (preuve écrite)~: pour une cellule pondérée $x$, soit $v$ le vecteur des valeurs, aux âges de la plage, du polynôme de degré au plus $z-1$ qui vaut~1 en $x$ et~0 aux $z-1$ autres cellules pondérées~; $Kv = 0$ et $Wv = w_x e_x$ ($W = \operatorname{Diag}(w)$ sous~(a), $\operatorname{Diag}(\hat m)$ sous~(b)), donc $(W + hK^{\mathsf T}K)\,v = w_x e_x$ ($\lambda$ au lieu de $h$ sous~(b)), d'où $v = w_x V e_x$ et $w_x V_{xx} = v_x = 1$.
     Calculée en flottant, la somme de ses leviers retenus s'en écarte de
     l'ordre de l'arrondi, ce qui publiait un ddl voisin de~0, parfois
     négatif. Dans un tel segment, la somme
@@ -15108,15 +15148,29 @@ paramètres estimés sur ces données~:
     retenues pondérées, et sa contribution au ddl vaut exactement le nombre
     de ses cellules retenues de poids nul (0 quand toutes sont pondérées).
     La détection se fait par la structure (décompte des leviers non nuls
-    contre $z$), sans tolérance. Quand chaque segment interpole avec toutes
-    ses cellules retenues pondérées, le ddl vaut exactement~0. L'ordre $z$
-    est transmis à la validation par \code{construire\_table()}, qui le lit
-    dans \code{etapes\$lissage\$parametres\$ordre\_difference}~: la
-    validation lit là un paramètre du producteur, écart à l'esprit du
-    contrat de la table construite (aucun nom d'étape lu), admis pour cette
-    version sur le précédent du positionnement~; la forme plus durable,
-    propriété du lisseur portée par sa table \code{segments}, est proposée
-    par l'issue~\#242 (ADR 0017, point~5.6). La table étant ajustée sur ces
+    contre $d_s$), sans tolérance~; elle repose sur une hypothèse nommée~:
+    le levier est nul exactement sur une cellule de poids nul (par
+    construction) et strictement positif en flottant sur une cellule
+    pondérée (strictement positif en arithmétique exacte, il ne
+    s'annulerait que sous le plus petit \code{double} positif~; aucun
+    levier nul n'a été observé sur une cellule pondérée, constat rapporté
+    par l'ADR 0017, point~5.7~(viii)). Quand chaque segment interpole avec toutes
+    ses cellules retenues pondérées, le ddl vaut exactement~0. La dimension
+    $d_s$ est lue dans les degrés de liberté effectifs rendus par
+    \code{table\_construite()} et passés en valeur~: la validation ne lit
+    aucun paramètre de l'étape \code{lissage} et ne connaît pas l'ordre
+    $z$, conformément au contrat de la table construite (aucun nom d'étape
+    lu)~; un autre lisseur porterait sa propre dimension, sans changer la
+    validation (issue~\#242~; ADR 0017, point~5.7). Jusqu'à l'issue~\#242,
+    $z$ était lu par \code{construire\_table()} dans
+    \code{etapes\$lissage\$parametres\$}\allowbreak\code{ordre\_difference}, écart
+    à ce contrat admis pour une version (ADR 0017, point~5.6). Sous la
+    relation \code{lissee}, \code{calculer\_validation()} exige la colonne
+    \code{dimension\_non\_penalisee}, \code{integer} sans \code{NA}, et
+    contrôle $0 \le d_s \le n_s$, $n_s$ compté sur sa grille, toute
+    violation étant une erreur de programmation~: ce contrôle double celui
+    du contrat de \code{table\_construite()} et garde un appel direct de
+    la fonction. La table étant ajustée sur ces
     décès, \textbf{aucune loi exacte} n'est établie sous une hypothèse
     nulle~: seules sont produites les p-valeurs asymptotiques de $X^2$ et
     $G^2$ à ce ddl, et les p-valeurs des signes, des suites et de Wilcoxon
@@ -15308,7 +15362,8 @@ cellules retenues du segment, analogue par segment de
 \code{parametres\_estimes}~; posé exactement au nombre de ses cellules
 retenues pondérées sous interpolation exacte) et
 \code{interpolation\_exacte} (\code{logical}~: le segment compte exactement
-$z$ cellules pondérées)~; les deux premières colonnes sont égales, en
+$d_s$ cellules pondérées, $d_s$ dimension de l'espace non pénalisé du
+lissage, égale à $z$ sous Whittaker-Henderson)~; les deux premières colonnes sont égales, en
 arithmétique exacte, quand toute cellule pondérée est retenue~; dans un
 segment qui interpole, \code{ddl\_effectifs} reste la trace calculée en
 flottant (ADR 0017, points~5.2, 5.5 et~5.6). Les degrés de
@@ -18860,9 +18915,12 @@ verdict~; titre et mentions du rapport figé sous les trois
     grandeurs et des sous-groupes~; le SMR sous la pondération
     \code{exposition} contre l'écart $\sum E^i g - \sum E^c(-\ln(1 - g))$~;
     \code{calculer\_validation()} appelée directement sur la table
-    construite, \code{identical()} à l'étape, et ses erreurs de
+    construite et les degrés de liberté effectifs rendus par
+    \code{table\_construite()}, \code{identical()} à l'étape, et ses erreurs de
     programmation (table, ddl effectifs ou colonne \code{levier} absents,
-    grille différente)~; \code{taux\_table\_egal\_un} sur la table
+    grille différente, colonne \code{dimension\_non\_penalisee} absente,
+    \code{double} ou \code{NA}, valeur négative ou supérieure au nombre
+    de cellules du segment, 0 et ce nombre étant admis~; issue~\#242)~; \code{taux\_table\_egal\_un} sur la table
     construite~; sous \code{independante}, table construite et ddl passés
     ignorés~; titre et mentions du rapport figé, colonne \code{levier}
     rendue~; canonisation et aller-retour d'un plan sans
@@ -18979,7 +19037,7 @@ reproduites ici, E3.4).
 \catalogue{fonctions-validation}{sous\_groupes\_validation()} & interne & cellules, regroupements, niveau, relation & S5~: table des sous-groupes~; sous \code{positionnee}, par la fonction de la ligne suivante~; sous \code{lissee}, SMR descriptif et états \\
 \catalogue{fonctions-validation}{sous\_groupes\_positionnee()} & interne & regroupement, cellules, segments, $D$, $A$, $O$, niveau, plafond de convolution (\code{n\_max}, par défaut \code{N\_MAX\_}\allowbreak\code{PRODUITS\_}\allowbreak\code{CONVOLUTION}~; autre valeur pour les seuls tests) & S5 sous \code{positionnee}~: p-valeurs binomiales ou de somme de binomiales, exactes ou, au-delà du plafond, asymptotiques, bornes d'un segment, états \\
 \catalogue{fonctions-validation}{segments\_complets()} & interne & cellules du sous-groupe, segment, cellules retenues & segments touchés et, pour chacun, si le sous-groupe contient toutes ses cellules retenues (décompte, jamais un test flottant)~; partagée par les relations \code{positionnee} et \code{lissee} \\
-\catalogue{fonctions-validation}{calculer\_validation()} & interne & table d'exposition, segmentation, découpage, convention, table (\code{NULL} sous \code{lissee}), paramètres, graine, étape \code{positionnement}, table construite, ddl effectifs et ordre des différences du lissage (lus sous \code{lissee}) & fonction d'étape \code{validation}~: paramètres, résultat, diagnostics, avertissements~; décomptes d'événements rangés en \code{integer} avant tout tirage (refus \code{denombrement\_hors\_plage}, issue~\#348)~; ne contrôle rien d'autre (issue~\#82) \\
+\catalogue{fonctions-validation}{calculer\_validation()} & interne & table d'exposition, segmentation, découpage, convention, table (\code{NULL} sous \code{lissee}), paramètres, graine, étape \code{positionnement}, table construite et ddl effectifs avec la dimension de l'espace non pénalisé (lus sous \code{lissee}~; aucun paramètre du lisseur, issue~\#242) & fonction d'étape \code{validation}~: paramètres, résultat, diagnostics, avertissements~; décomptes d'événements rangés en \code{integer} avant tout tirage (refus \code{denombrement\_hors\_plage}, issue~\#348)~; ne contrôle rien d'autre (issue~\#82) \\
 \catalogue{fonctions-validation}{ETATS\_TESTS\_HOMOGENEITE} & constante & --- & états d'un test d'homogénéité~: \code{produite}, \code{evenement\_sans\_}\allowbreak\code{exposition}, \code{moins\_de\_deux\_}\allowbreak\code{segments\_informatifs}, \code{precision\_}\allowbreak\code{insuffisante} (pivot de l'élimination non fini ou non strictement positif~; M570, P1~(a)~; issue~\#334) \\
 \catalogue{fonctions-validation}{ETATS\_P\_EXACTE\_HOMOGENEITE} & constante & --- & états de la p-valeur exacte~: ceux du test non produit, \code{produite}, \code{plus\_de\_deux\_groupes}, \code{convolution\_au\_dela\_}\allowbreak\code{n\_max}, \code{non\_produite\_par\_}\allowbreak\code{cette\_version}~; ceux du test non produit comprennent \code{precision\_}\allowbreak\code{insuffisante} (issue~\#334) \\
 \catalogue{fonctions-validation}{ETATS\_SEGMENTS\_HOMOGENEITE} & constante & --- & états d'une ligne par segment~: \code{produite}, \code{segment\_sans\_}\allowbreak\code{exposition}, \code{evenement\_sans\_}\allowbreak\code{exposition}, \code{variance\_nulle} ($V_{ss}$ nulle~: en arithmétique exacte, segment exposé dans aucune strate informative~; par arrondi seulement quand tous les produits $D_{\cdot c}\pi_{sc}\pi_{kc}$ sont arrondis à~0 (sous $2^{-1075} \approx 2{,}5 \cdot 10^{-324}$)~; $z_s$ et $\theta_{80}$ non définis, sans signal~; issues~\#336 et~\#333) \\
@@ -21761,8 +21819,10 @@ mêmes cellules, ses degrés de liberté effectifs ne sont en général pas
 entiers, les p-valeurs asymptotiques de $X^2$ et $G^2$ sont calculées à $n$
 moins la somme des leviers des cellules retenues, au statut
 d'approximation non établie, et le SMR et les sous-groupes sont
-descriptifs~; elle ajoute que, dans un segment qui compte exactement $z$
-cellules pondérées, le lissage interpole, que la somme de ses leviers
+descriptifs~; elle ajoute que, dans un segment qui compte exactement $d_s$
+cellules pondérées, $d_s$ dimension de l'espace non pénalisé du lissage
+(égale à l'ordre des différences $z$ sous Whittaker-Henderson), le lissage
+interpole, que la somme de ses leviers
 retenus est posée au nombre de ses cellules retenues pondérées et sa
 contribution au ddl au nombre exact de ses cellules retenues non
 pondérées (colonne \code{interpolation\_exacte}), et que les p ne sont
