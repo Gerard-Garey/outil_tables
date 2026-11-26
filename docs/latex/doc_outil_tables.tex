@@ -1484,7 +1484,7 @@ références de non-régression (section~\ref{sec:non-regression}) et contrôle
 l'effet d'une permutation des lignes de l'entrée de référence
 (section~\ref{sec:empreinte}, «~Représentation canonique~»~; issue~\#39), puis
 l'aller-retour du texte du plan et de la fiche et le rejeu à partir de ce
-texte pour chacun des plans de référence (quatorze~: fonction \code{plans\_reference} de
+texte pour chacun des plans de référence (dix-sept, R1 à R17~: fonction \code{plans\_reference} de
 \code{tests/reference/outils\_reference.R}~; section~\ref{sec:serialisation}).
 \textbf{\code{tests/concordance\_doc\_moteur.R}} confronte le présent document
 au code installé~: toute fonction citée existe~; toute fonction exportée est
@@ -18958,7 +18958,7 @@ reproduites ici, E3.4).
 \catalogue{fonctions-validation}{ETAPES\_TRANCHES\_REPLICATIONS} & constante & --- & étapes admises par les briques de forme des tranches d'âge et des réplications~: \code{validation}, \code{homogeneite} \\
 \catalogue{fonctions-validation}{controler\_tranches\_age()} & interne & tranches, plage, étape appelante & \code{TRUE} invisible, ou refus \code{tranches\_age\_invalides} sous le module de l'étape \\
 \catalogue{fonctions-validation}{controler\_replications()} & interne & $B$, étape appelante & \code{TRUE} invisible, ou refus \code{replications\_invalides} sous le module de l'étape \\
-\catalogue{fonctions-validation}{controler\_parametres\_validation()} & interne & paramètres de l'étape (\code{table\_reference} absent lu par \code{missing()}), paramètres des étapes \code{positionnement} et \code{lissage} du plan (\code{NULL} en leur absence) & \code{TRUE} invisible, ou le premier refus dans l'ordre du catalogue (relation par la fonction de la ligne suivante), puis, sous \code{positionnee}, les trois refus inter-étapes, sous \code{lissee}, les deux~; appelée par \code{valider\_plan()} seule (issue~\#82) \\
+\catalogue{fonctions-validation}{controler\_parametres\_validation()} & interne & paramètres de l'étape (\code{table\_reference} absent lu par \code{missing()}), paramètres des étapes \code{positionnement} et \code{lissage} du plan (\code{NULL} en leur absence, et par défaut~: un appel direct qui omet l'étape requise par la relation reçoit le refus d'absence de cette étape, non une erreur de R~; issue~\#240) & \code{TRUE} invisible, ou le premier refus dans l'ordre du catalogue (relation par la fonction de la ligne suivante), puis, sous \code{positionnee}, les trois refus inter-étapes, sous \code{lissee}, les deux~; appelée par \code{valider\_plan()} seule (issue~\#82) \\
 \catalogue{fonctions-validation}{controler\_relation\_table()} & interne & relation & \code{TRUE} invisible, ou refus \code{relation\_table\_}\allowbreak\code{invalide}~; contrôle du gouvernant, appelé par \code{valider\_plan()} avant la présence de \code{table\_reference}, et par la fonction de la ligne précédente \\
 \catalogue{fonctions-validation}{probabilite\_hors()} & interne & $A$, bornes & $P(X < l) + P(X > u)$, $X \sim \mathcal{P}(A)$, par cellule \\
 \catalogue{fonctions-validation}{probabilite\_hors\_binomiale()} & interne & $n$, $p$, bornes & $P(X < l) + P(X > u)$, $X \sim \mathcal{B}(n, p)$, par cellule (loi conditionnelle sous \code{positionnee}) \\
