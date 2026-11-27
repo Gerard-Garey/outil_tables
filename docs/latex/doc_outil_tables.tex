@@ -23108,9 +23108,10 @@ range~», puis était refusé sous le motif générique
 message parle de valeur manquante (\emph{constat} de mesure de
 l'issue~\#234)~; les tables construites sur des âges valides sont
 inchangées. La borne supérieure est une limite de représentation,
-\textbf{non un plafond actuariel}~: aucune source n'en fixe, et le
-constructeur ne refuse pas un âge sans sens démographique (choix de
-conception, sans source). Le garde-fou est en aval~: le simulateur refuse
+\textbf{non un plafond actuariel}~: le constructeur d'une table
+synthétique ne fixe pas d'âge limite et ne refuse pas un âge sans sens
+démographique (choix de conception, sans source)~; l'âge limite d'une
+table relève de la fermeture (section~\ref{sec:fermeture}). Le garde-fou est en aval~: le simulateur refuse
 une loi qui ne couvre pas les âges atteignables (\code{table\_trop\_courte})
 ou y atteint $q_x = 1$ (\code{qx\_egal\_a\_un}~;
 section~\ref{sec:portefeuille-simule}), ce qui arrive pour
