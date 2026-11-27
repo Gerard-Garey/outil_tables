@@ -23047,8 +23047,10 @@ spécification. Le nom constant et la source sont marqués UTF-8 par
 \code{texte\_moteur()} (section~\ref{sec:harnais}, «~Locale de
 l'installation~»). Les paramètres ne figurent que dans l'attribut
 \code{parametres} (section~\ref{sec:table-reference}), que la fiche
-écrit sous \code{tables\_reference/}\textit{clé}\code{/parametres}, en
-doubles au format \code{\%.17g}, et que le rapport figé restitue avec la
+écrit sous \code{tables\_reference/}\textit{clé}\code{/parametres}, les
+paramètres numériques de la loi en doubles au format \code{\%.17g} (la
+famille, \code{loi}, en chaîne~; l'étendue des âges, \code{ages}, en
+entiers), et que le rapport figé restitue avec la
 mention \code{tables\_reference\_parametres}
 (section~\ref{sec:rapport-fige}). Deux raisons. D'une part, un nom formé
 par \code{format()} dépendait des options de session \code{OutDec} et
@@ -23076,8 +23078,13 @@ changé. Conséquence~: le nom ne distingue plus deux lois synthétiques de
 même famille. Le message du refus \code{empreinte\_table\_discordante}
 (section~\ref{sec:rejeu}), qui cite le nom et le statut de la table,
 renvoie, pour une table synthétique, à
-\code{fiche/tables\_reference/}\textit{clé}\code{/parametres}~: ce
-renvoi suffit à identifier la loi.
+\code{fiche/tables\_reference/}\textit{clé}\code{/parametres}~: avec la
+clé, que le message cite, ce renvoi désigne la loi déclarée (pour les
+trois tables du package, famille, paramètres et étendue des âges, qui
+suffisent à la recalculer~; pour une table synthétique déclarée par
+l'appelant, des paramètres déclarés et non vérifiés,
+section~\ref{sec:table-reference}, «~Statut des paramètres d'une table
+synthétique~»)~; seule l'empreinte de table identifie les valeurs.
 
 \noindent
 \textbf{Âges déclarés} (issue~\#234). Les trois constructeurs contrôlent
