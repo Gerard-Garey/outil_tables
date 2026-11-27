@@ -110,6 +110,47 @@ verifier("table synthétique : âges valides inchangés (double entier = entier 
     identical(table_constante(0.05, c(0, 1, 2), "x")$age, 0:2)
 })
 
+# nom et source des tables synthétiques (#156 ; M500) : le `nom` est une constante
+# sans nombre (avant : formé par format() des paramètres, donc dépendant de
+# OutDec et de digits : « (A = 2e-04, B = 2,5e-05, c = 1,1) » sous OutDec = ","
+# et digits = 3) ; nom et source sont des textes du moteur marqués UTF-8 par
+# texte_moteur() (avant : non marqués, refusés à l'écriture de la fiche sous la
+# locale C, contrôle tests/controles/locale_c.R). Les paramètres restent dans
+# `parametres` ; l'empreinte de la table (valeurs seules) est celle de l'état
+# antérieur, mesurée sur 20f62b4 (A = 2e-4, B = 2.5e-5, c = 1.1 ; a = 2e-4,
+# b = 2.5e-5, c = log(1.1) ; q = 0.01 ; âges 0:120).
+synthetiques <- function() list(
+  gm = table_gm(GM_A, GM_B, GM_C, 0:120),
+  logistique = table_logistique(2e-4, 2.5e-5, log(1.1), 0:120),
+  constante = table_constante(0.01, 0:120, "constante"))
+SYNTHETIQUES_DEFAUT <- synthetiques()
+SYNTHETIQUES_OUTDEC <- local({
+  op <- options(OutDec = ",", digits = 3)
+  on.exit(options(op))
+  synthetiques()
+})
+u8 <- function(debut, fin) c(charToRaw(debut), as.raw(c(0xc3, 0xa9)), charToRaw(fin))  # « é » en octets UTF-8
+NOMS_SYNTHETIQUES <- list(gm = u8("Gompertz-Makeham synth", "tique"), logistique = u8("Logistique synth", "tique"))
+EMPREINTES_SYNTHETIQUES <- c(gm = "cfb5c8c7398a795d21beb5dbf030d7fd", logistique = "ae1112824b47a1f35e0d925cdf6cedc4",
+                             constante = "417e18bf2dde5e771b1cc770a2b789ad")
+for (k in c("gm", "logistique"))
+  verifier(sprintf("table synthétique %s (#156) : nom constant sans chiffre, octets UTF-8 attendus, marqué UTF-8, identique sous OutDec = \",\" et digits = 3", k),
+           identical(charToRaw(attr(SYNTHETIQUES_DEFAUT[[k]], "nom")), NOMS_SYNTHETIQUES[[k]]) &&
+             identical(charToRaw(attr(SYNTHETIQUES_OUTDEC[[k]], "nom")), NOMS_SYNTHETIQUES[[k]]) &&
+             !grepl("[0-9]", attr(SYNTHETIQUES_DEFAUT[[k]], "nom")) &&
+             identical(Encoding(attr(SYNTHETIQUES_DEFAUT[[k]], "nom")), "UTF-8") &&
+             identical(Encoding(attr(SYNTHETIQUES_OUTDEC[[k]], "nom")), "UTF-8"))
+for (k in names(SYNTHETIQUES_DEFAUT))
+  verifier(sprintf("table synthétique %s (#156) : source marquée UTF-8 ; source, parametres, valeurs et empreinte identiques sous OutDec = \",\" et digits = 3, empreinte de l'état antérieur", k),
+           {
+             d <- SYNTHETIQUES_DEFAUT[[k]]; o <- SYNTHETIQUES_OUTDEC[[k]]
+             identical(Encoding(attr(d, "source")), "UTF-8") && validUTF8(attr(d, "source")) &&
+               identical(charToRaw(attr(d, "source")), charToRaw(attr(o, "source"))) &&
+               identical(attr(d, "parametres"), attr(o, "parametres")) && identical(d$qx, o$qx) &&
+               identical(tablexp:::empreinte_table(d), tablexp:::empreinte_table(o)) &&
+               identical(tablexp:::empreinte_table(d), EMPREINTES_SYNTHETIQUES[[k]])
+           })
+
 # --- loi vraie effective -----------------------------------------------------------
 
 le <- loi_effective(list(table = GM, facteurs = c(H = 1, F = 0.6)), "deces", c("H", "F"))
