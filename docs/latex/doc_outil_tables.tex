@@ -1658,7 +1658,9 @@ usage, est l'objet de l'issue~\#25. Le \textbf{texte produit par le moteur}
 (messages d'avertissement, mentions, hypothèses et statuts de l'étape
 \code{brut}, unité d'exposition, hypothèse de censure, en-tête du texte du
 plan et de la fiche, gabarits des messages de refus, ces derniers par
-\code{formuler()}, section~\ref{sec:refus}) est en outre marqué UTF-8 par
+\code{formuler()}, section~\ref{sec:refus}~; nom des tables synthétiques
+de Gompertz-Makeham et logistique et source des trois tables synthétiques,
+section~\ref{sec:loi-vraie}~; issue~\#156) est en outre marqué UTF-8 par
 \code{texte\_moteur()},
 quelle que soit la locale d'installation ou d'exécution~: sans ce marquage,
 un package installé ou exécuté sous la locale C laissait des chaînes non
@@ -1687,7 +1689,15 @@ l'installation, les plans de référence R1 à R17 sur leur entrée de référen
 écrit, relit et réécrit leur fiche et leur plan, écrit leur rapport figé et,
 pour R1, le bilan du rejeu outillé, complété des cellules des bilans de
 fiches et de données à nom, classe des données ou fichier de provenance
-non ASCII (lignes~1, 6, 10 et~12~; issues~\#142 et~\#296), et cinq
+non ASCII (lignes~1, 6, 10 et~12~; issues~\#142 et~\#296)~; sur
+l'entrée de R1, il exécute en outre trois constructions qui lisent
+chacune une table synthétique (\code{table\_gompertz\_makeham()},
+\code{table\_logistique()} et \code{table\_constante()}~; positionnement
+par SMR sur la clé \code{tv}, sans segmentation~; issue~\#156), en
+écrit, relit et réécrit la fiche et le plan, en écrit le rapport figé, et
+exige que la source de la table lue soit marquée UTF-8 dans la fiche, ainsi
+que le nom, sans chiffre, des deux premières (le nom de la table constante
+est celui de l'appelant)~; il écrit de plus cinq
 messages (deux refus du rejeu
 outillé et deux refus \code{objet\_modifie} du rapport figé, dont trois
 citent des valeurs à caractères de contrôle ou non ASCII, et la citation
@@ -1720,7 +1730,8 @@ obtenus sous les deux locales (tableau~\ref{tab:scripts-controle})~; le
 moindre écart le fait sortir avec un code non nul. Il est une étape bloquante
 du job «~Tests (R 4.3.3)~», distincte des trois batteries. \textbf{Statut}~:
 l'identité des textes est un \emph{constat} sur la machine qui exécute le
-contrôle (la plateforme de référence en CI) et sur ces dix-sept plans, non une
+contrôle (la plateforme de référence en CI), sur ces dix-sept plans et ces
+trois constructions, non une
 propriété démontrée~; il ne couvre ni une locale latin-1 (contrôle
 suivant), ni Windows (issue~\#49), ni des données de l'utilisateur à chaînes
 non ASCII.
@@ -3713,7 +3724,7 @@ Windows. La batterie unitaire garde en outre un échantillon de l'écriture
 recoupée par \code{ecriture\_doubles.R} et les témoins T1 à T3 de
 \code{ecriture\_doubles\_texte.R}, que la CI exécute en entier
 (section~\ref{sec:verifications-rapport}). Pour
-\code{locale\_c.R}, dont l'exécution complète (deux installations, dix-sept plans)
+\code{locale\_c.R}, dont l'exécution complète (deux installations, dix-sept plans et trois constructions synthétiques)
 est une étape de la CI, la batterie ne rejoue que le chemin d'échec bon
 marché~: une racine sans package sort en échec et nomme l'installation
 sous \code{LC\_ALL=C}. Elle charge en outre le script sans le lancer
@@ -4228,7 +4239,10 @@ et~\#296), des bilans à segment de chemin cité entre «~…~» (lignes~8, 11,
 12 et~15~; issue~\#298) et à empreinte du code ou du résultat de forme
 non MD5 (lignes~9, 13 et~15~; issue~\#295), des cellules de la forme F307
 (lignes~9, 13, 14 et~15~; issue~\#307) et messages de refus (marqués UTF-8, sur une ligne~;
-issue~\#94)~; messages de refus par module (neuf modules, dont
+issue~\#94)~; sur l'entrée de R1, trois constructions qui lisent une table
+synthétique (Gompertz-Makeham, logistique, constante), fiche et plan écrits,
+relus et réécrits, rapport figé écrit, source de la table marquée UTF-8, nom
+marqué UTF-8 et sans chiffre pour les deux premières (issue~\#156)~; messages de refus par module (neuf modules, dont
 \code{positionnement}, \code{validation} et \code{homogeneite}, chacun
 contrôlé sur son module et son motif attendus),
 de la lecture du texte du
@@ -4237,12 +4251,12 @@ plan et de deux refus \code{type\_incompatible} sur un rôle date
 «~<xx>~»~; issue~\#127)~; marque UTF-8 de \code{details\$type\_attendu}
 de ces deux refus et des chaînes non ASCII de \code{TYPES\_ADMIS}, de
 \code{LIBELLES\_MOTIFS} et de \code{catalogue\_roles()\$type\_admis},
-avec témoin (issue~\#151)~; puis ces textes (trois par plan, le bilan, les messages
-de R1 et les messages par module~; leur nombre est écrit par la sortie du contrôle), comparés
+avec témoin (issue~\#151)~; puis ces textes (trois par plan et par construction synthétique, le bilan, les messages
+de R1 et les messages par module, soit $3 \times (17 + 3) + 3 = 63$, nombre exigé par le script et écrit par sa sortie), comparés
 octet à octet entre C et UTF-8, sans écart admis (section~\ref{sec:harnais})~; étape bloquante «~Locale C
 (installation et exécution)~» du job «~Tests (R 4.3.3)~», hors liste des
 batteries & ADR 0007, point 11 et annotation du 05/11/2026, (f)~; M54~;
-issues~\#66, \#127, \#142, \#151, \#295, \#296, \#298 et~\#307 \\
+issues~\#66, \#127, \#142, \#151, \#156, \#295, \#296, \#298 et~\#307 \\
 \code{messages\_refus.R} & règle de rédaction des messages de refus
 (section~\ref{sec:refus})~: fichiers de \code{R/} lus par \code{parse()},
 sans charger \code{tablexp}~; gabarit de \code{formuler()} constant, aux
@@ -8841,6 +8855,9 @@ métadonnées, et aucune étape ne lit les paramètres~; ils permettent au tiers
 de recalculer la table et de mesurer l'écart (ADR 0015, point~2.3) pour
 autant qu'ils aient été déclarés exactement. Le rapport figé le dit par la
 mention \code{tables\_reference\_parametres} (section~\ref{sec:rapport-fige}).
+Le nom d'une table de Gompertz-Makeham ou logistique ne porte pas ses
+paramètres~: ils ne se lisent que dans ce champ (section~\ref{sec:loi-vraie},
+«~Nom et source~»~; issue~\#156).
 \code{tests/unitaires/test\_invariance\_parametres\_table.R} vérifie
 l'affirmation (issue~\#257)~: sous un plan par étape qui lit une table
 (\code{positionnement}, \code{validation}, \code{importance\_exclusions}, qui
@@ -23011,6 +23028,48 @@ paramètres (attribut \code{parametres}), sont construites par le module~:
 \end{itemize}
 
 \noindent
+\textbf{Nom et source} (issue~\#156). Le nom des deux premières tables est
+une constante sans nombre, «~Gompertz-Makeham synthétique~» ou
+«~Logistique synthétique~»~; celui de la table constante est le texte
+déclaré par l'appelant (argument \code{nom}), laissé tel quel. La source
+des trois tables est un texte du moteur qui énonce la loi et sa
+spécification. Le nom constant et la source sont marqués UTF-8 par
+\code{texte\_moteur()} (section~\ref{sec:harnais}, «~Locale de
+l'installation~»). Les paramètres ne figurent que dans l'attribut
+\code{parametres} (section~\ref{sec:table-reference}), que la fiche
+écrit sous \code{tables\_reference/}\textit{clé}\code{/parametres}, en
+doubles au format \code{\%.17g}, et que le rapport figé restitue avec la
+mention \code{tables\_reference\_parametres}
+(section~\ref{sec:rapport-fige}). Deux raisons. D'une part, un nom formé
+par \code{format()} dépendait des options de session \code{OutDec} et
+\code{digits} (le paramètre $c = 1{,}1$ s'écrivait «~1.1~» ou «~1,1~»)~;
+or le nom entre dans \code{fiche\$tables\_reference}, donc dans
+l'empreinte du résultat (ADR 0015, point~3.1)~: la même table aurait donné
+deux empreintes du résultat selon le réglage de la session. D'autre part,
+le nom et la source, formés de littéraux non ASCII non marqués, n'étaient
+pas marqués UTF-8 quand le package était installé et exécuté sous la
+locale C~: une construction qui lisait l'une de ces tables y était
+refusée (\code{chaine\_codage\_indetermine}, sur le nom ou la source de la
+table). \emph{Constat de mesure} (R~4.3.3, package installé)~: le nom et
+la source sont identiques octet à octet sous \code{OutDec = ","} et
+\code{digits = 3} et sous les options par défaut
+(\code{tests/unitaires/test\_simulation.R})~; la fiche, le plan et le
+rapport figé d'une construction qui lit chacune des trois tables sont
+identiques octet à octet sous la locale C et sous une locale UTF-8
+(\code{tests/controles/locale\_c.R}, section~\ref{sec:harnais}). Les
+valeurs, les paramètres et l'empreinte de table sont inchangés~; le nom
+étant dans la fiche, l'empreinte du résultat d'une construction qui lit
+une table de Gompertz-Makeham ou logistique a changé à cette
+modification~; aucune construction des plans de référence R1 à R17 ne
+lit de table synthétique, et aucune référence de non-régression n'a
+changé. Conséquence~: le nom ne distingue plus deux lois synthétiques de
+même famille. Le message du refus \code{empreinte\_table\_discordante}
+(section~\ref{sec:rejeu}), qui cite le nom et le statut de la table,
+renvoie, pour une table synthétique, à
+\code{fiche/tables\_reference/}\textit{clé}\code{/parametres}~: ce
+renvoi suffit à identifier la loi.
+
+\noindent
 \textbf{Âges déclarés} (issue~\#234). Les trois constructeurs contrôlent
 leurs âges par une même règle, que porte la fonction
 \code{defaut\_ages\_synthetiques()}~: le vecteur
@@ -25444,9 +25503,9 @@ identique, attribut compris, dans un autre processus R.
 \catalogue{fonctions-simulation}{ORDRE\_TIRAGES\_DEFAUTS} & constante & --- & ordre des tirages des défauts, consigné dans l'attribut \code{defauts} \\
 \catalogue{fonctions-simulation}{DEFAUTS\_FORMES} & constante & --- & règles des défauts par forme, lues par le nom de forme (\code{lignes} pour \code{forme = NULL}, \code{agregats}, \code{stocks\_successifs})~: catalogue, combinaisons, domaine de \code{cible}, unités à cible requise, types exclusifs (stocks successifs~: \code{inventaire\_perdu}~; champ absent pour les autres formes), ordre des tirages et texte de validité consignés~; l'entrée \code{lignes} reprend à l'identique les trois constantes précédentes (tableaux~\ref{tab:catalogue-defauts}, \ref{tab:catalogue-defauts-agregats} et~\ref{tab:catalogue-defauts-stocks}) \\
 \catalogue{fonctions-simulation}{defaut\_ages\_synthetiques()} & interne & âges & \code{""} si les âges forment un vecteur numérique non vide d'entiers de 0 à \code{.Machine\$integer.max}, sinon le texte du défaut du premier âge fautif (manquant, non fini, non entier, négatif, supérieur au plus grand entier du moteur), valeur citée au format \code{\%.17g} et position, ou du vecteur vide ou non numérique~; règle unique des âges des trois tables synthétiques, aide de message (section~\ref{sec:loi-vraie}, «~Âges déclarés~»~; issue~\#234) \\
-\catalogue{fonctions-simulation}{table\_gompertz\_makeham()} & interne & $A$, $B$, $c$, âges & table synthétique de Gompertz-Makeham~; refus \code{loi\_invalide} (paramètres, puis âges par l'aide ci-dessus) \\
-\catalogue{fonctions-simulation}{table\_logistique()} & interne & $a$, $b$, $c$, âges & table synthétique logistique (Kannisto si $a = 0$)~; refus \code{loi\_invalide} (paramètres, puis âges par l'aide ci-dessus) \\
-\catalogue{fonctions-simulation}{table\_constante()} & interne & $q$, âges, nom & table synthétique à $q_x$ constant~; refus \code{loi\_invalide} ($q$, puis âges par l'aide ci-dessus) \\
+\catalogue{fonctions-simulation}{table\_gompertz\_makeham()} & interne & $A$, $B$, $c$, âges & table synthétique de Gompertz-Makeham, de nom constant «~Gompertz-Makeham synthétique~», paramètres dans l'attribut \code{parametres}, nom et source marqués UTF-8 (issue~\#156)~; refus \code{loi\_invalide} (paramètres, puis âges par l'aide ci-dessus) \\
+\catalogue{fonctions-simulation}{table\_logistique()} & interne & $a$, $b$, $c$, âges & table synthétique logistique (Kannisto si $a = 0$), de nom constant «~Logistique synthétique~», paramètres dans l'attribut \code{parametres}, nom et source marqués UTF-8 (issue~\#156)~; refus \code{loi\_invalide} (paramètres, puis âges par l'aide ci-dessus) \\
+\catalogue{fonctions-simulation}{table\_constante()} & interne & $q$, âges, nom & table synthétique à $q_x$ constant, de nom déclaré par l'appelant, source marquée UTF-8 (issue~\#156)~; refus \code{loi\_invalide} ($q$, puis âges par l'aide ci-dessus) \\
 \catalogue{fonctions-simulation}{loi\_effective()} & interne & loi d'une transition, cause, sexes & $q^{s}_x$ et $\mu_x$ par sexe~; refus \code{loi\_invalide}, dans l'ordre~: une loi qui n'est pas la liste (\code{table}, \code{facteurs}), une table de classe d'encodage \code{bytes} (issue~\#150), une table à axe temporel, \code{annee} ou \code{generation} (issue~\#272), une table qui n'est pas l'objet que rendrait le constructeur, jugée par l'assistant d'état du module \code{donnees} avant toute lecture de colonne, cohérence de la liste des colonnes et de leurs noms comprise (issues~\#253 et~\#365), puis la forme exacte des facteurs \\
 \catalogue{fonctions-simulation}{jours\_civils()} & interne & année, mois, jour & jours depuis 1970-01-01 (arithmétique entière) \\
 \catalogue{fonctions-simulation}{jour\_anniversaire()} & interne & composantes de naissance, âge & jour de l'anniversaire (29~février~: 1\textsuperscript{er}~mars des années non bissextiles) \\
