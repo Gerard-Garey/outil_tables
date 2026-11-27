@@ -24201,8 +24201,8 @@ et 155~refus, identiques, attributs compris, avant et après).
     l'exception énumère les refus établis, et l'absence d'autre refus
     causé par l'exclusion sous les trois conditions est une
     \textbf{hypothèse non démontrée}. Le texte de la forme agrégats énonce
-    la même exception, les cellules tenant lieu de lignes (forme
-    «~agrégats~», ci-dessous), sans condition sur les étapes du plan.
+    la même exception, les cellules tenant lieu de lignes, sous la même
+    condition d'étape (issue~\#381~; forme «~agrégats~», ci-dessous).
 \end{itemize}
 
 \noindent
@@ -24368,9 +24368,15 @@ exclusion déclarée, le module \code{donnees} refuse
 (\code{ligne\_invalide}) en nommant les motifs attendus~; avec toutes les
 exclusions des motifs attendus déclarées, les lignes exclues sont celles de
 l'attribut, motif par motif, sauf si ces exclusions ne conservent aucune
-cellule (refus \code{aucune\_ligne\_conservee}) ou aucune cellule
-d'exposition strictement positive ni aucun événement (refus
-\code{periode\_sans\_exposition}). Toute cellule exclue manque à la table
+cellule (refus \code{aucune\_ligne\_conservee}, levé par le module
+\code{donnees} quelles que soient la recette et les étapes du plan) ou
+aucune cellule d'exposition strictement positive ni aucun événement (refus
+\code{periode\_sans\_exposition} si le plan comporte l'étape
+\code{exposition}, seule à lever ce refus~; un plan réduit à l'étape
+\code{donnees} n'en lève aucun~: constat, R~4.3.3, sur le jeu du test de
+l'issue~\#381). Comme pour les lignes individuelles, l'absence d'autre
+refus causé par les exclusions sous ces conditions est une
+\textbf{hypothèse non démontrée}. Toute cellule exclue manque à la table
 (pour \code{cellule\_dupliquee}, l'original et la copie)~: le relevé
 \code{ages\_manquants} peut alors apparaître.
 
@@ -25374,7 +25380,14 @@ absent, inattendu, hors liste ou \code{NA}, et pour
 \code{"tete"} sous le rachat, avec ou sans défauts~; leurs messages~;
 \code{defauts\_ineligibles} après la projection (deux appels de
 \code{sous\_graine()}, état du générateur de l'appelant inchangé)~; la
-disjonction, sous un taux de~1 pour tous les types. \emph{Recoupement
+disjonction, sous un taux de~1 pour tous les types. Le texte de validité
+est égal (\code{identical()}) au texte spécifié, recopié dans le test~;
+sur un jeu par année à part (issue~\#381), dont toutes les cellules
+d'exposition strictement positive ou à événement sont altérées puis
+exclues, le refus
+\code{periode\_sans\_exposition} de l'étape \code{exposition} sous le
+plan complet et l'absence de refus sous un plan réduit à l'étape
+\code{donnees}. \emph{Recoupement
 contre le moteur} (A5~; \emph{approximation numérique}, tolérance relative
 $10^{-10}$, l'écart maximal mesuré figurant dans l'intitulé du test,
 affiché en cas d'échec ou sous l'option \code{harnais.verbeux}, un
