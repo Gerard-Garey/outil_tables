@@ -22,10 +22,13 @@
 #  - lisser_quadratique() : g, degrés de liberté effectifs, F, S, M et
 #    résidus de conservation d'un segment, par QR des moindres carrés
 #    augmentés (ADR 0017, point 9.1) ;
-#  - deviance_penalisee(), iteration_pirls(), log_det_penalite(),
-#    lisser_poisson(), choisir_lambda_poisson() : variante (b) (#225) :
-#    déviance pénalisée, itération de Newton (PIRLS) par QR des moindres
-#    carrés augmentés, ln |K'K|+, maximum de la vraisemblance pénalisée d'un
+#  - decompte_maximum(), deviance_penalisee(), iteration_pirls(),
+#    log_det_penalite(), arret_pirls(), lisser_poisson(),
+#    choisir_lambda_poisson() : variante (b) (#225) : décompte C de la
+#    condition d'existence du maximum (#247), déviance pénalisée, itération
+#    de Newton (PIRLS) par QR des moindres carrés augmentés, ln |K'K|+ (forme
+#    close, #249), règle d'arrêt des itérations (#249), maximum de la
+#    vraisemblance pénalisée d'un
 #    segment à lambda fixé (leviers, ddl effectifs, LAML, variances a
 #    posteriori), choix de lambda par la LAML (grille, puis Brent) ;
 #  - calculer_lissage() : fonction d'étape `lissage`.
@@ -94,8 +97,9 @@ HYPOTHESE_LISSAGE <- paste(
   "(force constante par âge entier), qui diffère de l'hypothèse de répartition du binomial d'entrée : écart entre",
   "les taux centraux de l'ordre de q^3/12.")
 REFERENCE_METHODE_LISSAGE <- paste(
-  "Lignes directrices mortalité de la Commission d'agrément de l'Institut des actuaires, recommandation du 20 juin",
-  "2006, chap. 3, IV.2.a (p. 31-32) et IV.2.d (p. 33), SHA-256",
+  "Lignes directrices mortalité de la Commission d'agrément, version approuvée, insérée en tant que recommandation",
+  "dans les règles professionnelles de l'Institut des actuaires par le Conseil d'administration du 20 juin 2006,",
+  "chap. 3, IV.2.a (p. 31-32) et IV.2.d (p. 33), SHA-256",
   "70ba7463b840bb4fd378dd05c7dad66213239d0bb033ea126b7b0b4669d26835 ; écarts documentés")
 # Variante (b) (#225 ; spécification de forme, §§ 2 et 3) : hypothèse, règles
 # non tirées de la source comprises (D12), et référence.
@@ -105,14 +109,20 @@ HYPOTHESE_LISSAGE_POISSON <- paste(
   "sur theta = ln mu, sans surdispersion (sigma^2 = 1), pénalisée par lambda S(theta) / 2, S = somme des",
   "(Delta^z theta)^2 ; theta^ : maximum de la vraisemblance pénalisée (mode a posteriori) ; cellules sans",
   "exposition (E^c = 0, D = 0) de poids nul, valeur interpolée, aucune extrapolation hors de la plage ;",
-  "aucun refus D > E^i. Algorithme de la source (annexe D, algorithme 1) : itérations de Newton poursuivies",
-  "tant que la déviance pénalisée décroît d'au moins EPSILON_DEVIANCE_LISSAGE en relatif (« < » au lieu du « <= »",
-  "de la source, pour arrêter à l'égalité). Règles non tirées de la source, reprises du code de WH 2.0.0 :",
-  "départ theta_0 = ln(max(D, EPSILON_DEPART_LISSAGE) / E^c) où E^c > 0 et theta_0 = 0 aux cellules sans",
-  "exposition ; réponse de travail z = theta aux cellules sans exposition ; divisions du pas par deux tant que la",
+  "aucun refus D > E^i. Existence du maximum (résultat exact, contrôlée avant les itérations) : theta^ existe,",
+  "unique, si et seulement si C >= z, C somme sur les blocs (suites maximales de cellules exposées consécutives",
+  "qui comptent toutes des décès) d'un coût L s'il contient la première ou la dernière cellule exposée, L + 1 si",
+  "L est impair et L s'il est pair sinon ; refus lissage_maximum_inexistant si C < z. Algorithme de la source",
+  "(annexe D, algorithme 1) : départ theta_0 = ln(max(D, epsilon) / E^c) où E^c > 0 ; itérations de Newton",
+  "poursuivies tant que la déviance pénalisée décroît d'au moins EPSILON_DEVIANCE_LISSAGE en relatif (« < » au",
+  "lieu du « <= » de la source, pour arrêter à l'égalité). Règles non tirées de la source, reprises du code de WH",
+  "2.0.0 : valeur epsilon = EPSILON_DEPART_LISSAGE et theta_0 = 0 aux cellules sans exposition ; réponse de",
+  "travail z = theta aux cellules sans exposition ; divisions du pas par deux tant que la",
   "déviance pénalisée croît ou n'est pas finie. Règles de l'outil, non tirées de la source : réponse de",
   "travail theta - 1 aux cellules exposées sans décès (D / m pris nul, valeur exacte pour m > 0, conservée",
-  "quand m est arrondi à 0) ; à l'épuisement des divisions du pas, arrêt au dernier itéré si la diminution",
+  "quand m est arrondi à 0) ; arrêt après un pas raccourci seulement si le décrément de Newton du pas complet",
+  "d'(W + P)d est au plus EPSILON_DEVIANCE_LISSAGE |dev_P| + epsilon machine x somme des D, poursuite sinon ;",
+  "à l'épuisement des divisions du pas, arrêt au dernier itéré si la diminution",
   "de la déviance pénalisée prédite par le pas de Newton (décrément d'(W + P)d) est au plus",
   "EPSILON_DEVIANCE_LISSAGE |dev_P| + epsilon machine x somme des D, refus lissage_non_convergent sinon ; rang",
   "numérique du système perdu : refus lissage_systeme_rang_deficient à la première itération ou au maximum,",
@@ -151,6 +161,11 @@ STATUTS_LISSAGE <- local({
     c("segments/ddl_effectifs",
       paste("trace de (W + h K'K)^-1 W, définition des degrés de liberté effectifs du cas normal ; approximation",
             "numérique (QR)")),
+    c("segments/dimension_non_penalisee",
+      paste("résultat exact : dimension du noyau de la pénalité S (polynômes de degré au plus z - 1 en l'âge,",
+            "échelle q), égale à l'ordre des différences z ; entier, sans calcul flottant ; lue par la validation",
+            "(relation lissee) pour reconnaître, par la structure, un segment où le lissage interpole (nombre de",
+            "cellules pondérées (levier > 0) égal à cette dimension)")),
     c("segments/fidelite", descriptif),
     c("segments/regularite", descriptif),
     c("segments/critere", descriptif),
@@ -200,17 +215,28 @@ STATUTS_LISSAGE_POISSON <- local({
             "lambda_a_la_borne, lambda retenu = la borne déclarée, sans recherche de Brent), d'un critère approché",
             "(approximation de Laplace, exacte dans le seul cas",
             "normal) ; unimodalité non établie ; approximation numérique, de",
-            "précision fixée par mesure (classe optimisation) ; état lambda_a_la_borne si le meilleur point de la",
-            "grille est une borne")),
+            "précision fixée par mesure (classe optimisation) ; plancher de bruit : la LAML est plate au voisinage",
+            "de son maximum et son bruit d'arrondi déplace lambda^ au-delà de la tolérance de Brent (1e-6 en ln",
+            "lambda), de l'ordre de 1e-5 en relatif sur un jeu simulé de 71 âges par segment (constat de mesure :",
+            "jusqu'à 2,1e-5 sous permutation des lignes de l'entrée) ; état lambda_a_la_borne si le meilleur point",
+            "de la grille est une borne")),
     c("segments/ddl_effectifs",
       paste("trace de (W + P)^-1 W, W à la convergence ; définition du cas normal transposée ; approximation",
             "numérique")),
+    c("segments/dimension_non_penalisee",
+      paste("résultat exact : dimension du noyau de la pénalité S (polynômes de degré au plus z - 1 en l'âge,",
+            "échelle ln mu), égale à l'ordre des différences z ; entier, sans calcul flottant ; lue par la",
+            "validation (relation lissee) pour reconnaître, par la structure, un segment où le lissage interpole",
+            "(nombre de cellules exposées (levier > 0) égal à cette dimension)")),
     c("segments/regularite", paste("descriptif, arithmétique flottante : somme des (Delta^z theta^)^2, échelle",
                                    "ln mu")),
     c("segments/laml",
       paste("approximation de Laplace de la vraisemblance marginale (Biessy, § 5.4, p. 19), exacte dans le seul cas",
             "normal ; valeur calculée au maximum approché, approximation numérique ; log-vraisemblance de la source",
-            "(§ 4.1), sans le terme - somme des ln D! (constant en lambda)")),
+            "(§ 4.1), sans le terme - somme des ln D! (constant en lambda) ; terme ln |K'K|+ (constant en lambda)",
+            "par forme close exacte, somme sur j de 0 à z - 1 de [2 ln j! - ln (2j)! - ln (2j + 1)! + somme sur k",
+            "de -j à j de ln(n + k)] (résultat exact ; valeur calculée par lgamma et log, à quelques unités de",
+            "dernier rang près)")),
     c("segments/deviance_penalisee",
       "valeur de la déviance pénalisée en theta^ calculé (minimum approché), approximation numérique"),
     c("segments/residu_conservation_0", residu),
@@ -440,14 +466,52 @@ iteration_pirls <- function(theta, D, Ec, pond, A) {
   list(fini = TRUE, rang = Q$rank, theta = qr.coef(Q, c(r * zk, numeric(nrow(A)))), racine_m = r)
 }
 
-# ln |K'K|+ (spécification de forme, § 2) : somme des logarithmes des n - z
-# plus grandes valeurs propres de K'K, K = diff(diag(n), differences = z)
-# (eigen(symmetric = TRUE, only.values = TRUE), valeurs décroissantes) ; ne
-# dépend que de n et z. ln |P|+ = (n - z) ln lambda + ce terme. Rend un
-# double.
+# ln |K'K|+, K = diff(diag(n), differences = z) (#249, point 1 ; ADR 0017,
+# annotation du 26/11/2026, point 9.5) : forme close exacte, ln det(K K') =
+# somme sur j de 0 à z - 1 de [2 ln j! - ln (2j)! - ln (2j + 1)! + somme sur
+# k de -j à j de ln(n + k)], évaluée par lgamma() et log() (à quelques
+# unités de dernier rang près ; ne dépend que de n et z ; coût O(z)), au
+# lieu de la somme des logarithmes des n - z plus grandes valeurs propres
+# par eigen() (erreur remesurée le 26/11/2026 : -1,35e-6 à n = 71,
+# z = 4). ln |P|+ = (n - z) ln lambda + ce terme. Rend un double.
 log_det_penalite <- function(n, z) {
-  s <- eigen(crossprod(diff(diag(n), differences = z)), symmetric = TRUE, only.values = TRUE)$values
-  sum(log(s[seq_len(n - z)]))
+  sum(vapply(0:(z - 1), function(j) 2 * lgamma(j + 1) - lgamma(2 * j + 1) - lgamma(2 * j + 2) +
+                                      sum(log(n + (-j):j)), 0))
+}
+
+# Décompte C de la condition d'existence du maximum de wh_poisson (#247 ;
+# ADR 0017, annotation du 26/11/2026, point 15) : expose (E^c > 0) et deces
+# (D > 0), indicateurs logiques des cellules d'un segment dans l'ordre des
+# âges. Sur la suite des cellules exposées (une cellule sans exposition est
+# ignorée et ne sépare pas deux cellules exposées), un bloc est une suite
+# maximale de cellules qui comptent toutes des décès ; un bloc de longueur L
+# coûte L s'il contient la première ou la dernière cellule exposée, sinon
+# L + 1 si L est impair, L s'il est pair. Rend la somme des coûts (integer),
+# sans arithmétique flottante. Le maximum de la vraisemblance pénalisée
+# existe, unique, si et seulement si C >= z (résultat exact, sous au moins z
+# cellules exposées, première et dernière cellules de la plage exposées).
+decompte_maximum <- function(expose, deces) {
+  a <- deces[expose]
+  n <- length(a)
+  if (!n) return(0L)
+  r <- rle(a)
+  fin <- cumsum(r$lengths)
+  L <- r$lengths[r$values]
+  bord <- (fin - r$lengths == 0L | fin == n)[r$values]
+  as.integer(sum(ifelse(bord, L, L + L %% 2L)))
+}
+
+# Règle d'arrêt d'une itération de wh_poisson (#249, point 2 ; règle de
+# l'outil) : dev, dev_n déviances pénalisées de l'itéré et du candidat
+# accepté ; j nombre de divisions du pas faites ; decrement : décrément de
+# Newton du pas complet d'(W + P)d (lu seulement si j > 0) ; seuil =
+# EPSILON_DEVIANCE_LISSAGE |dev| + .Machine$double.eps x somme des D. Arrêt
+# si et seulement si dev_n >= (1 - EPSILON_DEVIANCE_LISSAGE) dev et, après
+# un pas raccourci (j > 0), decrement fini et au plus seuil : une
+# déviance qui ne décroît plus après des demi-pas n'arrête que si le pas
+# complet ne prédit plus de diminution résoluble. Rend TRUE ou FALSE.
+arret_pirls <- function(dev, dev_n, j, decrement, seuil) {
+  dev_n >= (1 - EPSILON_DEVIANCE_LISSAGE) * dev && (j == 0L || (is.finite(decrement) && decrement <= seuil))
 }
 
 # Maximum de la vraisemblance de Poisson pénalisée d'un segment à lambda
@@ -463,8 +527,10 @@ log_det_penalite <- function(n, z) {
 # épuisement, arrêt au dernier itéré si le décrément de Newton d'(W + P)d,
 # d pas complet, est fini et au plus EPSILON_DEVIANCE_LISSAGE |dev_P| +
 # .Machine$double.eps x somme des D (diminution non résoluble : convergence
-# numérique, règle de l'outil), sinon non convergence ; poursuite si et
-# seulement si dev_new < (1 - EPSILON_DEVIANCE_LISSAGE) dev_old ; plafond
+# numérique, règle de l'outil), sinon non convergence ; arrêt selon
+# arret_pirls() (dev_new >= (1 - EPSILON_DEVIANCE_LISSAGE) dev_old et, après
+# des divisions du pas, même condition sur le décrément ; #249, point 2),
+# poursuite sinon ; plafond
 # ITERATIONS_MAX_LISSAGE itérations. Rang numérique perdu : à la première
 # itération (depuis theta_0) ou au maximum, rang_deficient (lambda trop grand
 # pour la tolérance de rang de qr()) ; à une itération suivante, non
@@ -488,6 +554,12 @@ lisser_poisson <- function(D, Ec, lambda, z, x, log_det_p, epsilon = EPSILON_DEP
   dev <- deviance_penalisee(theta, D, Ec, pond, lambda, z)
   plancher <- .Machine$double.eps * sum(D)
   echec <- function(statut, k) list(statut = statut, iterations = k)
+  # Décrément de Newton du pas complet d'(W + P)d depuis theta (it : itération
+  # de Newton depuis theta).
+  decrement_newton <- function(it, theta) {
+    pas <- it$theta - theta
+    sum((it$racine_m * pas)^2) + lambda * somme_differences_carrees(pas, z)
+  }
   k <- 0L
   repeat {
     if (k >= ITERATIONS_MAX_LISSAGE) return(echec("non_convergent", k))
@@ -500,8 +572,7 @@ lisser_poisson <- function(D, Ec, lambda, z, x, log_det_p, epsilon = EPSILON_DEP
     numerique <- FALSE
     while (!is.finite(dev_n) || dev_n > dev) {
       if (j >= DEMI_PAS_MAX_LISSAGE) {
-        pas <- it$theta - theta
-        decrement <- sum((it$racine_m * pas)^2) + lambda * somme_differences_carrees(pas, z)
+        decrement <- decrement_newton(it, theta)
         if (is.finite(decrement) && decrement <= EPSILON_DEVIANCE_LISSAGE * abs(dev) + plancher) {
           numerique <- TRUE
           break
@@ -514,10 +585,11 @@ lisser_poisson <- function(D, Ec, lambda, z, x, log_det_p, epsilon = EPSILON_DEP
     }
     if (numerique) break
     k <- k + 1L
-    continuer <- dev_n < (1 - EPSILON_DEVIANCE_LISSAGE) * dev
+    arret <- arret_pirls(dev, dev_n, j, if (j > 0L) decrement_newton(it, theta) else NA_real_,
+                         EPSILON_DEVIANCE_LISSAGE * abs(dev) + plancher)
     theta <- nouveau
     dev <- dev_n
-    if (!continuer) break
+    if (arret) break
   }
   m <- numeric(n)
   m[pond] <- exp(theta[pond]) * Ec[pond]
@@ -597,11 +669,14 @@ choisir_lambda_poisson <- function(D, Ec, z, x, intervalle, log_det_p) {
 # évalué sur tous les segments, dans l'ordre : lissage_interpolation_deces_nul
 # (exactement z cellules pondérées, dont au moins une sans décès : la
 # vraisemblance pénalisée interpole, ln mu tend vers -infini à la cellule
-# sans décès ; avis d'actuary, Q4 de #239) ; lissage_systeme_rang_deficient
+# sans décès ; avis d'actuary, Q4 de #239) ; lissage_maximum_inexistant
+# (C < z, C = decompte_maximum() : aucun maximum fini quels que soient lambda
+# et les effectifs ; #247, ADR 0017, annotation du 26/11/2026, point 15),
+# avant log_det_penalite() et toute itération ; lissage_systeme_rang_deficient
 # (rang numérique perdu à la première itération, depuis theta_0, ou au
-# maximum) ; lissage_non_convergent (plafond d'itérations, recherche linéaire
-# épuisée sans convergence numérique, ou rang numérique perdu à une itération
-# suivante). Bornes de crédibilité theta^ ± z_alpha
+# maximum) ; lissage_non_convergent (maximum existant, C >= z ; plafond
+# d'itérations, recherche linéaire épuisée sans convergence numérique, ou rang
+# numérique perdu à une itération suivante). Bornes de crédibilité theta^ ± z_alpha
 # sqrt(V_ii), z_alpha = qnorm((1 - niveau) / 2, lower.tail = FALSE), image
 # par q = -expm1(-exp(.)). État de ligne : interpolee si E^c = 0
 # (prioritaire), sinon qx_arrondi_un si qx ou une borne vaut 1, sinon
@@ -634,6 +709,26 @@ lisser_segments_poisson <- function(cel, g_seg, segs, par_segment, segmentation,
                                       collapse = ", "))
                      }, "")), collapse = " ; ")),
             list(plage_ages = plage_ages, ordre_difference = z, segments = segs[interpolation_nulle, , drop = FALSE]))
+  # C < z : aucun maximum fini, quels que soient lambda et les effectifs (#247).
+  decompte <- vapply(par_segment, function(i) decompte_maximum(pondere[i], D[i] > 0), 0L, USE.NAMES = FALSE)
+  sans_maximum <- which(decompte < z)
+  if (length(sans_maximum))
+    refuser("lissage", "lissage_maximum_inexistant",
+            formuler(paste("Lissage : %d segment(s) sans maximum fini de la vraisemblance de Poisson pénalisée sur la",
+                           "plage d'âges %d à %d (z = %d) : %s. Le maximum existe si et seulement si C >= z, C décompte",
+                           "des blocs de cellules exposées consécutives avec décès (un bloc de L cellules compte L s'il",
+                           "contient la première ou la dernière cellule exposée, sinon L arrondi au pair supérieur) ; la",
+                           "condition ne dépend ni de lambda ni des effectifs. Élargir la plage d'âges, regrouper des",
+                           "segments ou prendre ordre_difference au plus égal au plus petit C cité."),
+                     length(sans_maximum), p1, p2, as.integer(z),
+                     paste(paste0(segments_cites(sans_maximum), vapply(sans_maximum, function(s) {
+                       i <- par_segment[[s]]
+                       formuler(" (âge(s) avec décès : %s, C = %d)",
+                                paste(vapply(i[pondere[i] & D[i] > 0], function(j) formuler("%d", cel$age[j]), ""),
+                                      collapse = ", "), decompte[s])
+                     }, "")), collapse = " ; ")),
+            list(plage_ages = plage_ages, ordre_difference = z, segments = segs[sans_maximum, , drop = FALSE],
+                 decompte = decompte[sans_maximum]))
 
   x <- cel$age
   laml <- identical(critere_lissage, "laml")
@@ -682,8 +777,8 @@ lisser_segments_poisson <- function(cel, g_seg, segs, par_segment, segmentation,
             formuler(paste("Lissage : l'algorithme de la vraisemblance de Poisson pénalisée ne converge pas pour %s",
                            "(plafond de %d itérations atteint, déviance pénalisée non décroissante ou non finie après",
                            "%d divisions du pas sans convergence numérique, ou rang numérique du système perdu en",
-                           "cours d'itération) ; l'existence du maximum n'est pas établie pour ces données ; aucune",
-                           "table lissée n'est produite."),
+                           "cours d'itération) ; le maximum existe pour ces données (condition C >= z vérifiée avant",
+                           "les itérations) mais n'est pas atteint numériquement ; aucune table lissée n'est produite."),
                      paste(vapply(non_convergents, function(s)
                        formuler("%s, lambda = %.17g", segments_cites(s), lambda_echec[s]), ""), collapse = " ; "),
                      ITERATIONS_MAX_LISSAGE, DEMI_PAS_MAX_LISSAGE),
@@ -723,6 +818,7 @@ lisser_segments_poisson <- function(cel, g_seg, segs, par_segment, segmentation,
   segments$evenements <- denombrement_entier(deces, "lissage", "segments/evenements")
   segments$parametre_lissage <- lire("lambda")
   segments$ddl_effectifs <- lire("ddl_effectifs")
+  segments$dimension_non_penalisee <- rep(as.integer(z), n_seg)
   segments$regularite <- lire("regularite")
   segments$laml <- lire("laml")
   segments$deviance_penalisee <- lire("deviance_penalisee")
@@ -818,8 +914,8 @@ lisser_segments_poisson <- function(cel, g_seg, segs, par_segment, segmentation,
 # lissage_plage_bornee_sans_exposition (D11), lissage_cellules_insuffisantes,
 # lissage_sans_deces ; sous wh_poisson, lissage_interpolation_deces_nul
 # (exactement z cellules pondérées dont une sans décès : aucun maximum fini,
-# avis d'actuary, Q4 de #239), puis lissage_systeme_rang_deficient et
-# lissage_non_convergent ; sous wh_quadratique, lissage_systeme_rang_deficient
+# avis d'actuary, Q4 de #239), lissage_maximum_inexistant (C < z, #247),
+# puis lissage_systeme_rang_deficient et lissage_non_convergent ; sous wh_quadratique, lissage_systeme_rang_deficient
 # et lissage_taux_hors_domaine (D4, sans écrêtage). Rend list(parametres,
 # resultat (table_lissee, segments), diagnostics, avertissements (vide sous
 # wh_quadratique ; lambda_a_la_borne et qx_arrondi_un sous wh_poisson)).
@@ -1040,6 +1136,7 @@ calculer_lissage <- function(exposition, brut, segmentation, convention, methode
   segments$evenements <- denombrement_entier(deces, "lissage", "segments/evenements")
   segments$parametre_lissage <- rep(h, n_seg)
   segments$ddl_effectifs <- lire("ddl_effectifs")
+  segments$dimension_non_penalisee <- rep(as.integer(z), n_seg)
   segments$fidelite <- lire("fidelite")
   segments$regularite <- lire("regularite")
   segments$critere <- lire("critere")

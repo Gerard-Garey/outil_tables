@@ -49,6 +49,14 @@
 #  et durée imprimées), ligne « # rejeu » de la fiche égale à TEXTE_REJEU_FICHE.
 #  Table embarquée (#303, M520, sans référence nouvelle) : plan R10 sur
 #  TV 88-90 lue par son nom, fiche, rejeu (ligne 15 du bilan), rapport figé.
+#  Règle absolue à une échelle déclarée et régime de comparaison (#243 ; ADR
+#  0009, annotation du 26/11/2026) : décompte de TOLERANCES par classe,
+#  invariants d'ECHELLES_ABSOLUES et de CONSTATS_HORS_PLATEFORME, régime de
+#  chaque plan (regime_comparaison(), d'après les lignes « plateforme : » de
+#  l'en-tête commité) passé à la comparaison au fichier, régimes et verdicts
+#  imprimés par plan, verrou du régime strict (TABLEXP_IMAGE définie ou
+#  GITHUB_ACTIONS = true), témoins de la règle absolue et du régime sur des
+#  copies temporaires de R15 et de R16.
 #
 #  Usage (depuis la racine du dépôt) :
 #      Rscript tests/test_reproductibilite.R
@@ -455,6 +463,16 @@ CHEMINS_199 <- list(
 # apres_159(), transition_218() et les constantes *_159 et *_218 retirées. Le
 # bloc R11 et R12 de #218 (C4, recalcul indépendant, états, aucun signal) reste,
 # lu sur les références régénérées.
+# Transitions #242 (dimension du noyau de la pénalité, colonne integer
+# segments/dimension_non_penalisee et statuts, R15 à R17), #247 (condition
+# d'existence du maximum de wh_poisson, hypothèse du lissage de R16 et R17),
+# #248 (attribution des Lignes directrices et statuts de coherence_regularite,
+# R15) et #249 (forme close de ln |K'K|+, arrêt après demi-pas, plancher de bruit
+# de lambda^ ; R16 et R17) closes par la régénération unique (R) de B39
+# (exécution 45867016143, sur 972a0c5) ; transition_242(), transition_247(),
+# transition_248(), transition_249(), statuts_lissage_b39(),
+# hypothese_lissage_b39() et les constantes *_242, *_247, *_248 et *_249
+# retirées. Aucun bloc de test n'en dépendait : il ne reste rien à conserver.
 TRANSITIONS_EN_COURS <- list()
 # Transition #218 de la correction de theta_80 (B30, constat C1 de la revue
 # finale, c35eb9d) close par la seconde régénération (R′) de R1 à R17
@@ -685,10 +703,12 @@ aligner_reference <- function(ref, g, changements) {
 # TRUE si `g` ne diffère de `ref` que par les changements déclarés, tous
 # observés, sinon la raison (chaîne) : la référence alignée est comparée à `g`
 # comme dans le test ordinaire, aux tolérances près.
-seul_ecart <- function(ref, g, changements) {
+# `constats` : chemins de constat du plan en régime de constat (ADR 0009,
+# annotation du 26/11/2026, (f) 5), vide par défaut (strict).
+seul_ecart <- function(ref, g, changements, constats = character(0)) {
   r <- tryCatch(aligner_reference(ref, g, changements), error = function(e) e)
   if (inherits(r, "error")) return(conditionMessage(r))
-  if (comparer_references(r, g)$ok) TRUE
+  if (comparer_references(r, g, constats = constats)$ok) TRUE
   else "écart autre que les changements déclarés (référence alignée, comparaison en échec)"
 }
 
@@ -739,15 +759,16 @@ entree_inchangee <- function(ref, g, donnees, roles) {
 # attendu de la comparaison stricte ; sinon test ordinaire. `ref` et `strict`
 # (TRUE ou la raison de l'échec de la comparaison au fichier) ne sont évalués
 # que si le plan les exige. `donnees` et `roles` : l'entrée de référence, pour
-# la garde.
-controler_plan <- function(id, nom, ref, g, strict, transitions, donnees = NULL, roles = NULL) {
+# la garde. `constats` : chemins de constat du plan, passés à seul_ecart() en
+# régime de constat (vide : strict).
+controler_plan <- function(id, nom, ref, g, strict, transitions, donnees = NULL, roles = NULL, constats = character(0)) {
   t <- changements_du_plan(id, transitions)
   if (!length(t$changements)) return(verifier(nom, strict))
   chemins <- vapply(t$changements, `[[`, "", "chemin")
   verifier(sprintf("%s : seul écart à tests/reference/%s.tsv : %s (%s)", id, id,
                    paste(vapply(t$changements, decrire_changement, ""), collapse = " ; "),
                    paste(unique(t$issues), collapse = ", ")),
-           seul_ecart(ref, g, t$changements))
+           seul_ecart(ref, g, t$changements, constats))
   if (CHEMIN_EMPREINTE_DONNEES %in% chemins)
     verifier(sprintf("%s : garde 3.2 : entrée inchangée sous la représentation de la référence (%s)", id,
                      paste(unique(t$issues), collapse = ", ")),
@@ -1000,14 +1021,153 @@ verifier("TOLERANCES : aucune clé nue, sans « / » (point 3.4, #175)", {
 # coherence_regularite ; avis du 12/11/2026) : 191 clés, dont 60 exactes.
 # #218 : cinq clés ajoutées (trois constantes exactes, deux colonnes theta_80
 # à 1e-10) : 191 et 60 -> 196 et 63.
-verifier("TOLERANCES : 27 clés des dénombrements de #199 retirées, 196 clés dont 63 exactes (ADR 0009, point 9.6, (e) ; annotation du 12/11/2026, (e) ; #218)", {
+# #243 (ADR 0009, annotation du 26/11/2026, (d) 2) : trois clés de
+# coherence_regularite reclassées de 1e-14 à 1e-10, aucune clé ajoutée ni
+# retirée : 196 clés, exacte 63, 1e-14 39, 1e-12 75, 1e-10 8, optimisation 11.
+verifier("TOLERANCES : 27 clés des dénombrements de #199 retirées, 196 clés dont 63 exactes, 39 à 1e-14, 75 à 1e-12, 8 à 1e-10, 11 en optimisation (ADR 0009, point 9.6, (e) ; annotation du 12/11/2026, (e) ; #218 ; annotation du 26/11/2026, (d) 2)", {
   cles_199 <- sub("^etapes/", "", unlist(CHEMINS_199, use.names = FALSE))
   restantes <- intersect(cles_199, names(TOLERANCES))
+  par_classe <- vapply(CLASSES_TOLERANCE, function(v) sum(TOLERANCES == v), 0L)
+  attendu_ <- c(exacte = 63L, "1e-14" = 39L, "1e-12" = 75L, "1e-10" = 8L, optimisation = 11L)
   if (length(cles_199) != 27L || anyDuplicated(cles_199)) "CHEMINS_199 : 27 chemins distincts attendus"
   else if (length(restantes)) paste("clés encore présentes :", paste(restantes, collapse = ", "))
-  else if (length(TOLERANCES) != 196L || sum(TOLERANCES == 0) != 63L)
-    sprintf("%d clés dont %d exactes, au lieu de 196 et 63", length(TOLERANCES), sum(TOLERANCES == 0))
+  else if (length(TOLERANCES) != 196L || anyDuplicated(names(TOLERANCES)) || !identical(par_classe, attendu_))
+    sprintf("%d clés (%s), au lieu de 196 (%s)", length(TOLERANCES), paste(names(par_classe), par_classe, collapse = ", "),
+            paste(names(attendu_), attendu_, collapse = ", "))
+  else if (!all(TOLERANCES[paste0("coherence_regularite/resultat/regularite/", c("regularite", "r_estime", "regularite_r"))] == 1e-10))
+    "coherence_regularite/resultat/regularite/{regularite, r_estime, regularite_r} : classe 1e-10 attendue"
   else TRUE
+})
+# Règle absolue à une échelle déclarée (ADR 0009, annotation du 26/11/2026,
+# (b) 4 ; #243) : invariants de la déclaration, indépendants de toute donnée,
+# sauf (v), qui lit les fichiers commités. Rend les défauts (character(0) si
+# conforme) ; `references` : liste nommée des références lues.
+# Seuls les fichiers des plans de plans_reference() sont lus (tous les usages
+# de REFERENCES_LUES portent sur des identifiants de plan) : un fichier
+# orphelin, même malformé, n'arrête pas la batterie, il est nommé par le test
+# « aucune référence orpheline ». Une lecture qui échoue est consignée dans
+# `erreurs` (rapportée par verifier()), non propagée.
+lire_references_plans <- function(dossier, plans = plans_reference()) {
+  ids <- names(plans)[file.exists(file.path(dossier, paste0(names(plans), ".tsv")))]
+  lues <- list(); erreurs <- character(0)
+  for (id in ids) {
+    r <- tryCatch(lire_reference(file.path(dossier, paste0(id, ".tsv"))), error = function(e) e)
+    if (inherits(r, "error")) erreurs[[id]] <- conditionMessage(r) else lues[[id]] <- r
+  }
+  list(lues = lues, erreurs = erreurs)
+}
+.LECTURE_REFERENCES <- lire_references_plans(DOSSIER_REFERENCES)
+REFERENCES_LUES <- .LECTURE_REFERENCES$lues
+verifier("références des plans de plans_reference() : chaque fichier commité est lisible (lecture stricte)", {
+  e <- .LECTURE_REFERENCES$erreurs
+  if (length(e)) sprintf("%s : %s", names(e), e) else TRUE
+})
+verifier("témoin : un orphelin malformé (CRLF, sans LF final) n'arrête pas la lecture des plans ; seul le test des orphelines le nomme", {
+  d <- tempfile("references_"); dir.create(d); on.exit(unlink(d, recursive = TRUE))
+  file.copy(file.path(DOSSIER_REFERENCES, "R1.tsv"), file.path(d, "R1.tsv"))
+  writeBin(charToRaw("# x\r\nsans LF final"), file.path(d, "R99.tsv"))
+  lu <- lire_references_plans(d)
+  o <- references_orphelines(d)
+  # Un plan dont le fichier est malformé est signalé nommément, sans arrêt.
+  writeBin(charToRaw("# x\r\nsans LF final"), file.path(d, "R2.tsv"))
+  lu2 <- lire_references_plans(d)
+  if (!identical(names(lu$lues), "R1") || length(lu$erreurs)) "l'orphelin a été lu ou a produit une erreur"
+  else if (!identical(o, "R99.tsv")) "l'orphelin n'est pas nommé par references_orphelines()"
+  else if (!identical(names(lu2$erreurs), "R2") || !grepl("R2.tsv", lu2$erreurs[["R2"]], fixed = TRUE)) "plan malformé non nommé"
+  else TRUE
+})
+defauts_echelles <- function(echelles = ECHELLES_ABSOLUES, tolerances = TOLERANCES, references = REFERENCES_LUES,
+                             classes = CLASSES_ABSOLUES) {
+  d <- defauts_forme_echelles(echelles, classes)
+  if (length(d) && startsWith(d[1L], "table :")) return(d)
+  hors <- echelles$cle[!echelles$cle %in% names(tolerances)]
+  if (length(hors)) d <- c(d, sprintf("cle %s absente de TOLERANCES (i)", hors))
+  doubles <- unique(unlist(lapply(references, function(r) names(r$types)[r$types == "double"]), use.names = FALSE))
+  mortes <- echelles$cle[!vapply(echelles$cle, function(k) any(cle_couvre(k, doubles)), NA)]
+  if (length(mortes)) d <- c(d, sprintf("déclaration morte : %s ne couvre aucun chemin double des références (v)", mortes))
+  d
+}
+CLES_ECHELLES_ATTENDUES <- c("lissage/resultat/segments/residu_conservation_0", "lissage/resultat/segments/residu_conservation_1",
+                             "validation/resultat/statistiques/valeur", "coherence_regularite/resultat/ages/delta1",
+                             "coherence_regularite/resultat/ages/delta2", "coherence_regularite/resultat/ordre_segments/ecart")
+verifier("ECHELLES_ABSOLUES : invariants (i) à (v) de la déclaration (clés de TOLERANCES, classes de CLASSES_ABSOLUES, facteurs finis > 0, couples (cle, selection) uniques et grammaire, aucune déclaration morte) (ADR 0009, annotation du 26/11/2026, (b) 4)", {
+  d <- defauts_echelles()
+  if (length(d)) d else TRUE
+})
+verifier("ECHELLES_ABSOLUES : (vi) six lignes, clés fixées ; CLASSES_ABSOLUES : deux classes, abs_1e-10 = 1e-10 et abs_1e-12 = 1e-12, distinctes de CLASSES_TOLERANCE (ADR 0009, annotation du 26/11/2026, (b) 1 et 4)", {
+  if (nrow(ECHELLES_ABSOLUES) != 6L || !identical(sort(ECHELLES_ABSOLUES$cle), sort(CLES_ECHELLES_ATTENDUES)))
+    sprintf("%d ligne(s), clés : %s", nrow(ECHELLES_ABSOLUES), paste(ECHELLES_ABSOLUES$cle, collapse = ", "))
+  else if (!identical(CLASSES_ABSOLUES, c("abs_1e-10" = 1e-10, "abs_1e-12" = 1e-12))) "CLASSES_ABSOLUES différente de la déclaration"
+  else if (any(names(CLASSES_ABSOLUES) %in% names(CLASSES_TOLERANCE))) "nom de classe absolue commun avec CLASSES_TOLERANCE"
+  else if (!identical(ECHELLES_ABSOLUES$facteur[match(CLES_ECHELLES_ATTENDUES, ECHELLES_ABSOLUES$cle)], c(1, 120, 1, 2, 4, 2)) ||
+           !identical(ECHELLES_ABSOLUES$classe[match(CLES_ECHELLES_ATTENDUES, ECHELLES_ABSOLUES$cle)], rep(c("abs_1e-10", "abs_1e-12"), each = 3L)))
+    "facteurs ou classes différents de l'annotation du 26/11/2026, (b) 2"
+  else TRUE
+})
+verifier("ECHELLES_ABSOLUES : (b) 5, échelles valides du côté de la référence dans chaque fichier commité qui porte un chemin couvert (aucune déclaration d'échelle invalide)", {
+  inv <- unlist(lapply(names(REFERENCES_LUES), function(id) {
+    r <- REFERENCES_LUES[[id]]
+    ch <- names(r$types)[r$types == "double"]
+    unlist(lapply(ch, function(c_) { e <- echelle_de(c_, r); if (!is.null(e) && length(e$invalide)) paste(id, c_, e$invalide) }))
+  }))
+  if (length(inv)) inv else TRUE
+})
+# Constat hors plateforme de référence (annotation du 26/11/2026, (f) 2) :
+# invariants de CONSTATS_HORS_PLATEFORME, dont la complétude pour R16 et R17.
+defauts_constats <- function(constats = CONSTATS_HORS_PLATEFORME, references = REFERENCES_LUES,
+                             hors_table = VALIDATION_HORS_TABLE_LISSEE) {
+  if (!is.data.frame(constats) || !identical(names(constats), c("plan", "chemin")) ||
+      !identical(vapply(constats, typeof, ""), c(plan = "character", chemin = "character")))
+    return("table : data.frame de colonnes plan et chemin (character) exigé")
+  d <- character(0)
+  inconnus <- setdiff(constats$plan, names(plans_reference()))
+  if (length(inconnus)) d <- c(d, sprintf("plan %s hors de plans_reference()", inconnus))
+  if (anyDuplicated(constats)) d <- c(d, "ligne (plan, chemin) répétée")
+  for (i in seq_len(nrow(constats))) {
+    r <- references[[constats$plan[i]]]
+    if (is.null(r) || !identical(unname(r$types[constats$chemin[i]]), "double"))
+      d <- c(d, sprintf("%s : %s n'est pas un chemin double du fichier du plan", constats$plan[i], constats$chemin[i]))
+  }
+  for (id in c("R16", "R17")) {
+    r <- references[[id]]
+    if (is.null(r)) { d <- c(d, sprintf("%s : référence absente", id)); next }
+    ch <- names(r$types)[r$types == "double" & startsWith(names(r$types), "etapes/validation/")]
+    finis <- ch[vapply(ch, function(c_) any(is.finite(r$valeurs[[c_]])), NA)]
+    non_classes <- setdiff(finis, c(constats$chemin[constats$plan == id], hors_table))
+    if (length(non_classes))
+      d <- c(d, sprintf("%s : double fini de etapes/validation/ ni déclaré ni indépendant de la table lissée : %s", id, non_classes))
+  }
+  d
+}
+verifier("CONSTATS_HORS_PLATEFORME : plans de plans_reference(), chemins double du fichier de leur plan, complétude pour R16 et R17 (tout double fini de etapes/validation/ déclaré ou dans VALIDATION_HORS_TABLE_LISSEE) (ADR 0009, annotation du 26/11/2026, (f) 2)", {
+  d <- defauts_constats()
+  if (length(d)) d else TRUE
+})
+verifier("CONSTATS_HORS_PLATEFORME : plans R15, R16, R17, vingt-six lignes (4, 11, 11), chemins de R16 et R17 identiques ; VALIDATION_HORS_TABLE_LISSEE : onze chemins, disjoints des déclarés (ADR 0009, annotation du 26/11/2026, (f) 2)", {
+  n <- table(CONSTATS_HORS_PLATEFORME$plan)
+  if (nrow(CONSTATS_HORS_PLATEFORME) != 26L || !identical(names(n), c("R15", "R16", "R17")) || !identical(as.integer(n), c(4L, 11L, 11L)))
+    sprintf("%d ligne(s), plans %s", nrow(CONSTATS_HORS_PLATEFORME), paste(names(n), n, collapse = ", "))
+  else if (!identical(CONSTATS_HORS_PLATEFORME$chemin[CONSTATS_HORS_PLATEFORME$plan == "R16"],
+                      CONSTATS_HORS_PLATEFORME$chemin[CONSTATS_HORS_PLATEFORME$plan == "R17"]))
+    "chemins de R16 et de R17 différents"
+  else if (length(VALIDATION_HORS_TABLE_LISSEE) != 11L || anyDuplicated(VALIDATION_HORS_TABLE_LISSEE) ||
+           length(intersect(VALIDATION_HORS_TABLE_LISSEE, CONSTATS_HORS_PLATEFORME$chemin)))
+    "VALIDATION_HORS_TABLE_LISSEE : onze chemins distincts, disjoints des chemins déclarés, attendus"
+  else TRUE
+})
+verifier("CONSTATS_HORS_PLATEFORME, témoins : chemin absent, chemin non double, plan inconnu, double fini nouveau non classé de la validation de R16 -> défauts", {
+  avec <- function(plan, chemin) rbind(CONSTATS_HORS_PLATEFORME, data.frame(plan = plan, chemin = chemin, stringsAsFactors = FALSE))
+  r16 <- REFERENCES_LUES[["R16"]]
+  nouveau <- "etapes/validation/resultat/cellules/grandeur_nouvelle"
+  r16$types[[nouveau]] <- "double"; r16$valeurs[[nouveau]] <- c(1, NA)
+  refs <- REFERENCES_LUES; refs[["R16"]] <- r16
+  d1 <- defauts_constats(avec("R16", "etapes/validation/resultat/cellules/inexistant"))
+  d2 <- defauts_constats(avec("R16", "etapes/validation/resultat/cellules/etat"))
+  d3 <- defauts_constats(avec("R99", "etapes/validation/resultat/cellules/qx_table"))
+  d4 <- defauts_constats(references = refs)
+  d5 <- defauts_constats(hors_table = VALIDATION_HORS_TABLE_LISSEE[-1L])
+  length(d1) == 1L && length(d2) == 1L && length(d3) == 2L && length(d4) == 1L && grepl(nouveau, d4, fixed = TRUE) &&
+    length(d5) == 2L && all(grepl(VALIDATION_HORS_TABLE_LISSEE[1L], d5, fixed = TRUE))
 })
 # Contrôle des types des dénombrements (ADR 0009, point 9.6, (f) ; #199, M396,
 # Q6) : tout chemin dont le dernier segment (nom de colonne ou de
@@ -1109,6 +1269,10 @@ controler_violations_table_construite <- function(x, segmentation) {
   if (all(v == "erreur")) TRUE else paste(sprintf("%s : %s", names(v)[v != "erreur"], v[v != "erreur"]), collapse = " ; ")
 }
 aplatis <- list()
+# Relevé de la plateforme d'exécution, une fois (ADR 0009, annotation du
+# 26/11/2026, (f) 3) ; régime et comparaison de chaque plan.
+PLATEFORME <- identifiant_plateforme(RACINE)
+REGIMES <- list(); COMPARAISONS <- list()
 for (p in plans_reference()) {
   id <- p$identifiant
   entree_p <- entrees_ref[[p$entree]]
@@ -1358,13 +1522,28 @@ for (p in plans_reference()) {
     identical(lu$types, g$types) && identical(lu$valeurs, g$valeurs)
   })
   unlink(f)
+  # Régime de comparaison du plan (ADR 0009, annotation du 26/11/2026, (f) 3
+  # et 5) : calculé une fois, d'après les lignes « plateforme : » de l'en-tête
+  # du fichier commité et le relevé de la plateforme d'exécution ; en régime
+  # de constat, les chemins du plan de CONSTATS_HORS_PLATEFORME sont passés à
+  # la comparaison ordinaire et, sous transition, à seul_ecart().
+  f_p <- file.path(DOSSIER_REFERENCES, paste0(id, ".tsv"))
+  regime_p <- if (file.exists(f_p)) regime_comparaison(PLATEFORME, lire_reference(f_p)$entete)
+              else list(regime = "strict", raison = "fichier de référence absent", mixte = FALSE)
+  REGIMES[[id]] <- regime_p$regime
+  constats_p <- if (identical(regime_p$regime, "constat"))
+    CONSTATS_HORS_PLATEFORME$chemin[CONSTATS_HORS_PLATEFORME$plan == id] else character(0)
   comparer_au_fichier <- function(id, g) {
     f <- file.path(DOSSIER_REFERENCES, paste0(id, ".tsv"))
     if (!file.exists(f)) return(sprintf("fichier de référence absent : tests/reference/%s.tsv", id))
-    r <- comparer_references(lire_reference(f), g)
-    cat(imprimer_comparaison(r, sprintf("  -- %s : tests/reference/%s.tsv contre l'objet recalculé", id, id)), sep = "\n")
+    r <- comparer_references(lire_reference(f), g, constats = constats_p)
+    COMPARAISONS[[id]] <<- r
+    cat(imprimer_comparaison(r, sprintf("  -- %s : tests/reference/%s.tsv contre l'objet recalculé (régime du plan : %s ; %s%s)", id, id,
+                                        regime_p$regime, regime_p$raison,
+                                        if (isTRUE(regime_p$mixte)) " ; mention : régime strict, aucun échec nouveau" else "")), sep = "\n")
     if (r$ok) TRUE else sprintf("comparaison en échec (%d écart(s) structurel(s), %d grandeur(s) en écart ou sans tolérance%s)",
-                                length(r$structure), sum(!r$grandeurs$verdict %in% c("identique", "sous tolérance")),
+                                length(r$structure), sum(!(r$grandeurs$verdict %in% c("identique", VERDICT_CONSTAT) |
+                                                           grepl("^sous tol", r$grandeurs$verdict, useBytes = TRUE))),
                                 if (r$entree$differente) ", entrée différente" else "")
   }
   nom <- sprintf("%s (%s) : comparaison à tests/reference/%s.tsv", id, p$description, id)
@@ -1376,8 +1555,27 @@ for (p in plans_reference()) {
   else if (id %in% names(SANS_REFERENCE))
     verifier(nom, sprintf("tests/reference/%s.tsv existe : retirer %s de SANS_REFERENCE", id, id))
   else controler_plan(id, nom, lire_reference(file.path(DOSSIER_REFERENCES, paste0(id, ".tsv"))), g,
-                      comparer_au_fichier(id, g), TRANSITIONS_EN_COURS, entree_p$donnees, entree_p$roles)
+                      comparer_au_fichier(id, g), TRANSITIONS_EN_COURS, entree_p$donnees, entree_p$roles, constats_p)
 }
+# Régimes et verdicts par plan (ADR 0009, annotation du 26/11/2026, (g) 1).
+cat("  Régimes de comparaison et verdicts par plan (identique / sous tolérance / constat / écart) :\n")
+for (id in names(COMPARAISONS)) {
+  # Verdicts comparés sur leur motif ASCII ou aux constantes de l'outillage :
+  # un littéral non ASCII de ce fichier n'est pas marqué en locale C.
+  v <- COMPARAISONS[[id]]$grandeurs$verdict
+  sous <- grepl("^sous tol", v, useBytes = TRUE)
+  cat(sprintf("    %s : régime %s ; %d / %d / %d / %d\n", id, REGIMES[[id]], sum(v == "identique"), sum(sous),
+              sum(v == VERDICT_CONSTAT), sum(!(v == "identique" | sous | v == VERDICT_CONSTAT))))
+}
+# Verrou en conditions réelles ((g) 3) : une exécution qui se déclare sur
+# l'image de référence (TABLEXP_IMAGE définie) ou sur la CI (GITHUB_ACTIONS =
+# true) exige le régime strict pour chaque plan ; il ne peut que faire
+# échouer. Sans objet sur un poste.
+verrou <- verrou_regimes(unlist(REGIMES), vapply(COMPARAISONS, function(r) length(r$constats), 0L))
+if (is.na(verrou)) {
+  cat("  [sans objet] verrou du régime strict : ni TABLEXP_IMAGE définie (même vide), ni GITHUB_ACTIONS = true (poste)\n")
+} else verifier(sprintf("verrou : exécution déclarée sur la plateforme de référence -> régime strict pour chacun des %d plans (ADR 0009, annotation du 26/11/2026, (g) 3)",
+                        length(REGIMES)), verrou)
 verifier("aucune référence orpheline sous tests/reference/ (point 3.7)", {
   o <- if (dir.exists(DOSSIER_REFERENCES)) references_orphelines(DOSSIER_REFERENCES) else character(0)
   if (length(o)) paste("orphelines :", paste(o, collapse = ", ")) else TRUE
@@ -1677,13 +1875,17 @@ verifier("témoin : clé retenue pour kaplan_meier/taux = brut/resultat/kaplan_m
     any(grepl("clé retenue : etapes/brut/resultat/kaplan_meier/taux -> brut/resultat/kaplan_meier/taux (classe 1e-12 ; aussi : kaplan_meier/taux)",
               imprimer_comparaison(r), fixed = TRUE, useBytes = TRUE))
 })
-verifier("témoin : impression d'un écart (chemin, avant et après en %.17g, tolérance, verdict) et de chaque classe de CLASSES_TOLERANCE", {
+verifier("témoin : impression d'un écart (chemin, avant et après en %.17g, tolérance, verdict), de chaque classe de CLASSES_TOLERANCE (cinq) et de CLASSES_ABSOLUES (deux), du régime et des compteurs de constats et de déclarations d'échelle invalides", {
   avant <- alterer(P_TAUX, 1 + 2e-14)
   r <- comparer_references(avant, base)
   l <- imprimer_comparaison(r)
   e <- r$grandeurs[r$grandeurs$chemin == P_TAUX, ]
   sum(grepl("Écart relatif maximal, classe", l, fixed = TRUE, useBytes = TRUE)) == length(CLASSES_TOLERANCE) &&
     length(CLASSES_TOLERANCE) == 5L &&
+    sum(grepl("Écart rapporté à facteur x échelle maximal, classe abs_", l, fixed = TRUE, useBytes = TRUE)) == length(CLASSES_ABSOLUES) &&
+    length(CLASSES_ABSOLUES) == 2L &&
+    any(grepl("Régime de la comparaison : strict", l, fixed = TRUE, useBytes = TRUE)) &&
+    any(grepl("; 0 constat(s) hors plateforme de référence ; 0 déclaration(s) d'échelle invalide(s)", l, fixed = TRUE, useBytes = TRUE)) &&
     any(grepl(sprintf("%s | 149 | 1 | ", P_TAUX), l, fixed = TRUE, useBytes = TRUE)) &&
     any(grepl(sprintf("| %s | %s | 1e-14 | écart", e$avant, e$apres), l, fixed = TRUE, useBytes = TRUE)) &&
     identical(e$avant, sprintf("%.17g", avant$valeurs[[P_TAUX]][e$position])) &&
@@ -1997,6 +2199,267 @@ for (cas in list(list(a = Inf, b = -Inf, nom = "Inf contre -Inf"), list(a = NA_r
     attendu(r, FALSE, "x", "écart")
   })
 }
+# Règle absolue à une échelle déclarée et régime de comparaison (ADR 0009,
+# annotation du 26/11/2026, (g) 2 et 3 ; #243) : témoins sur des copies
+# temporaires de R15 et de R16 (fichiers copiés puis lus ; rien n'est écrit
+# sous tests/reference/). Chaque copie altérée repasse par le fichier
+# (par_fichier()). S est lue du côté de la référence ; la borne d'un élément
+# est tau x facteur x S.
+copie_reference <- function(id) {
+  f <- tempfile(paste0("reference_", id, "_"), fileext = ".tsv"); on.exit(unlink(f))
+  file.copy(file.path(DOSSIER_REFERENCES, paste0(id, ".tsv")), f)
+  lire_reference(f)
+}
+REF15 <- copie_reference("R15"); REF16 <- copie_reference("R16")
+modifier <- function(ref, chemin, i, valeur) { ref$valeurs[[chemin]][i] <- valeur; ref }
+CH_R0 <- "etapes/lissage/resultat/segments/residu_conservation_0"
+CH_R1 <- "etapes/lissage/resultat/segments/residu_conservation_1"
+CH_STAT <- "etapes/validation/resultat/statistiques/valeur"
+CH_D1 <- "etapes/coherence_regularite/resultat/ages/delta1"
+CH_D2 <- "etapes/coherence_regularite/resultat/ages/delta2"
+CH_ECART <- "etapes/coherence_regularite/resultat/ordre_segments/ecart"
+ligne_stat <- function(ref, stat, grandeur) {
+  d <- dirname_chemin(CH_STAT)
+  which(ref$valeurs[[joindre(d, "statistique")]] == stat & ref$valeurs[[joindre(d, "grandeur")]] == grandeur)
+}
+# Un élément couvert par cas : premier élément fini (ligne smr/ecart pour
+# statistiques/valeur), sa borne tau x facteur x S lue sur la référence.
+CAS_ABSOLUS <- list(
+  list(ref = REF16, chemin = CH_R0, i = 1L), list(ref = REF16, chemin = CH_R1, i = 2L),
+  list(ref = REF16, chemin = CH_STAT, i = ligne_stat(REF16, "smr", "ecart")),
+  list(ref = REF15, chemin = CH_D1, i = which(is.finite(REF15$valeurs[[CH_D1]]))[1L]),
+  list(ref = REF15, chemin = CH_D2, i = which(is.finite(REF15$valeurs[[CH_D2]]))[1L]),
+  list(ref = REF15, chemin = CH_ECART, i = which(is.finite(REF15$valeurs[[CH_ECART]]))[1L]))
+borne_de <- function(cas) {
+  e <- echelle_de(cas$chemin, cas$ref)
+  e$tau[cas$i] * e$facteur[cas$i] * e$S[cas$i]
+}
+for (cas in CAS_ABSOLUS) for (q in c(0.9, 1.1)) {
+  attendu_v <- if (q < 1) "sous tolérance" else "écart"
+  verifier(sprintf("témoin (règle absolue) : %s, élément %d, altéré de %.1f tau x facteur x S -> « %s »", cas$chemin, cas$i, q, attendu_v), {
+    a <- cas$ref$valeurs[[cas$chemin]][cas$i]
+    r <- comparer_references(cas$ref, par_fichier(modifier(cas$ref, cas$chemin, cas$i, a + q * borne_de(cas))))
+    attendu(r, q < 1, cas$chemin, attendu_v)
+  })
+}
+for (cas in CAS_ABSOLUS[c(1L, 3L, 6L)]) {
+  verifier(sprintf("témoin (règle absolue) : %s, changement de signe sous la borne (0,3 contre -0,3 tau x facteur x S) -> « sous tolérance »", cas$chemin), {
+    B <- borne_de(cas)
+    ref <- par_fichier(modifier(cas$ref, cas$chemin, cas$i, 0.3 * B))
+    attendu(comparer_references(ref, par_fichier(modifier(cas$ref, cas$chemin, cas$i, -0.3 * B))), TRUE, cas$chemin, "sous tolérance")
+  })
+  verifier(sprintf("témoin (règle absolue) : %s, zéro contre non nul sous la borne (0 contre 0,5 tau x facteur x S) -> « sous tolérance »", cas$chemin), {
+    B <- borne_de(cas)
+    ref <- par_fichier(modifier(cas$ref, cas$chemin, cas$i, 0))
+    attendu(comparer_references(ref, par_fichier(modifier(cas$ref, cas$chemin, cas$i, 0.5 * B))), TRUE, cas$chemin, "sous tolérance")
+  })
+}
+verifier("témoin (règle absolue) : autre ligne de statistiques/valeur (smr/smr), non couverte, altérée de 2e-12 en relatif -> « écart » (règle relative, classe 1e-12)", {
+  i <- ligne_stat(REF16, "smr", "smr")
+  r <- comparer_references(REF16, par_fichier(modifier(REF16, CH_STAT, i, REF16$valeurs[[CH_STAT]][i] * (1 + 2e-12))))
+  isTRUE(attendu(r, FALSE, CH_STAT, "écart")) && identical(r$grandeurs$position[r$grandeurs$chemin == CH_STAT], i)
+})
+verifier("témoin (règle absolue) : valeur non finie (NaN) à un élément couvert -> écart structurel inchangé (position des valeurs non finies)", {
+  r <- comparer_references(REF16, par_fichier(modifier(REF16, CH_R0, 1L, NaN)))
+  isTRUE(attendu(r, FALSE, CH_R0, "écart")) && any(startsWith(r$structure, paste0(CH_R0, " : position des valeurs non finies")))
+})
+# Déclarations d'échelle invalides : (ix) sélection vide ou ambiguë, (vii)
+# échelle absente, (viii) échelle nulle, négative ou non finie, (x) plage
+# d'âges au-delà de 120 ; verdict « déclaration d'échelle invalide », plan en
+# échec, même si le vecteur est identique ; jamais de repli.
+avec_declaration <- function(ligne, selection, echelle) {
+  e <- ECHELLES_ABSOLUES; k <- match(ligne, e$cle); e$selection[k] <- selection; e$echelle[k] <- echelle; e
+}
+invalide_attendu <- function(r, chemin) {
+  if (r$ok) return("ok = TRUE au lieu de FALSE")
+  v <- verdict(r, chemin)
+  if (!identical(v, VERDICT_ECHELLE_INVALIDE)) return(sprintf("verdict « %s » pour %s", paste(v, collapse = ""), chemin))
+  if (!any(startsWith(r$echelles_invalides, paste0(chemin, " : ")))) return("raison non relevée dans echelles_invalides")
+  if (!any(grepl("DÉCLARATION D'ÉCHELLE INVALIDE", imprimer_comparaison(r), fixed = TRUE, useBytes = TRUE))) return("raison non imprimée")
+  TRUE
+}
+CLE_STAT <- "validation/resultat/statistiques/valeur"
+CLE_R0 <- "lissage/resultat/segments/residu_conservation_0"
+for (cas in list(
+  list(nom = "sélection vide (statistique=smr;grandeur=inexistante)", ech = avec_declaration(CLE_STAT, "statistique=smr;grandeur=inexistante", "statistique=smr;grandeur=observes"), chemin = CH_STAT),
+  list(nom = "sélection ambiguë (statistique=smr)", ech = avec_declaration(CLE_STAT, "statistique=smr", "statistique=smr;grandeur=observes"), chemin = CH_STAT),
+  list(nom = "échelle d'une sélection absente (grandeur=absente)", ech = avec_declaration(CLE_STAT, "statistique=smr;grandeur=ecart", "statistique=smr;grandeur=absente"), chemin = CH_STAT),
+  list(nom = "échelle égale à la sélection", ech = avec_declaration(CLE_STAT, "statistique=smr;grandeur=ecart", "statistique=smr;grandeur=ecart"), chemin = CH_STAT),
+  list(nom = "colonne de sélection absente (colonne_absente=smr)", ech = avec_declaration(CLE_STAT, "colonne_absente=smr", "statistique=smr;grandeur=observes"), chemin = CH_STAT),
+  list(nom = "colonne soeur d'échelle absente (evenements_absents)", ech = avec_declaration(CLE_R0, NA_character_, "evenements_absents"), chemin = CH_R0),
+  list(nom = "colonne soeur d'échelle de type character (sexe)", ech = avec_declaration(CLE_R0, NA_character_, "sexe"), chemin = CH_R0))) {
+  verifier(sprintf("témoin (règle absolue) : %s -> « déclaration d'échelle invalide », plan en échec (vecteur identique)", cas$nom),
+           invalide_attendu(comparer_references(REF16, REF16, echelles = cas$ech), cas$chemin))
+}
+CH_EVEN <- "etapes/lissage/resultat/segments/evenements"
+CH_QX15 <- "etapes/coherence_regularite/resultat/ages/qx"
+CH_GSUP <- "etapes/coherence_regularite/resultat/ordre_segments/g_superieure"
+for (cas in list(
+  list(nom = "evenements nul", ref = modifier(REF16, CH_EVEN, 1L, 0L), chemins = c(CH_R0, CH_R1)),
+  list(nom = "evenements négatif", ref = modifier(REF16, CH_EVEN, 1L, -5L), chemins = c(CH_R0, CH_R1)),
+  list(nom = "evenements manquant (NA, non fini)", ref = modifier(REF16, CH_EVEN, 1L, NA_integer_), chemins = c(CH_R0, CH_R1)),
+  list(nom = "ligne smr/observes nulle", ref = modifier(REF16, CH_STAT, ligne_stat(REF16, "smr", "observes"), 0), chemins = CH_STAT),
+  list(nom = "ligne smr/observes négative", ref = modifier(REF16, CH_STAT, ligne_stat(REF16, "smr", "observes"), -1), chemins = CH_STAT),
+  list(nom = "qx non fini (Inf)", ref = modifier(REF15, CH_QX15, which(is.finite(REF15$valeurs[[CH_D1]]) & is.finite(REF15$valeurs[[CH_D2]]))[1L], Inf),
+       chemins = c(CH_D1, CH_D2)),
+  list(nom = "g_superieure non finie (NaN)", ref = modifier(REF15, CH_GSUP, which(is.finite(REF15$valeurs[[CH_ECART]]))[1L], NaN), chemins = CH_ECART),
+  list(nom = "plage_ages du lissage au-delà de 120 (20 à 121)", ref = modifier(REF16, CHEMIN_PLAGE_LISSAGE, 2L, 121), chemins = CH_R1))) {
+  verifier(sprintf("témoin (règle absolue) : échelle invalide côté référence (%s) -> « déclaration d'échelle invalide » sur %s, plan en échec", cas$nom,
+                   paste(basename(cas$chemins), collapse = " et ")), {
+    ref <- par_fichier(cas$ref)
+    r <- comparer_references(ref, ref)
+    v <- vapply(cas$chemins, function(ch) isTRUE(invalide_attendu(r, ch)), NA)
+    autres <- r$grandeurs$verdict == VERDICT_ECHELLE_INVALIDE & !r$grandeurs$chemin %in% cas$chemins
+    if (all(v) && !any(autres)) TRUE else
+      sprintf("invalides : %s", paste(r$grandeurs$chemin[r$grandeurs$verdict == VERDICT_ECHELLE_INVALIDE], collapse = ", "))
+  })
+}
+verifier("témoin (règle absolue) : plage_ages du lissage à 120 -> déclaration valide (borne incluse) ; residu_conservation_0 non concerné par (x)", {
+  ref <- par_fichier(modifier(REF16, CHEMIN_PLAGE_LISSAGE, 2L, 120))
+  r <- comparer_references(ref, ref)
+  ref2 <- par_fichier(modifier(REF16, CHEMIN_PLAGE_LISSAGE, 2L, 121))
+  r2 <- comparer_references(ref2, ref2)
+  isTRUE(r$ok) && !length(r$echelles_invalides) && identical(verdict(r2, CH_R0), "identique")
+})
+verifier("témoin (invariants de la déclaration) : clé absente de TOLERANCES (i), classe inconnue (ii), facteur nul (iii), couple répété et grammaire (iv), déclaration morte (v) -> défauts", {
+  e <- ECHELLES_ABSOLUES
+  e_i <- rbind(e, data.frame(cle = "lissage/resultat/segments/inexistante", selection = NA_character_, echelle = "evenements",
+                             facteur = 1, classe = "abs_1e-10", stringsAsFactors = FALSE))
+  e_ii <- e; e_ii$classe[1L] <- "abs_1e-11"
+  e_iii <- e; e_iii$facteur[2L] <- 0
+  e_iv <- rbind(e, e[1L, ])
+  e_g <- e; e_g$selection[3L] <- "statistique==smr"
+  d_i <- defauts_echelles(e_i); d_ii <- defauts_echelles(e_ii); d_iii <- defauts_echelles(e_iii)
+  d_iv <- defauts_echelles(e_iv); d_g <- defauts_echelles(e_g)
+  d_v <- defauts_echelles(references = REFERENCES_LUES["R1"])
+  any(grepl("(i)", d_i, fixed = TRUE)) && any(grepl("(ii)", d_ii, fixed = TRUE)) && any(grepl("(iii)", d_iii, fixed = TRUE)) &&
+    any(grepl("répété", d_iv, fixed = TRUE, useBytes = TRUE)) && any(grepl("grammaire", d_g, fixed = TRUE)) &&
+    length(d_v) == 6L && all(grepl("(v)", d_v, fixed = TRUE)) && !length(defauts_echelles())
+})
+verifier("témoin (impression) : grandeur jugée par la règle absolue imprimée avec S, facteur et classe ; ligne de sa classe absolue non nulle", {
+  cas <- CAS_ABSOLUS[[1L]]
+  r <- comparer_references(cas$ref, par_fichier(modifier(cas$ref, cas$chemin, cas$i, cas$ref$valeurs[[cas$chemin]][cas$i] + 0.5 * borne_de(cas))))
+  l <- imprimer_comparaison(r)
+  S <- echelle_de(cas$chemin, cas$ref)$S[cas$i]
+  any(grepl(sprintf("règle absolue : |a - b| / (facteur x S) max 5e-11, S = %.17g, facteur = 1, classe abs_1e-10", S), l, fixed = TRUE, useBytes = TRUE)) &&
+    any(grepl("classe abs_1e-10 : 5e-11 (3 grandeur(s) double)", l, fixed = TRUE, useBytes = TRUE)) &&
+    any(grepl("classe abs_1e-12 : 0 (0 grandeur(s) double)", l, fixed = TRUE, useBytes = TRUE))
+})
+
+# Régime de comparaison ((f) 3) : table de vérité de regime_comparaison().
+LIGNES_A <- c("Image                     : x", "R                         : 4.3.3")
+LIGNES_B <- c("Image                     : y", "R                         : 4.3.3")
+entete_de <- function(l) c(identifiant = "R16", stats::setNames(l, rep("plateforme", length(l))), mode = "creation")
+verifier("régime : table de vérité de regime_comparaison() (défauts vides et en-tête identique ou différent, défauts non vides et en-tête identique ou sans ligne « plateforme : » -> strict ; défauts non vides et en-tête différent -> constat ; indétermination -> strict)", {
+  conf <- list(controle = LIGNES_A, defauts = character(0))
+  hors <- list(controle = LIGNES_A, defauts = "La_version() : 3.12.0 au lieu de 3.10.0")
+  cas <- list(
+    list(conf, entete_de(LIGNES_A), "strict", FALSE), list(conf, entete_de(LIGNES_B), "strict", TRUE),
+    list(hors, entete_de(LIGNES_A), "strict", FALSE), list(hors, c(identifiant = "R16", mode = "creation"), "strict", FALSE),
+    list(hors, entete_de(LIGNES_B), "constat", FALSE), list(hors, entete_de(LIGNES_A[1L]), "constat", FALSE),
+    list(hors, NULL, "strict", FALSE), list(list(controle = LIGNES_A, defauts = NA_character_), entete_de(LIGNES_B), "strict", FALSE),
+    list(NULL, entete_de(LIGNES_B), "strict", FALSE))
+  r <- vapply(cas, function(k) { x <- regime_comparaison(k[[1L]], k[[2L]]); identical(x$regime, k[[3L]]) && identical(x$mixte, k[[4L]]) }, NA)
+  if (all(r)) TRUE else paste("cas en défaut :", paste(which(!r), collapse = ", "))
+})
+verifier("régime : verrou_regimes() (TABLEXP_IMAGE définie, même vide, ou GITHUB_ACTIONS = true : tout plan strict exigé, sinon échec ; ni l'une ni l'autre : sans objet)", {
+  st <- c(R1 = "strict", R16 = "strict"); co <- c(R1 = "strict", R16 = "constat")
+  is.na(verrou_regimes(co, image = NA, github_actions = "")) && is.na(verrou_regimes(co, image = NA, github_actions = "false")) &&
+    isTRUE(verrou_regimes(st, image = "rocker/r-ver:4.3.3@sha256:0", github_actions = "")) &&
+    isTRUE(verrou_regimes(st, image = NA, github_actions = "true")) &&
+    is.character(verrou_regimes(co, image = "", github_actions = "")) &&
+    is.character(verrou_regimes(co, image = NA, github_actions = "true")) &&
+    grepl("R16", verrou_regimes(co, image = "x", github_actions = "true"), fixed = TRUE)
+})
+verifier("régime : verrou_regimes() avec les chemins de constat passés (tous plans strict, mais une comparaison a reçu des chemins de constat ; TABLEXP_IMAGE vide ou GITHUB_ACTIONS = true -> échec ; aucun chemin passé -> TRUE ; poste -> sans objet) (constat mineur 2 de l'audit léger)", {
+  st <- c(R1 = "strict", R16 = "strict")
+  avec <- c(R1 = 0L, R16 = 11L); sans <- c(R1 = 0L, R16 = 0L)
+  v1 <- verrou_regimes(st, avec, image = "", github_actions = "")
+  v2 <- verrou_regimes(st, avec, image = NA, github_actions = "true")
+  is.character(v1) && grepl("R16", v1, fixed = TRUE) && is.character(v2) &&
+    isTRUE(verrou_regimes(st, sans, image = "", github_actions = "")) &&
+    isTRUE(verrou_regimes(st, sans, image = NA, github_actions = "true")) &&
+    is.na(verrou_regimes(st, avec, image = NA, github_actions = ""))
+})
+# Régime de constat ((f) 4, (g) 3) sur une copie de R16 : chemins déclarés du
+# plan ; la condition de cause est remplie par un double de
+# etapes/lissage/resultat/ altéré sous sa tolérance (table_lissee/qx, classe
+# optimisation, x (1 + 1e-6)).
+CONSTATS_R16 <- CONSTATS_HORS_PLATEFORME$chemin[CONSTATS_HORS_PLATEFORME$plan == "R16"]
+CH_QXT <- "etapes/validation/resultat/cellules/qx_table"
+CH_LISSE <- "etapes/lissage/resultat/table_lissee/qx"
+lissage_altere <- function(ref = REF16) modifier(ref, CH_LISSE, 1L, ref$valeurs[[CH_LISSE]][1L] * (1 + 1e-6))
+qxt_altere <- function(ref) modifier(ref, CH_QXT, 1L, ref$valeurs[[CH_QXT]][1L] * (1 + 1e-9))
+verifier("régime : sur la plateforme de référence (strict), qx_table de R16 (déclaré, classe exacte) altéré de 1e-9 -> « écart », plan en échec", {
+  attendu(comparer_references(REF16, par_fichier(qxt_altere(lissage_altere()))), FALSE, CH_QXT, "écart")
+})
+verifier("régime : en régime de constat, même altération, un double du lissage altéré sous sa tolérance -> « constat hors plateforme de référence », compté et imprimé à part, plan non en échec", {
+  r <- comparer_references(REF16, par_fichier(qxt_altere(lissage_altere())), constats = CONSTATS_R16)
+  l <- imprimer_comparaison(r)
+  isTRUE(attendu(r, TRUE, CH_QXT, VERDICT_CONSTAT)) && meme(verdict(r, CH_LISSE), "sous tolérance") &&
+    any(grepl("; 1 constat(s) hors plateforme de référence ;", l, fixed = TRUE, useBytes = TRUE)) &&
+    any(grepl("NON JUGÉ hors plateforme de référence sur 1 chemin(s)", l, fixed = TRUE, useBytes = TRUE)) &&
+    any(grepl("Régime de la comparaison : constat hors plateforme de référence (11 chemin(s)", l, fixed = TRUE, useBytes = TRUE)) &&
+    any(grepl(sprintf("    %s | 142 | 1 | ", CH_QXT), l, fixed = TRUE, useBytes = TRUE))
+})
+verifier("régime : en régime de constat, lissage identique au bit près (condition de cause non remplie), même altération -> « écart », plan en échec", {
+  attendu(comparer_references(REF16, par_fichier(qxt_altere(REF16)), constats = CONSTATS_R16), FALSE, CH_QXT, "écart")
+})
+verifier("régime : en régime de constat, sous_groupes/smr (déclaré) altéré sous sa classe (5e-13) -> « sous tolérance », non constat", {
+  c_ <- "etapes/validation/resultat/sous_groupes/smr"; i <- which(is.finite(REF16$valeurs[[c_]]) & REF16$valeurs[[c_]] != 0)[1L]
+  g <- modifier(lissage_altere(), c_, i, REF16$valeurs[[c_]][i] * (1 + 5e-13))
+  attendu(comparer_references(REF16, par_fichier(g), constats = CONSTATS_R16), TRUE, c_, "sous tolérance")
+})
+for (cas in list(
+  list(nom = "table_lissee/qx (non déclaré) au-delà de 1e-3", chemin = CH_LISSE, facteur = 1 + 2e-3),
+  list(nom = "écho du plan validation/parametres/niveau (non déclaré)", chemin = "etapes/validation/parametres/niveau", facteur = 1 + 1e-9),
+  list(nom = "validation/resultat/cellules/taux_brut (double non déclaré de la validation)", chemin = "etapes/validation/resultat/cellules/taux_brut", facteur = 1 + 1e-12))) {
+  verifier(sprintf("régime : en régime de constat, lissage altéré, %s -> « écart », plan en échec", cas$nom), {
+    g <- lissage_altere(); v <- g$valeurs[[cas$chemin]]; i <- which(is.finite(v) & v != 0)[1L]
+    attendu(comparer_references(REF16, par_fichier(modifier(g, cas$chemin, i, v[i] * cas$facteur)), constats = CONSTATS_R16),
+            FALSE, cas$chemin, "écart")
+  })
+}
+verifier("régime : en régime de constat, clé d'un double du lissage (table_lissee/qx) retirée de TOLERANCES, lissage non altéré (« sans tolérance déclarée », valeurs identiques), qx_table (déclaré) altéré -> « écart », non constat : la cause exige une différence de valeur (constat mineur 1 de l'audit léger)", {
+  masque <- TOLERANCES[names(TOLERANCES) != "lissage/resultat/table_lissee/qx"]
+  r <- comparer_references(REF16, par_fichier(qxt_altere(REF16)), tolerances = masque, constats = CONSTATS_R16)
+  isTRUE(attendu(r, FALSE, CH_QXT, "écart")) && meme(verdict(r, CH_LISSE), "sans tolérance déclarée") &&
+    !any(r$grandeurs$verdict == VERDICT_CONSTAT)
+})
+jamais_constat <- function(r, motif) {
+  if (r$ok) return("ok = TRUE au lieu de FALSE")
+  if (any(r$grandeurs$verdict == VERDICT_CONSTAT)) return("constat relevé")
+  if (!is.null(motif) && !any(grepl(motif, r$structure, fixed = TRUE, useBytes = TRUE))) return(sprintf("structure sans « %s »", motif))
+  TRUE
+}
+verifier("régime : en régime de constat, lissage altéré, sur qx_table (déclaré) : type changé, chemin retiré, chemin ajouté, position d'une valeur non finie déplacée -> échec structurel, jamais constat", {
+  g <- qxt_altere(lissage_altere())
+  g_type <- g; g_type$types[[CH_QXT]] <- "character"; g_type$valeurs[[CH_QXT]] <- sprintf("%.17g", g$valeurs[[CH_QXT]])
+  g_nf <- modifier(g, CH_QXT, 2L, NA_real_)
+  c(type = jamais_constat(comparer_references(REF16, par_fichier(g_type), constats = CONSTATS_R16), paste(CH_QXT, ": type")),
+    retire = jamais_constat(comparer_references(REF16, par_fichier(retirer(g, CH_QXT)), constats = CONSTATS_R16), paste(CH_QXT, ": manquant")),
+    ajoute = jamais_constat(comparer_references(par_fichier(retirer(REF16, CH_QXT)), par_fichier(g), constats = CONSTATS_R16), paste(CH_QXT, ": en trop")),
+    non_fini = jamais_constat(comparer_references(REF16, par_fichier(g_nf), constats = CONSTATS_R16), paste(CH_QXT, ": position des valeurs non finies"))) -> v
+  if (all(v == "TRUE")) TRUE else paste(names(v)[v != "TRUE"], v[v != "TRUE"], sep = " : ")
+})
+verifier("régime : en régime de constat, lissage altéré, empreinte des données altérée -> « entrée différente », échec, qx_table altéré en « écart », jamais constat", {
+  g <- qxt_altere(lissage_altere()); g$valeurs[[CHEMIN_EMPREINTE_DONNEES]] <- strrep("0", 32L)
+  r <- comparer_references(REF16, par_fichier(g), constats = CONSTATS_R16)
+  isTRUE(jamais_constat(r, NULL)) && isTRUE(r$entree$differente) && meme(verdict(r, CH_QXT), "écart")
+})
+verifier("régime : en régime de constat, lissage altéré, élément couvert de statistiques/valeur (smr/ecart, déclaré) altéré au-delà de 1,1 tau x facteur x S -> constat ; même altération en régime strict -> écart", {
+  cas <- CAS_ABSOLUS[[3L]]
+  g <- modifier(lissage_altere(), CH_STAT, cas$i, REF16$valeurs[[CH_STAT]][cas$i] + 1.1 * borne_de(cas))
+  isTRUE(attendu(comparer_references(REF16, par_fichier(g), constats = CONSTATS_R16), TRUE, CH_STAT, VERDICT_CONSTAT)) &&
+    isTRUE(attendu(comparer_references(REF16, par_fichier(g)), FALSE, CH_STAT, "écart"))
+})
+verifier("régime : seul_ecart() strict par défaut, constat sur demande (référence alignée sans changement de valeur sur ce chemin)", {
+  g <- qxt_altere(lissage_altere())
+  ch <- list(list(chemin = "etapes/validation/resultat/temoin_ajout", nature = "ajout", type = "integer", longueur = 1))
+  g2 <- g; g2$types[[ch[[1L]]$chemin]] <- "integer"; g2$valeurs[[ch[[1L]]$chemin]] <- 1L
+  g2 <- par_fichier(g2)
+  is.character(seul_ecart(REF16, g2, ch)) && isTRUE(seul_ecart(REF16, g2, ch, CONSTATS_R16))
+})
 # Refus d'écriture (point 2.3) : classe ou attribut hors format, avec le
 # chemin fautif ; rien n'est converti en silence.
 x6_ref <- construire_table(jeu_ref$donnees, jeu_ref$roles, plans_reference()$R6$plan)

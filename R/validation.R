@@ -595,8 +595,10 @@ STATUTS_VALIDATION_LISSEE <- local({
                "trace calculée en flottant, ddl_effectifs_retenus est posé exactement) : n cellules retenues, nu_s degrés de liberté effectifs du lissage",
                "du segment s (trace de la matrice de lissage, recopiés dans etapes/validation/parametres/ddl_effectifs ;",
                "somme des leviers retenus du segment dans ddl_effectifs_retenus), réel, en général non entier ;",
-               "contribution d'un segment qui compte exactement z cellules pondérées (z ordre des différences du",
-               "lissage, etapes/lissage/parametres/ordre_difference ; le lissage y interpole, chaque",
+               "contribution d'un segment qui compte exactement d_s cellules pondérées (levier > 0), d_s dimension de",
+               "l'espace non pénalisé du lissage (etapes/lissage/resultat/segments/dimension_non_penalisee, égale à",
+               "l'ordre des différences z sous Whittaker-Henderson, cas normal comme Poisson) ; le lissage y",
+               "interpole, chaque",
                "levier pondéré vaut 1 en arithmétique exacte) posée au nombre exact de ses cellules retenues de poids",
                "nul, 0 quand toutes sont pondérées ; ddl_effectifs_retenus = nombre de ses cellules retenues pondérées,",
                "interpolation_exacte vrai ; approximation : degrés de liberté résiduels du cas normal transposés au",
@@ -720,19 +722,22 @@ controler_replications <- function(replications, etape) {
 # positionnée sur cette référence, sur cette plage : la contrainte
 # somme A = O et les lois conditionnelles n'en tiennent qu'à ce prix).
 # `positionnement` : paramètres de l'étape positionnement du plan (déjà
-# contrôlés par valider_plan()), ou NULL si elle est absente. Sous la
+# contrôlés par valider_plan()), ou NULL si elle est absente (défaut NULL,
+# comme `lissage` : omis sous positionnee, un appel direct reçoit le refus
+# positionnement_absent, non une erreur R générique ; #240). Sous la
 # relation lissee (#224 ; ADR 0017, point 15), dans l'ordre : lissage_absent
 # (étape lissage absente du plan) ; plage_ages_differente_lissage (les ddl
 # effectifs sont ceux du lissage sur ses cellules). `lissage` : paramètres de
 # l'étape lissage du plan, ou NULL si elle est absente (défaut NULL : un
-# appel direct hors lissee peut l'omettre) ; lu sous la seule relation
+# appel direct hors lissee peut l'omettre, comme `positionnement` hors
+# positionnee) ; lu sous la seule relation
 # lissee. `table_reference` : absent (missing()) quand le plan ne le porte
 # pas (paramètre conditionnel à relation_table, ADR 0017, point 3.4 ; sa
 # présence est contrôlée par controler_parametres_condition()) ; sa forme
 # n'est contrôlée que s'il est passé ; absent sous positionnee : erreur de
 # programmation préfixée. Rend TRUE, invisible.
 controler_parametres_validation <- function(table_reference, relation_table, plage_ages, tranches_age, niveau,
-                                            replications, positionnement, lissage = NULL) {
+                                            replications, positionnement = NULL, lissage = NULL) {
   if (!missing(table_reference)) controler_cle_table(table_reference, "validation")
   controler_relation_table(relation_table)
   controler_plage_ages(plage_ages, "validation")
@@ -1665,19 +1670,17 @@ segments_complets <- function(dans, segment, ret) {
 #                      ignoré sous les autres relations ;
 #   construite, ddl_effectifs : table construite de l'étape productrice du
 #                      plan (colonne levier exigée sous lissee) et ddl
-#                      effectifs par segment (clés,
-#                      ddl_effectifs), rendus par la fonction d'orchestration
-#                      de la table construite (construire_table()), en
-#                      valeur, ou NULL ; lus sous la seule relation lissee
-#                      (#224 ; ADR 0017, points 1.5, 5 et 10.2), ignorés sous
-#                      les autres. Argument nommé `construite`, non
-#                      `table_construite` : graphe_modules.R lirait ce nom
-#                      comme un appel de la fonction homonyme du module
-#                      construire_table, interdit (ADR 0007, point 2.1) ;
-#   ordre_difference : ordre z des différences de l'étape lissage
-#                      (etapes/lissage/parametres, valeur entière en
-#                      double, au moins 1), ou NULL ; lu sous la seule
-#                      relation lissee (interpolation exacte, #239).
+#                      effectifs par segment (clés, ddl_effectifs,
+#                      dimension_non_penalisee : integer, sans NA, exigée
+#                      sous lissee, #242), rendus par la fonction
+#                      d'orchestration de la table construite
+#                      (construire_table()), en valeur, ou NULL ; lus sous la
+#                      seule relation lissee (#224 ; ADR 0017, points 1.5, 5,
+#                      5.7 et 10.2), ignorés sous les autres. Argument nommé
+#                      `construite`, non `table_construite` : graphe_modules.R
+#                      lirait ce nom comme un appel de la fonction homonyme du
+#                      module construire_table, interdit (ADR 0007, point
+#                      2.1).
 # Relation positionnee : la grille (clés, âges, E^c, D, q~) est celle du
 # positionnement (même exposition, même table, même plage : contrôlé,
 # erreur de programmation sinon) ; attendus A_c = theta^_s A~_c, force
@@ -1703,7 +1706,7 @@ segments_complets <- function(dans, segment, ret) {
 # la table (ADR 0015, point 5).
 calculer_validation <- function(exposition, segmentation, par_annee, convention, table, table_reference,
                                 relation_table, plage_ages, tranches_age, niveau, replications, graine,
-                                positionnement, construite, ddl_effectifs, ordre_difference) {
+                                positionnement, construite, ddl_effectifs) {
   manquantes <- setdiff(c(segmentation, "age", if (isTRUE(par_annee)) "annee", "evenements", "exposition_centrale"),
                         names(exposition))
   if (length(manquantes))
@@ -1717,9 +1720,11 @@ calculer_validation <- function(exposition, segmentation, par_annee, convention,
     stop("calculer_validation() : étape positionnement requise sous la relation positionnee (erreur de programmation).",
          call. = FALSE)
   if (lissee && (is.null(construite) || is.null(ddl_effectifs) || !("levier" %in% names(construite)) ||
-                 !valeurs_entieres_double(ordre_difference) || length(ordre_difference) != 1L || ordre_difference < 1))
-    stop(paste("calculer_validation() : table construite avec la colonne levier, ddl effectifs et ordre des",
-               "différences requis sous la relation lissee (erreur de programmation)."), call. = FALSE)
+                 !forme_exacte(ddl_effectifs[["dimension_non_penalisee"]], "integer") ||
+                 anyNA(ddl_effectifs[["dimension_non_penalisee"]])))
+    stop(paste("calculer_validation() : table construite avec la colonne levier, ddl effectifs et dimension",
+               "de l'espace non pénalisé (integer, sans NA) requis sous la relation lissee (erreur de",
+               "programmation)."), call. = FALSE)
   if (lissee) {
     # Grille unique (ADR 0017, point 10.2), q de la table construite apparié
     # par (segment, âge) : clés et âges identiques, dans le même ordre.
@@ -1733,6 +1738,11 @@ calculer_validation <- function(exposition, segmentation, par_annee, convention,
         !forme_exacte(ddl_effectifs[["ddl_effectifs"]], "double"))
       stop("calculer_validation() : grille différente de celle de la table construite (erreur de programmation).",
            call. = FALSE)
+    # 0 <= d_s <= n_s (ADR 0017, point 5.7 (ii)), n_s compté sur la grille.
+    d_s <- ddl_effectifs[["dimension_non_penalisee"]]
+    if (any(d_s < 0L | d_s > tabulate(ap$segment, nrow(seg_cles))))
+      stop(paste("calculer_validation() : dimension de l'espace non pénalisé hors de [0, nombre de cellules du",
+                 "segment] (erreur de programmation)."), call. = FALSE)
     qx_c <- construite$qx
     un <- qx_c == 1 & cel$exposition_centrale > 0
     if (any(un))
@@ -1754,8 +1764,9 @@ calculer_validation <- function(exposition, segmentation, par_annee, convention,
   # les seules cellules retenues (C+) ; une cellule pondérée par le lissage
   # mais non retenue (E^c = 0 sous la recette agregats) en est exclue.
   # Interpolation exacte (#239), détectée par la structure, sans tolérance :
-  # segment qui compte exactement z cellules de levier > 0 (pondérées ; z
-  # ordre des différences), retenues ou non. Le lissage y interpole, chaque
+  # segment qui compte exactement d_s cellules de levier > 0 (pondérées ; d_s
+  # = colonne dimension_non_penalisee de ddl_effectifs, dimension du noyau de
+  # la pénalité du lisseur, #242), retenues ou non. Le lissage y interpole, chaque
   # levier pondéré vaut 1 en arithmétique exacte (complément de Schur, avis
   # d'actuary) et la somme des leviers retenus est posée au nombre de
   # cellules retenues pondérées du segment : sa contribution au ddl vaut le
@@ -1763,7 +1774,8 @@ calculer_validation <- function(exposition, segmentation, par_annee, convention,
   # pondérées (en flottant, écart de ±1e-15 à ±1e-11 sans cette règle).
   if (lissee) {
     lev <- construite$levier
-    interpolation <- vapply(seq_len(nrow(seg_cles)), function(k) sum(lev[ap$segment == k] > 0) == ordre_difference, NA)
+    interpolation <- vapply(seq_len(nrow(seg_cles)), function(k)
+      sum(lev[ap$segment == k] > 0) == ddl_effectifs$dimension_non_penalisee[k], NA)
     retenus <- vapply(seq_len(nrow(seg_cles)), function(k)
       if (interpolation[k]) as.numeric(sum(ret & ap$segment == k & lev > 0)) else sum(lev[ret & ap$segment == k]), 0)
   }
@@ -2882,9 +2894,10 @@ calculer_homogeneite <- function(exposition, segmentation, par_annee, convention
 # Référence de méthode (texte de la spécification, § 3 ; source lue sur le
 # rendu des pages par regulatory-approfondi, SHA-256 consigné, § 0).
 REFERENCE_METHODE_COHERENCE_REGULARITE <- texte_moteur(paste(
-  "Lignes directrices mortalité de la Commission d'agrément, recommandation du 20 juin 2006, chap. 4, II (p. 36-38)",
-  "et III.1 (p. 38), SHA-256 70ba7463b840bb4fd378dd05c7dad66213239d0bb033ea126b7b0b4669d26835 ; propriétés",
-  "déterministes de la table, sans seuil ni verdict"))
+  "Lignes directrices mortalité de la Commission d'agrément, version approuvée, insérée en tant que recommandation",
+  "dans les règles professionnelles de l'Institut des actuaires par le Conseil d'administration du 20 juin 2006,",
+  "chap. 4, II (p. 36-38) et III.1 (p. 38), SHA-256 70ba7463b840bb4fd378dd05c7dad66213239d0bb033ea126b7b0b4669d26835 ;",
+  "propriétés déterministes de la table, sans seuil ni verdict"))
 
 # Convention d'âge restituée pour une table de référence évaluée
 # (spécification de forme, § 3 ; ADR 0017, point 13.4 : option « non portée
@@ -2925,14 +2938,16 @@ STATUTS_COHERENCE_REGULARITE <- local({
             "verdict")),
     c("ages", "differences_croissantes", "toutes",
       paste("descriptif : delta2_x = (g_(x+2) - g_(x+1)) - (g_(x+1) - g_x) en arithmétique flottante, inégalité",
-            "delta2_x >= 0 (Lignes directrices, chap. 4, II.1) ; erreur d'arrondi de l'ordre de 2u(|g_x| + 2|g_(x+1)| + |g_(x+2)|)",
+            "delta2_x >= 0 (Lignes directrices, chap. 4, II.1, p. 37 : vérification présentée comme facultative,",
+            "« Il peut également être intéressant de vérifier si les différences premières des taux de décès",
+            "augmentent avec l'âge ») ; erreur d'arrondi de l'ordre de 2u(|g_x| + 2|g_(x+1)| + |g_(x+2)|)",
             "(u = 2^-53), plus l'erreur numérique de la construction de la table : un delta2_x de cet ordre n'établit",
             "pas le signe ; aucune exception d'âge appliquée, aucun verdict")),
     c("ordre_segments", "inegalite_verifiee", "construite",
       paste("résultat exact sur les valeurs enregistrées : inégalité g_x(a) >= g_x(b) pour l'ordre déclaré (Lignes",
             "directrices, chap. 4, II.3) ; pour les sexes, propriété attendue « si les groupes constitués par les",
-            "hommes et les femmes ont des distributions comparables vis-à-vis des autres critères » (p. 38) ; un",
-            "défaut appelle une explication, aucun verdict")),
+            "hommes et les femmes ont des distributions comparables vis-à-vis des autres critères influant sur le",
+            "risque de mortalité » (p. 38) ; un défaut appelle une explication, aucun verdict")),
     c("ordre_segments", "inegalite_verifiee", "reference",
       "choix de l'outil, à finalité comparative, non prescrit par II.3"),
     c("regularite", "regularite", "toutes",

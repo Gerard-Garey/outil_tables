@@ -193,15 +193,16 @@ verifier("#159 #330 C3 STATUTS_VALIDATION_POSITIONNEE (litt\u00e9ral de la sp\u0
 verifier("#159 #329 C3 STATUTS_VALIDATION_LISSEE (littéral de la spécification) : marqueur sur aucune ligne (relation lissee non retenue, #329, § 3)",
          ecart_159(tablexp:::STATUTS_VALIDATION_LISSEE, character(0)))
 # STATUTS_LISSAGE_POISSON (#329 ; spécification d'actuary-approfondi, #329,
-# commentaire 7102999392, § 1, § 2 et § 4) : 2 lignes de loi sur 12, nature
+# commentaire 7102999392, § 1, § 2 et § 4) : 2 lignes de loi sur 13 (12 avant la
+# ligne segments/dimension_non_penalisee de #242), nature
 # credibilite (#359, décision du mainteneur D-b (a) du 25/11/2026), lues par
 # grandeur seule ; fragment égal à l'octet à mention_independance("credibilite").
 BORNES_329 <- c("table_lissee/borne_inf_credibilite", "table_lissee/borne_sup_credibilite")
-verifier("#329 C3 STATUTS_LISSAGE_POISSON (litt\u00e9ral de la sp\u00e9cification) : 12 lignes ; marqueur une fois sur les deux bornes de cr\u00e9dibilit\u00e9, jamais ailleurs (parametre_lissage et laml comprises) ; mention de la nature credibilite (#359, D-b (a)) en fin de statut, texte exact et identique \u00e0 l'octet \u00e0 mention_independance(\"credibilite\")", {
+verifier("#329 C3 STATUTS_LISSAGE_POISSON (litt\u00e9ral de la sp\u00e9cification) : 13 lignes ; marqueur une fois sur les deux bornes de cr\u00e9dibilit\u00e9, jamais ailleurs (parametre_lissage et laml comprises) ; mention de la nature credibilite (#359, D-b (a)) en fin de statut, texte exact et identique \u00e0 l'octet \u00e0 mention_independance(\"credibilite\")", {
   s <- tablexp:::STATUTS_LISSAGE_POISSON; st <- enc2utf8(s$statut[match(BORNES_329, s$grandeur)])
   e <- ecart_159(s, BORNES_329, s$grandeur)
   m <- enc2utf8(tablexp:::mention_independance("credibilite"))
-  if (nrow(s) != 12L || !identical(names(s), c("grandeur", "statut"))) "STATUTS_LISSAGE_POISSON : 12 lignes, colonnes grandeur et statut attendues"
+  if (nrow(s) != 13L || !identical(names(s), c("grandeur", "statut"))) "STATUTS_LISSAGE_POISSON : 13 lignes, colonnes grandeur et statut attendues"
   else if (!isTRUE(e)) e
   else if (!identical(m, mention_330("credibilite"))) "mention_independance(\"credibilite\") diff\u00e8re du litt\u00e9ral"
   else if (!all(endsWith(st, paste(";", mention_330("credibilite"))))) "texte ou place de la mention (litt\u00e9ral)"

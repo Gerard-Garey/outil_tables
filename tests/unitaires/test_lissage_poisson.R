@@ -113,6 +113,86 @@ verifier("A5 LAML de lisser_poisson() = formule de Biessy, p. 19, recalculée en
   }, 0)))
   if (all(e <= 1e-9)) TRUE else sprintf("écart relatif max %.3g", max(e))
 })
+# ln |K'K|+ par forme close (#249, point 1 ; ADR 0017, annotation du
+# 26/11/2026, point 9.5) : valeurs exactes de la remesure (0') d'actuary-
+# approfondi (det(K K') entier par Bareiss) ; balayage contre un déterminant
+# entier exact recalculé ici : élimination de Bareiss en arithmétique modulaire
+# (deux nombres premiers p < 2^26 : tout produit < 2^52, exact en double ; la
+# division exacte de Bareiss devient le produit par l'inverse modulaire),
+# reconstruction par les restes chinois (det < p1 p2, borne lue sur
+# determinant() en flottant), contrôle par un troisième nombre premier.
+PREMIERS_249 <- c(67108859, 67108837, 67108819)
+mulmod <- function(a, b, p) (a * b) %% p
+invmod <- function(a, p) {
+  r <- 1; b <- a %% p; e <- p - 2
+  while (e > 0) { if (e %% 2 == 1) r <- mulmod(r, b, p); b <- mulmod(b, b, p); e <- e %/% 2 }
+  r
+}
+det_bareiss_mod <- function(M, p) {
+  M <- M %% p; m <- nrow(M); prec <- 1
+  for (k in seq_len(m - 1L)) {
+    if (M[k, k] == 0) stop(sprintf("pivot nul modulo %d (choisir un autre nombre premier)", p))
+    i <- (k + 1L):m
+    M[i, i] <- mulmod((mulmod(M[i, i], M[k, k], p) - outer(M[i, k], M[k, i]) %% p) %% p, invmod(prec, p), p)
+    prec <- M[k, k]
+  }
+  M[m, m]
+}
+det_entier_exact <- function(n, z) {
+  K <- diff(diag(n), differences = z)
+  M <- tcrossprod(K)
+  approx <- as.numeric(determinant(M, logarithm = FALSE)$modulus)
+  if (approx >= prod(PREMIERS_249[1:2]) / 2) stop("déterminant hors de la portée des restes chinois")
+  r <- vapply(PREMIERS_249, function(p) det_bareiss_mod(M, p), 0)
+  p1 <- PREMIERS_249[1]; p2 <- PREMIERS_249[2]
+  x <- r[1] + p1 * mulmod((r[2] - r[1]) %% p2, invmod(p1 %% p2, p2), p2)
+  if (x %% PREMIERS_249[3] != r[3]) stop("restes chinois incohérents avec le troisième nombre premier")
+  x
+}
+verifier("log_det_penalite() (#249, point 1) : forme close aux quatre couples de la remesure (0') d'actuary-approfondi, (71, 3), (71, 4), (101, 4), (121, 4) : écart relatif <= 1e-14 aux valeurs exactes (ln det(K K') entier par Bareiss) (résultat exact ; valeur calculée par lgamma et log)", {
+  v <- c(ldp(71, 3), ldp(71, 4), ldp(101, 4), ldp(121, 4))
+  ref <- c(29.298770437202322, 47.613856784815574, 53.254915623305017, 56.146230935553966)
+  e <- abs(v - ref) / ref
+  if (all(e <= 1e-14)) TRUE else sprintf("écart relatif max %.3g", max(e))
+})
+verifier("log_det_penalite() (#249, point 1) : balayage n de z + 1 à 20, z = 1 à 4 (70 couples) contre det(K K') entier exact (Bareiss modulaire, restes chinois) : round(exp(forme close)) identique au déterminant entier et écart relatif à log(det) <= 1e-14 ; nombres premiers contrôlés (résultat exact)", {
+  premiers <- all(vapply(PREMIERS_249, function(p) all(p %% 2:floor(sqrt(p)) != 0), NA))
+  cas <- do.call(rbind, lapply(1:4, function(z) cbind(n = (z + 1):20, z = z)))
+  ko <- character(0)
+  for (i in seq_len(nrow(cas))) {
+    n <- cas[i, "n"]; z <- cas[i, "z"]
+    d <- det_entier_exact(n, z); f <- ldp(n, z)
+    if (!identical(round(exp(f)), d) || abs(f - log(d)) > 1e-14 * abs(log(d)))
+      ko <- c(ko, sprintf("(%d, %d) : det %.17g, exp(forme close) %.17g", n, z, d, exp(f)))
+  }
+  if (premiers && nrow(cas) == 70L && !length(ko)) TRUE
+  else paste(c(if (!premiers) "nombre non premier", sprintf("%d couples", nrow(cas)), ko), collapse = " ; ")
+})
+# Règle d'arrêt des itérations de wh_poisson (#249, point 2) : table de
+# vérité d'arret_pirls() (dev = 100, seuil 1e-6 ; borne de déviance
+# (1 - EPSILON_DEVIANCE_LISSAGE) dev incluse, décrément égal au seuil inclus).
+verifier("arret_pirls() (#249, point 2) : table de vérité ; arrêt si et seulement si dev_n >= (1 - EPSILON_DEVIANCE_LISSAGE) dev et (j = 0 ou décrément fini <= seuil) ; décrément non lu sans division du pas (NA admis) (valeur calculée à la main)", {
+  ap <- function(...) tablexp:::arret_pirls(...)
+  b <- (1 - tablexp:::EPSILON_DEVIANCE_LISSAGE) * 100
+  s <- 1e-6
+  cas <- list(
+    list(dev_n = 100, j = 0L, dec = NA_real_, attendu = TRUE),
+    list(dev_n = b, j = 0L, dec = NA_real_, attendu = TRUE),
+    list(dev_n = 99, j = 0L, dec = NA_real_, attendu = FALSE),
+    list(dev_n = 100, j = 3L, dec = 1e-7, attendu = TRUE),
+    list(dev_n = 100, j = 3L, dec = s, attendu = TRUE),
+    list(dev_n = 100, j = 3L, dec = 1e-5, attendu = FALSE),
+    list(dev_n = 100, j = 3L, dec = Inf, attendu = FALSE),
+    list(dev_n = 100, j = 3L, dec = NaN, attendu = FALSE),
+    list(dev_n = 100, j = 3L, dec = NA_real_, attendu = FALSE),
+    list(dev_n = 99, j = 3L, dec = 1e-7, attendu = FALSE),
+    list(dev_n = 99, j = 3L, dec = 1e-5, attendu = FALSE))
+  ko <- Filter(Negate(is.null), lapply(cas, function(c) {
+    r <- ap(100, c$dev_n, c$j, c$dec, s)
+    if (identical(r, c$attendu)) NULL else sprintf("dev_n %.17g, j %d, décrément %g : %s", c$dev_n, c$j, c$dec, format(r))
+  }))
+  if (!length(ko)) TRUE else paste(unlist(ko), collapse = " ; ")
+})
 verifier("A leviers m^_i V_ii : 0 exactement aux cellules sans exposition, > 0 ailleurs ; ddl_effectifs identical() à leur somme ; ddl dans ]z, n+] et décroissants en lambda (identité mathématique)", {
   r <- lp(D0, E0, 1e3, 2, X, ldp(N, 2))
   nu <- vapply(c(1, 1e2, 1e4, 1e6), function(l) lp(D0, E0, l, 2, X, ldp(N, 2))$ddl_effectifs, 0)
@@ -132,13 +212,83 @@ verifier("A décès à un seul âge intérieur (49), z = 2 : maximum fini, statu
   d <- numeric(N); d[20] <- 10
   identical(lp(d, E, 1e3, 2, X, ldp(N, 2))$statut, "produite")
 })
-verifier("A réponse de travail theta - 1 aux cellules exposées sans décès (réserve R-a d'actuary-approfondi) : jeu DS (8 cellules sans décès), z = 4, lambda = 1e-6 : statut produite (non_convergent avant la règle : m arrondi à 0, D / m = 0 / 0) ; LAML sur [1e-6, 1e8] : lambda^ intérieur (borne NA), 371 297,92 à 1e-6 près en relatif (valeur d'actuary-approfondi) ; un seul âge intérieur avec décès, z = 3, reste non_convergent (valeur calculée à la main)", {
+# Condition d'existence du maximum (#247 ; ADR 0017, annotation du
+# 26/11/2026, point 15.1) : decompte_maximum() contre un test direct du cône
+# des directions de récession. Le maximum n'existe pas si et seulement s'il
+# existe un polynôme p non nul de degré au plus z - 1, <= 0 sur les cellules
+# exposées et nul sur les cellules avec décès. Test : p = q w, w produit des
+# (x - x_d) sur les âges avec décès (m âges ; q de degré au plus k - 1,
+# k = z - m ; aucune direction si k <= 0) ; contraintes A a <= 0 sur les
+# cellules exposées sans décès (lignes normées) ; A de rang < k : direction
+# (noyau) ; sinon le cône {A a <= 0} est saillant et n'est pas réduit à 0 si
+# et seulement s'il a un rayon extrême, annulé par k - 1 lignes de A
+# linéairement indépendantes (énumérées ; tolérance 1e-9 sur des lignes et un
+# a normés, données entières). Domaine : n = 1 à 8 cellules (âges 1 à n),
+# chacune sans exposition, exposée sans décès ou exposée avec décès, première
+# et dernière exposées, au moins z cellules exposées, n > z, z = 1 à 4 :
+# 17 236 configurations (décompte de la remesure (0'), § 4 ; environ 2 s).
+direction_recession <- function(x, d, z) {
+  xd <- x[d]; xn <- x[!d]; k <- z - length(xd)
+  if (k <= 0L) return(FALSE)
+  if (length(xn) < k) return(TRUE)
+  w <- vapply(xn, function(t) prod(t - xd), 0)
+  A <- outer(xn - mean(x), 0:(k - 1L), `^`) * w
+  A <- A / sqrt(rowSums(A^2))
+  if (qr(A)$rank < k) return(TRUE)
+  if (k == 1L) return(all(A >= 0) || all(A <= 0))
+  for (S in utils::combn(nrow(A), k - 1L, simplify = FALSE)) {
+    M <- A[S, , drop = FALSE]
+    if (qr(M)$rank < k - 1L) next
+    v <- drop(A %*% svd(M, nv = k)$v[, k])
+    if (all(v <= 1e-9) || all(v >= -1e-9)) return(TRUE)
+  }
+  FALSE
+}
+verifier("A decompte_maximum() (#247) = test direct du cône des directions de récession : n <= 8, z = 1 à 4, 17 236 configurations, aucun désaccord ; valeur integer (identité mathématique)", {
+  n_conf <- 0L; desaccords <- character(0); types <- TRUE
+  for (n in 1:8) {
+    g <- as.matrix(expand.grid(rep(list(0:2), n)))
+    g <- g[g[, 1L] > 0 & g[, n] > 0, , drop = FALSE]
+    for (r in seq_len(nrow(g))) {
+      e <- g[r, ] > 0; d <- g[r, ] == 2
+      C <- tablexp:::decompte_maximum(e, d)
+      types <- types && is.integer(C) && length(C) == 1L
+      for (z in 1:4) {
+        if (sum(e) < z || n <= z) next
+        n_conf <- n_conf + 1L
+        if ((C >= z) == direction_recession(seq_len(n)[e], d[e], z))
+          desaccords <- c(desaccords, sprintf("%s z = %d", paste(g[r, ], collapse = ""), z))
+      }
+    }
+  }
+  tous(list(if (identical(n_conf, 17236L)) TRUE else sprintf("%d configurations", n_conf),
+            if (!length(desaccords)) TRUE else paste(utils::head(desaccords, 5L), collapse = ", "),
+            if (types) TRUE else "valeur non integer"))
+})
+verifier("A decompte_maximum() (#247) sur exemples écrits à la main : bloc de bord L, bloc intérieur L ou L + 1 (pair supérieur), cellule sans exposition ignorée sans séparer, aucune cellule exposée 0L (valeur calculée à la main)", {
+  dm <- tablexp:::decompte_maximum
+  tous(list(
+    if (identical(dm(rep(TRUE, 5), c(TRUE, TRUE, FALSE, FALSE, FALSE)), 2L)) TRUE else "bord, L = 2",
+    if (identical(dm(rep(TRUE, 5), c(FALSE, TRUE, FALSE, FALSE, FALSE)), 2L)) TRUE else "intérieur, L = 1",
+    if (identical(dm(rep(TRUE, 6), c(FALSE, TRUE, TRUE, FALSE, FALSE, FALSE)), 2L)) TRUE else "intérieur, L = 2",
+    if (identical(dm(rep(TRUE, 7), c(FALSE, TRUE, TRUE, TRUE, FALSE, FALSE, TRUE)), 5L)) TRUE else "intérieur L = 3 + bord",
+    if (identical(dm(c(TRUE, TRUE, FALSE, TRUE, TRUE), c(FALSE, TRUE, FALSE, TRUE, FALSE)), 2L)) TRUE
+    else "cellule sans exposition entre deux cellules avec décès : un seul bloc intérieur de 2",
+    if (identical(dm(rep(FALSE, 3), rep(FALSE, 3)), 0L)) TRUE else "aucune cellule exposée"))
+})
+verifier("A réponse de travail theta - 1 aux cellules exposées sans décès (réserve R-a d'actuary-approfondi) : jeu DS (8 cellules sans décès), z = 4, lambda = 1e-6 : statut produite (non_convergent avant la règle : m arrondi à 0, D / m = 0 / 0) ; LAML sur [1e-6, 1e8] : lambda^ intérieur (borne NA), 371 297,92 à 1e-4 près en relatif (valeur d'actuary-approfondi ; tolérance au-dessus du plancher de bruit de lambda^, #249) ; un seul âge intérieur avec décès, z = 3 (C = 2 < z, aucun maximum fini) : lisser_poisson() en appel direct reste non_convergent (construire_table() refuse ce cas par lissage_maximum_inexistant, #247) (valeur calculée à la main)", {
+  # Tolérance 1e-4 (#249, point 1) : le profil de la LAML est plat ; un
+  # décalage constant de la LAML (sans effet en arithmétique exacte) de 1e-9 à
+  # 1e-6 déplace lambda^ de 2,0e-6 à 5,5e-6 en relatif (mesuré le 26/11/2026,
+  # R 4.3.3), et la forme close de ln |K'K|+ le déplace de 2,0e-6
+  # (371 297,919 -> 371 297,170) : plancher de bruit de l'ordre de 1e-5 ; 1e-4
+  # le dépasse d'un facteur 10 et reste sous la classe optimisation (1e-3).
   r <- lp(DS, E, 1e-6, 4, X, ldp(N, 4))
   ch <- tablexp:::choisir_lambda_poisson(DS, E, 4, X, c(1e-6, 1e8), ldp(N, 4))
   d <- numeric(N); d[20] <- 10
   tous(list(if (identical(r$statut, "produite")) TRUE else sprintf("statut %s", r$statut),
             if (is.null(ch$echec) && is.na(ch$borne)) TRUE else "lambda^ non intérieur ou échec",
-            if (isTRUE(proche(ch$ajustement$lambda, 371297.92, rel = 1e-6, abs = 0))) TRUE
+            if (isTRUE(proche(ch$ajustement$lambda, 371297.92, rel = 1e-4, abs = 0))) TRUE
             else sprintf("lambda^ = %.17g", ch$ajustement$lambda),
             if (identical(lp(d, E, 1e3, 3, X, ldp(N, 3))$statut, "non_convergent")) TRUE else "z = 3 : statut produit"))
 })
@@ -331,31 +481,146 @@ verifier("F témoin : sans la règle, exactement z cellules exposées dont une s
   e <- numeric(21); d <- numeric(21); e[c(1, 21)] <- EH[c(1, 21)]; d[21] <- DH[21]
   lp(d, e, 100, 2, AGES, ldp(21, 2))$statut %in% c("non_convergent", "rang_deficient")
 })
-verifier("F lissage_non_convergent (A6) : décès d'un segment au seul âge 60, z = 2 ; message exact (lambda en %.17g), details", {
-  dh <- numeric(length(AGES)); dh[21L] <- 10
-  controle(rc(jeu(dh = dh, df = round(DH * 0.6))), "lissage", "lissage_non_convergent",
-           paste("Lissage : l'algorithme de la vraisemblance de Poisson pénalisée ne converge pas pour sexe = « H »,",
-                 "lambda = 100 (plafond de 100 itérations atteint, déviance pénalisée non décroissante ou non finie après",
-                 "30 divisions du pas sans convergence numérique, ou rang numérique du système perdu en cours",
-                 "d'itération) ; l'existence du maximum n'est pas établie pour ces données ; aucune table lissée n'est",
-                 "produite."))
-})
-verifier("F details de lissage_interpolation_deces_nul et de lissage_non_convergent : plage, ordre, segments cités (clés), lambda", {
+# Message de lissage_maximum_inexistant (#247 ; ADR 0017, annotation du
+# 26/11/2026, point 15.3) pour le seul segment H, z et détail donnés.
+MESSAGE_247 <- function(z, detail)
+  paste(sprintf(paste("Lissage : 1 segment(s) sans maximum fini de la vraisemblance de Poisson pénalisée sur la plage",
+                      "d'âges 40 à 60 (z = %d) : sexe = « H » (%s)."), z, detail),
+        "Le maximum existe si et seulement si C >= z, C décompte des blocs de cellules exposées consécutives avec",
+        "décès (un bloc de L cellules compte L s'il contient la première ou la dernière cellule exposée, sinon L",
+        "arrondi au pair supérieur) ; la condition ne dépend ni de lambda ni des effectifs. Élargir la plage d'âges,",
+        "regrouper des segments ou prendre ordre_difference au plus égal au plus petit C cité.")
+# Décès du segment H aux seuls âges `ages` (10 chacun) ; F : décès de DH * 0,6.
+jeu_247 <- function(ages) { dh <- numeric(length(AGES)); dh[ages - 39L] <- 10; jeu(dh = dh, df = round(DH * 0.6)) }
+verifier("F lissage_maximum_inexistant (A6, #247) : décès d'un segment au seul âge 60, z = 2 (C = 1) ; message exact, sans lambda (valeur calculée à la main)", controle(
+  rc(jeu_247(60L)), "lissage", "lissage_maximum_inexistant", MESSAGE_247(2L, "âge(s) avec décès : 60, C = 1")))
+verifier("F details de lissage_interpolation_deces_nul et de lissage_maximum_inexistant : plage, ordre, segments cités (clés), decompte (integer), aucun parametre_lissage", {
   d <- jeu(ages = c(40, 60), eh = EH[c(1L, 21L)], dh = c(0, DH[21L]), df = c(2, 3))
   r1 <- rc(d)
-  dh <- numeric(length(AGES)); dh[21L] <- 10
-  r2 <- rc(jeu(dh = dh, df = round(DH * 0.6)))
+  r2 <- rc(jeu_247(60L))
   identical(names(r1$details), c("plage_ages", "ordre_difference", "segments")) &&
     identical(r1$details$segments$sexe, "H") && identical(r1$details$ordre_difference, 2) &&
-    identical(names(r2$details), c("plage_ages", "ordre_difference", "segments", "parametre_lissage")) &&
-    identical(r2$details$segments$sexe, "H") && identical(r2$details$parametre_lissage, 100)
+    identical(names(r2$details), c("plage_ages", "ordre_difference", "segments", "decompte")) &&
+    identical(r2$details$segments$sexe, "H") && identical(r2$details$decompte, 1L) &&
+    identical(r2$details$plage_ages, c(40, 60)) && identical(r2$details$ordre_difference, 2)
 })
-verifier("F lissage_non_convergent sous laml : le segment est cité au lambda de la grille où l'algorithme échoue (borne inférieure déclarée, évaluée exactement)", {
-  dh <- numeric(length(AGES)); dh[21L] <- 10
-  r <- rc(jeu(dh = dh, df = round(DH * 0.6)), lissage = LAML)
+verifier("F lissage_maximum_inexistant sous laml (A6, #247) : refus avant tout lambda de la grille, details sans parametre_lissage", {
+  r <- rc(jeu_247(60L), lissage = LAML)
+  ok <- controle(r, "lissage", "lissage_maximum_inexistant", MESSAGE_247(2L, "âge(s) avec décès : 60, C = 1"))
+  if (!isTRUE(ok)) return(ok)
+  identical(names(r$details), c("plage_ages", "ordre_difference", "segments", "decompte"))
+})
+# Cas obligatoires de #247 (ADR 0017, annotation du 26/11/2026, point 15.7 ;
+# remesure (0'), § 4) : sous declare (lambda = 100) et sous laml, refus
+# lissage_maximum_inexistant sans aucun appel de lisser_poisson() (trace() à
+# l'entrée, dans l'espace de noms installé : un appel lève une erreur qui
+# n'est pas un refus, rendue en texte ; comparée par son début ASCII, le
+# message « appelée » n'étant pas marqué UTF-8 sous la locale C) ; témoin de
+# la trace : un cas produit l'appelle.
+sans_lisser_poisson <- function(expr) {
+  ns <- asNamespace("tablexp")
+  suppressMessages(trace("lisser_poisson", quote(stop("appelée")), where = ns, print = FALSE))
+  on.exit(suppressMessages(untrace("lisser_poisson", where = ns)))
+  tryCatch(expr, refus_tablexp = function(r) r, error = function(e) conditionMessage(e))
+}
+CAS_247 <- list(
+  list(nom = "décès au seul âge extrême 60, z = 2", ages = 60L, z = 2, detail = "âge(s) avec décès : 60, C = 1"),
+  list(nom = "un âge intérieur (50), z = 3", ages = 50L, z = 3, detail = "âge(s) avec décès : 50, C = 2"),
+  list(nom = "deux âges intérieurs consécutifs (50, 51), z = 3", ages = c(50L, 51L), z = 3,
+       detail = "âge(s) avec décès : 50, 51, C = 2"),
+  list(nom = "les deux âges extrêmes (40, 60), z = 3", ages = c(40L, 60L), z = 3,
+       detail = "âge(s) avec décès : 40, 60, C = 2"))
+for (cas in CAS_247) for (b in list(LISSAGE, LAML))
+  verifier(sprintf("F lissage_maximum_inexistant (#247), %s, sous %s : message exact, decompte, aucun appel de lisser_poisson() (valeur calculée à la main)",
+                   cas$nom, b$critere_lissage), {
+    r <- sans_lisser_poisson(construire_table(jeu_247(cas$ages), ROLES, plan_l(avec(b, ordre_difference = cas$z))))
+    if (is.character(r)) return(sprintf("erreur : %s", r))
+    ok <- controle(r, "lissage", "lissage_maximum_inexistant", MESSAGE_247(as.integer(cas$z), cas$detail))
+    if (!isTRUE(ok)) return(ok)
+    identical(r$details$decompte, as.integer(sub(".*C = ", "", cas$detail)))
+  })
+verifier("F témoins positifs de #247, sous declare et laml : un âge intérieur (50), z = 2 (C = 2) ; âges 40 et 50, z = 3 (C = 3) : table produite ; la trace de lisser_poisson() y lève l'erreur (témoin de la trace)", tous(unlist(lapply(list(
+  list(ages = 50L, z = 2), list(ages = c(40L, 50L), z = 3)), function(cas) lapply(list(LISSAGE, LAML), function(b) {
+    p <- plan_l(avec(b, ordre_difference = cas$z))
+    x <- refus_de(construire_table(jeu_247(cas$ages), ROLES, p))
+    t <- sans_lisser_poisson(construire_table(jeu_247(cas$ages), ROLES, p))
+    if (!is.null(x)) sprintf("refus %s", x$motif)
+    else if (!(is.character(t) && startsWith(t, "appel"))) "trace de lisser_poisson() sans effet"
+    else TRUE
+  })), recursive = FALSE)))
+# Segment F seul, puis les deux segments (#247 ; constat M2 de l'audit) :
+# décès au seul âge 60, z = 2 (C = 1) ; segments cités dans l'ordre de la
+# table des segments (F, H).
+TEXTE_247 <- paste("Le maximum existe si et seulement si C >= z, C décompte des blocs de cellules exposées consécutives",
+                   "avec décès (un bloc de L cellules compte L s'il contient la première ou la dernière cellule exposée,",
+                   "sinon L arrondi au pair supérieur) ; la condition ne dépend ni de lambda ni des effectifs. Élargir la",
+                   "plage d'âges, regrouper des segments ou prendre ordre_difference au plus égal au plus petit C cité.")
+verifier("F lissage_maximum_inexistant (#247) sur le segment F seul (décès au seul âge 60, z = 2, C = 1 ; H complet) : message exact, segments F, decompte 1L (valeur calculée à la main)", {
+  d60 <- numeric(length(AGES)); d60[21L] <- 6
+  r <- rc(jeu(df = d60))
+  ok <- controle(r, "lissage", "lissage_maximum_inexistant",
+                 paste("Lissage : 1 segment(s) sans maximum fini de la vraisemblance de Poisson pénalisée sur la plage",
+                       "d'âges 40 à 60 (z = 2) : sexe = « F » (âge(s) avec décès : 60, C = 1).", TEXTE_247))
+  if (!isTRUE(ok)) return(ok)
+  if (identical(r$details$segments$sexe, "F") && identical(r$details$decompte, 1L)) TRUE else "details différents"
+})
+verifier("F lissage_maximum_inexistant (#247) sur les deux segments (décès au seul âge 60, z = 2) : message au pluriel exact, segments F et H, decompte c(1L, 1L) (valeur calculée à la main)", {
+  d60 <- numeric(length(AGES)); d60[21L] <- 10
+  r <- rc(jeu(dh = d60, df = d60))
+  ok <- controle(r, "lissage", "lissage_maximum_inexistant",
+                 paste("Lissage : 2 segment(s) sans maximum fini de la vraisemblance de Poisson pénalisée sur la plage",
+                       "d'âges 40 à 60 (z = 2) : sexe = « F » (âge(s) avec décès : 60, C = 1) ; sexe = « H » (âge(s)",
+                       "avec décès : 60, C = 1).", TEXTE_247))
+  if (!isTRUE(ok)) return(ok)
+  if (identical(r$details$segments$sexe, c("F", "H")) && identical(r$details$decompte, c(1L, 1L))) TRUE
+  else "details différents"
+})
+verifier("F ordre des refus (#247) : âges 40 et 60 seuls observés, z = 2, H sans décès à 40 (C = 1 < z) : lissage_interpolation_deces_nul, premier dans l'ordre", {
+  d <- jeu(ages = c(40, 60), eh = EH[c(1L, 21L)], dh = c(0, DH[21L]), df = c(2, 3))
+  ok <- controle(rc(d), "lissage", "lissage_interpolation_deces_nul")
+  if (!isTRUE(ok)) return(ok)
+  if (identical(tablexp:::decompte_maximum(c(TRUE, TRUE), c(FALSE, TRUE)), 1L)) TRUE else "C différent de 1"
+})
+# Comportement spécifié, non défaut connu : le plafond ITERATIONS_MAX_LISSAGE
+# (100) est une constante déclarée et le refus lissage_non_convergent est
+# prescrit (#247). Mesure d'actuary (26/11/2026, R 4.3.3, plafond relevé hors
+# dépôt) : PIRLS converge sur ce jeu en 107 itérations, vers un optimum où
+# theta descend à -88 606,7 et où m s'annule en flottant sur 54 des 71 âges
+# (C = z, cas limite : maximum fini mais dégénéré). Relever le plafond
+# produirait une table à taux nuls ; ce n'est pas une correction.
+verifier("F lissage_non_convergent à maximum existant (#247 ; cas de la remesure (0'), § 4) : âges 20 à 90, H décès 10 aux âges 21 et 24 (C = 4), F décès à tous les âges, z = 4, lambda = 1 déclaré : segment H, plafond de 100 itérations (lisser_poisson() : 100 itérations) ; message exact (constat de mesure, R 4.3.3)", {
+  a <- 20:90
+  eh <- round(1000 * exp(-0.01 * (a - 20)), 3)
+  dh <- numeric(length(a)); dh[a %in% c(21, 24)] <- 10
+  r <- rc(jeu(ages = a, eh = eh, dh = dh, df = rep(10, length(a))),
+          lissage = avec(plage_ages = c(20, 90), ordre_difference = 4, parametre_lissage = 1))
+  direct <- lp(dh, eh, 1, 4, a, ldp(length(a), 4))
+  tous(list(
+    controle(r, "lissage", "lissage_non_convergent",
+             paste("Lissage : l'algorithme de la vraisemblance de Poisson pénalisée ne converge pas pour sexe = « H »,",
+                   "lambda = 1 (plafond de 100 itérations atteint, déviance pénalisée non décroissante ou non finie après",
+                   "30 divisions du pas sans convergence numérique, ou rang numérique du système perdu en cours",
+                   "d'itération) ; le maximum existe pour ces données (condition C >= z vérifiée avant les itérations)",
+                   "mais n'est pas atteint numériquement ; aucune table lissée n'est produite."),
+             NULL),
+    if (identical(names(r$details), c("plage_ages", "ordre_difference", "segments", "parametre_lissage")) &&
+        identical(r$details$segments$sexe, "H") && identical(r$details$parametre_lissage, 1)) TRUE
+    else "details différents",
+    if (identical(tablexp:::decompte_maximum(eh > 0, dh > 0), 4L)) TRUE else "C différent de 4",
+    if (identical(direct$statut, "non_convergent") && identical(direct$iterations, 100L)) TRUE
+    else sprintf("lisser_poisson() : %s, %d itération(s)", direct$statut, direct$iterations)))
+})
+verifier("F lissage_non_convergent à maximum existant sous laml (#247 ; constat M1 de l'audit) : même jeu (C = 4, z = 4), intervalle_lissage = c(1, 1e4) : segment H cité au lambda de la grille où l'algorithme échoue, la borne inférieure 1 (constat de mesure, R 4.3.3)", {
+  a <- 20:90
+  eh <- round(1000 * exp(-0.01 * (a - 20)), 3)
+  dh <- numeric(length(a)); dh[a %in% c(21, 24)] <- 10
+  r <- rc(jeu(ages = a, eh = eh, dh = dh, df = rep(10, length(a))),
+          lissage = avec(LAML, plage_ages = c(20, 90), ordre_difference = 4, intervalle_lissage = c(1, 1e4)))
   ok <- controle(r, "lissage", "lissage_non_convergent")
   if (!isTRUE(ok)) return(ok)
-  identical(r$details$parametre_lissage, 1e-2)
+  if (identical(r$details$segments$sexe, "H") && identical(r$details$parametre_lissage, 1)) TRUE
+  else sprintf("segments %s, parametre_lissage %.17g", paste(r$details$segments$sexe, collapse = ", "),
+               r$details$parametre_lissage)
 })
 verifier("F lissage_systeme_rang_deficient sous wh_poisson : lambda = 1e20, z = 3 ; message de la variante (b), details", {
   r <- rc(lissage = avec(parametre_lissage = 1e20, ordre_difference = 3))
@@ -416,11 +681,12 @@ verifier("G table_lissee : data.frame nu, colonnes sexe, age, qx, etat, levier, 
     is.integer(t$age) && all(t$qx > 0 & t$qx < 1) && all(t$etat == "observee") &&
     all(t$borne_inf_credibilite < t$qx & t$qx < t$borne_sup_credibilite)
 })
-verifier("G segments : colonnes et types (iterations integer) ; etat produite sous declare", {
+verifier("G segments : colonnes et types (iterations integer ; dimension_non_penalisee integer après ddl_effectifs, valeur z par segment, ADR 0017, point 5.7, #242) ; etat produite sous declare", {
   s <- L1$resultat$segments
   identical(names(s), c("sexe", "cellules", "cellules_ponderees", "cellules_interpolees", "evenements",
-                        "parametre_lissage", "ddl_effectifs", "regularite", "laml", "deviance_penalisee", "iterations",
-                        "residu_conservation_0", "residu_conservation_1", "etat")) &&
+                        "parametre_lissage", "ddl_effectifs", "dimension_non_penalisee", "regularite", "laml",
+                        "deviance_penalisee", "iterations", "residu_conservation_0", "residu_conservation_1", "etat")) &&
+    identical(s$dimension_non_penalisee, rep(as.integer(L1$parametres$ordre_difference), 2L)) &&
     all(vapply(s[c("cellules", "cellules_ponderees", "cellules_interpolees", "evenements", "iterations")], is.integer, NA)) &&
     all(vapply(s[c("parametre_lissage", "ddl_effectifs", "regularite", "laml", "deviance_penalisee",
                    "residu_conservation_0", "residu_conservation_1")], is.double, NA)) &&
@@ -443,9 +709,9 @@ verifier("G table_lissee recalculée par lisser_poisson() sur D et E^c de l'éta
     identical(s$ddl_effectifs[s$sexe == "H"], r$ddl_effectifs) && identical(s$laml[s$sexe == "H"], r$laml) &&
     identical(s$iterations[s$sexe == "H"], r$iterations)
 })
-verifier("G contrat de la table construite (ADR 0017, points 1.5 et 5.5) : table_construite() accepte table_lissee de wh_poisson, somme des leviers identical() à ddl_effectifs", {
+verifier("G contrat de la table construite (ADR 0017, points 1.5, 5.5 et 5.7) : table_construite() accepte table_lissee de wh_poisson, somme des leviers identical() à ddl_effectifs, ddl_effectifs rendu avec dimension_non_penalisee", {
   r <- tablexp:::table_construite(X1$etapes, "sexe", "lissage")
-  identical(r$table, L1$resultat$table_lissee) && identical(r$ddl_effectifs, L1$resultat$segments[c("sexe", "ddl_effectifs")])
+  identical(r$table, L1$resultat$table_lissee) && identical(r$ddl_effectifs, L1$resultat$segments[c("sexe", "ddl_effectifs", "dimension_non_penalisee")])
 })
 verifier("G cellule intérieure sans ligne (H, âge 50) : état interpolee, levier 0, bornes produites ; cellules_interpolees", {
   d <- jeu(); d <- d[!(d$sexe == "H" & d$age == 50), ]

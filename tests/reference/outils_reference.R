@@ -46,11 +46,24 @@
 #  - TOLERANCES, tolerance_de(chemin) : classes de tolérance, clé qualifiée
 #    `<table>/<colonne>` prioritaire, recherche par le suffixe le plus long
 #    (seconde annotation, (a)) ;
-#  - comparer_references(reference, obtenu, tolerances) : empreinte des
-#    données en premier (point 3.2), structure exacte (point 3.1), valeurs
-#    élément par élément (point 3.3 ; seconde annotation, (c)) ; un double
-#    sans classe est un échec (point 3.4) ;
-#  - imprimer_comparaison(r) : impression du point 3.5 ;
+#  - comparer_references(reference, obtenu, tolerances, echelles, constats) :
+#    empreinte des données en premier (point 3.2), structure exacte (point
+#    3.1), valeurs élément par élément (point 3.3 ; seconde annotation, (c)) ;
+#    un double sans classe est un échec (point 3.4) ; éléments couverts par
+#    ECHELLES_ABSOLUES jugés par la règle absolue |a - b| <= tau x facteur x S
+#    (S lue côté référence ; déclaration invalide : échec, jamais de repli),
+#    et, si `constats` (chemins du plan, passés par la batterie seule en
+#    régime de constat) n'est pas vide, requalification en « constat hors
+#    plateforme de référence » sous condition de cause (ADR 0009, annotation
+#    du 26/11/2026, (b) et (f) ; #243) ; strict par défaut ;
+#  - echelle_de(), CLASSES_ABSOLUES, ECHELLES_ABSOLUES,
+#    CONSTATS_HORS_PLATEFORME, VALIDATION_HORS_TABLE_LISSEE,
+#    regime_comparaison(plateforme, entete), verrou_regimes(regimes) : règle
+#    absolue, déclarations, régime de comparaison et son verrou (même
+#    annotation, (b), (f) 2 et 3, (g) 3) ;
+#  - imprimer_comparaison(r) : impression du point 3.5 (régime, compteurs
+#    des constats et des déclarations d'échelle invalides, une ligne par
+#    classe absolue ; annotation du 26/11/2026, (g) 1) ;
 #  - references_orphelines(dossier) : fichiers sans plan (point 3.7) ;
 #  - regle_mode(), controle_bascule(), sortie_interdite() : règles des modes
 #    du workflow (point 5.2) et garde du dossier de sortie (point 9.4,
@@ -376,18 +389,119 @@ TOLERANCES <- c(
   "coherence_regularite/resultat/ages/qx" = 0,
   "coherence_regularite/resultat/ordre_segments/g_superieure" = 0,
   "coherence_regularite/resultat/ordre_segments/g_inferieure" = 0,
-  # 1e-14 : différences (delta1, delta2, ecart), somme des carrés des
-  # différences d'ordre z (S_z), r = somme ab / somme b^2 et S^r = somme
-  # (a - r b)^2 : arithmétique IEEE de base. Annulation : une variation d'un
-  # ulp de q en amont se lit amplifiée (constat, lignes permutées de R15 :
-  # delta1 2,5e-11) ; sur la plateforme de référence, q est identique au bit
-  # près (même argument que (delta), annotation du 12/11/2026, (d) 1).
+  # 1e-14 : différences (delta1, delta2, ecart) : arithmétique IEEE de base.
+  # Annulation : une variation d'un ulp de q en amont se lit amplifiée
+  # (constat, lignes permutées de R15 : delta1 2,5e-11) ; sur la plateforme
+  # de référence, q est identique au bit près (même argument que (delta),
+  # annotation du 12/11/2026, (d) 1). Ces trois clés sont jugées par la
+  # règle absolue d'ECHELLES_ABSOLUES (ADR 0009, annotation du 26/11/2026,
+  # (b)) ; leur classe relative ne sert qu'à la complétude (point 3.4) et
+  # n'est jamais un repli pour un élément couvert.
   "coherence_regularite/resultat/ages/delta1" = 1e-14,
   "coherence_regularite/resultat/ages/delta2" = 1e-14,
   "coherence_regularite/resultat/ordre_segments/ecart" = 1e-14,
-  "coherence_regularite/resultat/regularite/regularite" = 1e-14,
-  "coherence_regularite/resultat/regularite/r_estime" = 1e-14,
-  "coherence_regularite/resultat/regularite/regularite_r" = 1e-14)
+  # 1e-10 : agrégats S_z (somme des carrés des différences d'ordre z),
+  # r = somme ab / somme b^2 et S^r = somme (a - r b)^2, sous la règle
+  # relative 3.3 (ADR 0009, annotation du 26/11/2026, (d) ; M429) : écarts
+  # relatifs sous permutation des lignes de R15 jusqu'à 9,65e-13 (vingt-trois
+  # permutations, constat de simulation rapporté) ; 1e-12 n'en couvrirait que
+  # 1,04 fois le plus grand. Reclassées de 1e-14.
+  "coherence_regularite/resultat/regularite/regularite" = 1e-10,
+  "coherence_regularite/resultat/regularite/r_estime" = 1e-10,
+  "coherence_regularite/resultat/regularite/regularite_r" = 1e-10)
+
+# --- règle absolue à une échelle déclarée (ADR 0009, annotation du 26/11/2026,
+# (b) et (c) ; #243, M429, M604) -----------------------------------------------
+
+# Classes absolues, distinctes de CLASSES_TOLERANCE : nom_classe() retrouve une
+# classe relative par sa valeur, et 1e-10 comme 1e-12 sont déjà des classes
+# relatives ((b) 1). Statut de tau : constat de mesure sur vingt-trois
+# permutations des lignes de l'entrée (constat de simulation), non borne
+# démontrée ((c) 3) ; condition de réexamen : (c) 5.
+CLASSES_ABSOLUES <- c("abs_1e-10" = 1e-10, "abs_1e-12" = 1e-12)
+
+# Déclarations (b) 2 : une ligne couvre un chemin double si `cle` en est un
+# suffixe, segment par segment (comme cles_de()). `selection` NA : tous les
+# éléments sont couverts et `echelle` nomme une colonne soeur (même table,
+# même longueur), S_i étant sa valeur à la ligne i ; sinon `selection` et
+# `echelle` sont des égalités `colonne=valeur` séparées par `;`, sur des
+# colonnes soeurs de type character, comparées en chaînes exactes, qui
+# désignent chacune un élément et un seul du même vecteur (S : la valeur de
+# l'élément désigné par `echelle`). Règle : |a - b| <= tau x facteur x S_i,
+# S lue du côté de la référence, quels que soient les signes et la présence
+# d'un zéro ((b) 3). Les colonnes sont découpées par strsplit(), jamais
+# évaluées. Facteurs ((c) 1) : borne de l'erreur d'arrondi de la différence,
+# exprimée en multiples de S. Chaque opérande qui porte une erreur d'arrondi
+# compte pour |coefficient| x |opérande| / S. Différences de taux calculés,
+# dont l'échelle est un opérande et dont les autres opérandes sont du même
+# ordre : somme des |coefficients| (2 pour delta1 et ordre_segments/ecart, 4
+# pour delta2). Différence entre un total calculé et un total observé pris
+# pour échelle : 1, le total calculé étant de l'ordre de S (Sigma m = Sigma D
+# à la convergence pour residu_conservation_0 ; A = O / SMR pour la ligne
+# smr/ecart, approximation absorbée par la marge, (c) 4). 120 pour le moment
+# d'ordre 1 (Sigma x D <= 120 Sigma D pour des âges au plus égaux à 120 :
+# invariant (x), AGE_MAXIMAL_MOMENT). Statut : majoration heuristique, non
+# borne démontrée ; tau est un constat de mesure ((c) 3). Toute modification
+# est annotée dans l'ADR 0009, datée, avec l'avis d'actuary (point 9.3).
+ECHELLES_ABSOLUES <- data.frame(
+  cle = c("lissage/resultat/segments/residu_conservation_0",
+          "lissage/resultat/segments/residu_conservation_1",
+          "validation/resultat/statistiques/valeur",
+          "coherence_regularite/resultat/ages/delta1",
+          "coherence_regularite/resultat/ages/delta2",
+          "coherence_regularite/resultat/ordre_segments/ecart"),
+  selection = c(NA, NA, "statistique=smr;grandeur=ecart", NA, NA, NA),
+  echelle = c("evenements", "evenements", "statistique=smr;grandeur=observes", "qx", "qx", "g_superieure"),
+  facteur = c(1, 120, 1, 2, 4, 2),
+  classe = c("abs_1e-10", "abs_1e-10", "abs_1e-10", "abs_1e-12", "abs_1e-12", "abs_1e-12"),
+  stringsAsFactors = FALSE)
+# Invariant (x) : le facteur 120 de la clé CLE_MOMENT_AGE n'est une borne que
+# si la plage d'âges du lissage (CHEMIN_PLAGE_LISSAGE, lue dans la référence)
+# s'arrête au plus à AGE_MAXIMAL_MOMENT.
+CLE_MOMENT_AGE <- "lissage/resultat/segments/residu_conservation_1"
+CHEMIN_PLAGE_LISSAGE <- "etapes/lissage/parametres/plage_ages"
+AGE_MAXIMAL_MOMENT <- 120
+
+# Verdicts propres aux règles de l'annotation du 26/11/2026 ((b) 5, (f) 4).
+VERDICT_ECHELLE_INVALIDE <- "déclaration d'échelle invalide"
+VERDICT_CONSTAT <- "constat hors plateforme de référence"
+
+# --- règle (d) 4 arrêtée : constat hors plateforme de référence (ADR 0009,
+# annotation du 26/11/2026, (f) ; #243, D11 de M604, M606) ---------------------
+
+# Chemins complets, exacts (aucun préfixe), dont l'écart par des paires de
+# valeurs finies devient « constat hors plateforme de référence » en régime
+# de constat (regime_comparaison()), sous la condition de cause de (f) 4.
+# Propriété du fichier de référence d'un plan, déclarée par plan ((f) 2) :
+# R15, les quatre recopies exactes de q ; R16 et R17, les onze doubles de
+# etapes/validation/ calculés à partir de la table lissée. Toute
+# modification est une modification du critère : annotation datée, avec
+# l'avis d'actuary (point 9.3). Les résidus de la validation de R15 n'y sont
+# pas (#385, (i) 2).
+CHEMINS_VALIDATION_LISSEE <- paste0("etapes/validation/", c(
+  "parametres/ddl_effectifs/ddl_effectifs", "parametres/ddl_effectifs/ddl_effectifs_retenus",
+  "resultat/cellules/qx_table", "resultat/cellules/taux_table", "resultat/cellules/attendus",
+  "resultat/cellules/residu_reponse", "resultat/cellules/residu_pearson", "resultat/cellules/residu_deviance",
+  "resultat/statistiques/valeur", "resultat/sous_groupes/attendus", "resultat/sous_groupes/smr"))
+CONSTATS_HORS_PLATEFORME <- data.frame(
+  plan = c(rep("R15", 4L), rep("R16", 11L), rep("R17", 11L)),
+  chemin = c("etapes/coherence_regularite/resultat/ages/qx",
+             "etapes/coherence_regularite/resultat/ordre_segments/g_superieure",
+             "etapes/coherence_regularite/resultat/ordre_segments/g_inferieure",
+             "etapes/validation/resultat/cellules/qx_table",
+             CHEMINS_VALIDATION_LISSEE, CHEMINS_VALIDATION_LISSEE),
+  stringsAsFactors = FALSE)
+# Invariant de complétude de (f) 2 : les onze doubles finis de
+# etapes/validation/ de R16 et R17 qui ne dépendent pas de la table lissée
+# (six échos du plan, exposition hors plage, trois colonnes des cellules
+# tirées des seules observations, nombre de réplications).
+VALIDATION_HORS_TABLE_LISSEE <- paste0("etapes/validation/", c(
+  "parametres/plage_ages", "parametres/tranches_age", "parametres/niveau", "parametres/replications",
+  "parametres/n_max_wilcoxon_exact", "parametres/n_max_runs_exact", "diagnostics/exposition_hors_plage",
+  "resultat/cellules/exposition_centrale", "resultat/cellules/taux_brut", "resultat/cellules/probabilite_brute",
+  "resultat/monte_carlo/replications"))
+# Préfixe des doubles dont la différence établit la condition de cause ((f) 4).
+PREFIXE_CAUSE_CONSTAT <- "etapes/lissage/resultat/"
 
 nom_classe <- function(tol) names(CLASSES_TOLERANCE)[match(tol, CLASSES_TOLERANCE)]
 
@@ -1110,7 +1224,188 @@ identiques_elements <- function(a, b) {
   (is.na(a) & is.na(b)) | (!is.na(a) & !is.na(b) & a == b)
 }
 
-comparer_references <- function(reference, obtenu, tolerances = TOLERANCES) {
+# --- règle absolue : grammaire, couverture et échelle ((b) 2 à 5) --------------
+
+# `cle` couvre `chemin` si elle en est un suffixe, segment par segment.
+cle_couvre <- function(cle, chemin) chemin == cle | endsWith(chemin, paste0("/", cle))
+
+# Égalités `colonne=valeur` séparées par `;` ((b) 2), découpées par
+# strsplit(), jamais évaluées : vecteur nommé (colonne -> valeur), ou NULL si
+# le texte sort de la grammaire (colonne : lettre puis lettres, chiffres ou
+# `_` ; valeur non vide, sans `=` ni `;` ; colonne non répétée).
+analyser_selection <- function(texte) {
+  if (!is.character(texte) || length(texte) != 1L || is.na(texte) || !nzchar(texte)) return(NULL)
+  morceaux <- strsplit(texte, ";", fixed = TRUE)[[1L]]
+  if (!length(morceaux) || endsWith(texte, ";")) return(NULL)
+  paires <- strsplit(morceaux, "=", fixed = TRUE)
+  ok <- vapply(seq_along(morceaux), function(i)
+    length(paires[[i]]) == 2L && !endsWith(morceaux[i], "=") &&
+      grepl("^[A-Za-z][A-Za-z0-9_]*$", paires[[i]][1L]) && grepl("^[^=;]+$", paires[[i]][2L]), NA)
+  if (!all(ok)) return(NULL)
+  colonnes <- vapply(paires, `[`, "", 1L)
+  if (anyDuplicated(colonnes)) return(NULL)
+  stats::setNames(vapply(paires, `[`, "", 2L), colonnes)
+}
+nom_colonne_valide <- function(x) is.character(x) && length(x) == 1L && !is.na(x) && grepl("^[A-Za-z][A-Za-z0-9_]*$", x)
+
+# Défauts de forme d'une table de déclarations (invariants (ii) à (iv) ; la
+# couverture (v) et l'appartenance à TOLERANCES (i) sont contrôlées par la
+# batterie, qui connaît les fichiers) ; character(0) si la table est conforme.
+defauts_forme_echelles <- function(echelles, classes = CLASSES_ABSOLUES) {
+  colonnes <- c(cle = "character", selection = "character", echelle = "character", facteur = "double",
+                classe = "character")
+  if (!is.data.frame(echelles) || !identical(names(echelles), names(colonnes)) ||
+      !identical(vapply(echelles, typeof, ""), colonnes))
+    return("table : data.frame de colonnes cle, selection, echelle, classe (character) et facteur (double) exigé, dans cet ordre")
+  d <- character(0)
+  for (i in seq_len(nrow(echelles))) {
+    e <- echelles[i, ]; n <- sprintf("ligne %d (%s)", i, e$cle)
+    if (is.na(e$cle) || !nzchar(e$cle)) d <- c(d, paste(n, ": cle vide"))
+    if (!(e$classe %in% names(classes))) d <- c(d, sprintf("%s : classe %s inconnue (ii)", n, e$classe))
+    if (!is.finite(e$facteur) || e$facteur <= 0) d <- c(d, sprintf("%s : facteur %s non fini ou non strictement positif (iii)", n, format(e$facteur)))
+    if (is.na(e$selection)) {
+      if (!nom_colonne_valide(e$echelle)) d <- c(d, sprintf("%s : echelle %s : nom de colonne soeur attendu (iv)", n, e$echelle))
+    } else {
+      if (is.null(analyser_selection(e$selection))) d <- c(d, sprintf("%s : selection %s hors de la grammaire colonne=valeur;... (iv)", n, e$selection))
+      if (is.null(analyser_selection(e$echelle))) d <- c(d, sprintf("%s : echelle %s hors de la grammaire colonne=valeur;... (iv)", n, e$echelle))
+    }
+  }
+  doublons <- duplicated(paste(echelles$cle, ifelse(is.na(echelles$selection), "\001NA", echelles$selection), sep = "\002"))
+  if (any(doublons)) d <- c(d, sprintf("couple (cle, selection) répété : %s (iv)", echelles$cle[doublons]))
+  d
+}
+
+# Éléments d'un vecteur désignés par une sélection (vecteur nommé
+# colonne -> valeur) sur les colonnes soeurs de `chemin` dans `reference` ;
+# rend list(indices, raison) (raison NA si les colonnes sont admissibles).
+designer <- function(sel, chemin, reference, n) {
+  dossier <- dirname_chemin(chemin)
+  masque <- rep(TRUE, n)
+  for (col in names(sel)) {
+    soeur <- joindre(dossier, col)
+    if (!soeur %in% names(reference$types))
+      return(list(indices = integer(0), raison = sprintf("colonne soeur %s absente de la référence", soeur)))
+    if (!identical(reference$types[[soeur]], "character") || length(reference$valeurs[[soeur]]) != n)
+      return(list(indices = integer(0), raison = sprintf("colonne soeur %s : character de longueur %d exigé", soeur, n)))
+    v <- reference$valeurs[[soeur]]
+    masque <- masque & !is.na(v) & v == enc2utf8(sel[[col]])
+  }
+  list(indices = which(masque), raison = NA_character_)
+}
+
+# Couverture de `chemin` (double, n éléments) par les déclarations, lue du
+# côté de la référence ((b) 3 et 5) : NULL si aucune ligne ne le couvre ;
+# sinon list(couvert, S, facteur, tau, classe) par élément (NA hors
+# couverture) et `invalide`, raisons des violations de (vii) à (x) (vide si
+# la déclaration est valide). Jamais de repli : une violation rend le vecteur
+# entier invalide.
+echelle_de <- function(chemin, reference, echelles = ECHELLES_ABSOLUES, classes = CLASSES_ABSOLUES) {
+  lignes <- which(cle_couvre(echelles$cle, chemin))
+  if (!length(lignes)) return(NULL)
+  n <- length(reference$valeurs[[chemin]])
+  a <- reference$valeurs[[chemin]]
+  r <- list(couvert = rep(FALSE, n), S = rep(NA_real_, n), facteur = rep(NA_real_, n), tau = rep(NA_real_, n),
+            classe = rep(NA_character_, n), invalide = character(0))
+  invalide <- function(m) r$invalide <<- c(r$invalide, m)
+  if (length(defauts_forme_echelles(echelles[lignes, , drop = FALSE], classes)))
+    invalide("déclaration hors de la forme de (b) 2 (invariants (ii) à (iv))")
+  else if (sum(is.na(echelles$selection[lignes])) > 1L || (anyNA(echelles$selection[lignes]) && length(lignes) > 1L))
+    invalide("plusieurs déclarations couvrent le vecteur dont au moins une entière (selection NA)")
+  if (length(r$invalide)) return(r)
+  for (l in lignes) {
+    e <- echelles[l, ]
+    if (is.na(e$selection)) {
+      soeur <- joindre(dirname_chemin(chemin), e$echelle)
+      if (!soeur %in% names(reference$types)) { invalide(sprintf("échelle %s absente de la référence (vii)", soeur)); next }
+      if (!reference$types[[soeur]] %in% c("double", "integer") || length(reference$valeurs[[soeur]]) != n) {
+        invalide(sprintf("échelle %s : double ou integer de longueur %d exigé (vii)", soeur, n)); next
+      }
+      i <- seq_len(n); S <- as.double(reference$valeurs[[soeur]])
+      etiquette <- soeur
+    } else {
+      d <- designer(analyser_selection(e$selection), chemin, reference, n)
+      if (!is.na(d$raison)) { invalide(paste(d$raison, "(ix)")); next }
+      if (length(d$indices) != 1L) {
+        invalide(sprintf("sélection %s : %d élément(s) désigné(s) au lieu d'un seul (ix)", e$selection, length(d$indices))); next
+      }
+      j <- designer(analyser_selection(e$echelle), chemin, reference, n)
+      if (!is.na(j$raison)) { invalide(paste(j$raison, "(ix)")); next }
+      if (length(j$indices) != 1L || identical(j$indices, d$indices)) {
+        invalide(sprintf("échelle %s : %d élément(s) désigné(s) au lieu d'un seul, distinct de la sélection (ix)",
+                         e$echelle, length(j$indices))); next
+      }
+      i <- d$indices; S <- as.double(a[j$indices])
+      etiquette <- sprintf("%s[%s]", chemin, e$echelle)
+    }
+    if (any(r$couvert[i])) { invalide(sprintf("élément couvert par deux déclarations (%s)", e$cle)); next }
+    Si <- if (length(S) == 1L) rep(S, length(i)) else S[i]
+    a_finie <- is.finite(a[i])
+    if (any(a_finie & !(is.finite(Si) & Si > 0))) {
+      invalide(sprintf("échelle %s non finie ou non strictement positive pour un élément couvert de valeur finie (viii)", etiquette)); next
+    }
+    if (cle_couvre(CLE_MOMENT_AGE, chemin)) {
+      p <- reference$valeurs[[CHEMIN_PLAGE_LISSAGE]]
+      if (!identical(reference$types[[CHEMIN_PLAGE_LISSAGE]], "double") || length(p) != 2L || !all(is.finite(p)) ||
+          max(p) > AGE_MAXIMAL_MOMENT) {
+        invalide(sprintf("%s : borne supérieure au plus %g exigée pour le facteur %g de %s (x)", CHEMIN_PLAGE_LISSAGE,
+                         AGE_MAXIMAL_MOMENT, e$facteur, CLE_MOMENT_AGE)); next
+      }
+    }
+    r$couvert[i] <- TRUE; r$S[i] <- Si; r$facteur[i] <- e$facteur
+    r$tau[i] <- classes[[e$classe]]; r$classe[i] <- e$classe
+  }
+  r
+}
+
+# --- régime de comparaison ((f) 3) --------------------------------------------
+
+# Fonction pure : `plateforme` est identifiant_plateforme() de l'exécution
+# (controle, defauts), `entete` celui du fichier de référence lu. Régime de
+# constat si et seulement si (i) la plateforme d'exécution n'est pas la
+# plateforme de référence (défauts non vides : prédicat de l'étape
+# « Plateforme (mode strict) » de la CI), (ii) l'en-tête porte au moins une
+# ligne `plateforme :` et (iii) ces lignes diffèrent de plateforme$controle ;
+# toute indétermination vaut régime strict. Rend list(regime, raison, mixte) ;
+# `mixte` : plateforme conforme et en-tête différent (bascule en cours,
+# point 5.2), régime strict, mention imprimée.
+regime_comparaison <- function(plateforme, entete) {
+  strict <- function(raison, mixte = FALSE) list(regime = "strict", raison = raison, mixte = mixte)
+  chaines <- function(x) is.character(x) && !anyNA(x)
+  if (!is.list(plateforme) || !chaines(plateforme$controle) || !chaines(plateforme$defauts) ||
+      !chaines(entete) || is.null(names(entete)))
+    return(strict("indétermination (relevé de plateforme ou en-tête illisible)"))
+  lignes <- unname(entete[names(entete) == "plateforme"])
+  if (!length(plateforme$defauts)) {
+    if (length(lignes) && !identical(lignes, plateforme$controle))
+      return(strict("plateforme de référence, en-tête d'une autre plateforme (bascule en cours ?)", mixte = TRUE))
+    return(strict("plateforme de référence"))
+  }
+  if (!length(lignes)) return(strict("en-tête sans ligne « plateforme : »"))
+  if (identical(lignes, plateforme$controle)) return(strict("en-tête identique à la plateforme d'exécution"))
+  list(regime = "constat", raison = "hors plateforme de référence, en-tête d'une autre plateforme", mixte = FALSE)
+}
+
+# Verrou en conditions réelles ((g) 3) : quand l'exécution se déclare sur
+# l'image de référence (TABLEXP_IMAGE définie) ou sur la CI (GITHUB_ACTIONS
+# vaut "true"), tout plan doit être en régime strict et aucun chemin de
+# constat ne doit avoir été passé à sa comparaison. `regimes` : vecteur nommé
+# (plan -> régime) ; `constats` : vecteur nommé (plan -> nombre de chemins de
+# constat passés à la comparaison), vide par défaut. Rend TRUE, ou la raison
+# (un échec, jamais une relaxation) ; NA si le verrou est sans objet (poste).
+verrou_regimes <- function(regimes, constats = integer(0), image = Sys.getenv("TABLEXP_IMAGE", unset = NA),
+                           github_actions = Sys.getenv("GITHUB_ACTIONS", unset = "")) {
+  declare <- !is.na(image) || identical(github_actions, "true")
+  if (!declare) return(NA)
+  hors <- names(regimes)[regimes != "strict"]
+  passes <- names(constats)[constats > 0L]
+  if (length(hors) || length(passes))
+    sprintf("exécution déclarée sur la plateforme de référence (TABLEXP_IMAGE définie, même vide, ou GITHUB_ACTIONS = true) et plan(s) hors régime strict : %s ; plan(s) dont la comparaison a reçu des chemins de constat : %s",
+            if (length(hors)) paste(hors, collapse = ", ") else "aucun", if (length(passes)) paste(passes, collapse = ", ") else "aucun")
+  else TRUE
+}
+
+comparer_references <- function(reference, obtenu, tolerances = TOLERANCES, echelles = ECHELLES_ABSOLUES,
+                                constats = character(0)) {
   ch_r <- names(reference$types); ch_o <- names(obtenu$types)
   structure_ <- character(0)
   # Entrée, en premier (point 3.2).
@@ -1133,9 +1428,11 @@ comparer_references <- function(reference, obtenu, tolerances = TOLERANCES) {
   g <- data.frame(chemin = communs, type = character(n), longueur = integer(n), cle = NA_character_,
                   tolerance = NA_real_, n_differents = integer(n), ecart_relatif_max = NA_real_,
                   position = NA_integer_, avant = NA_character_, apres = NA_character_,
-                  verdict = NA_character_, stringsAsFactors = FALSE)
+                  verdict = NA_character_, n_non_finis = integer(n), classe_absolue = NA_character_,
+                  ecart_absolu_max = NA_real_, echelle = NA_real_, facteur = NA_real_, stringsAsFactors = FALSE)
   garde <- rep(TRUE, n)
   cm <- list(chemin = character(0), cle = character(0), classe = character(0), autres = character(0))
+  invalides <- character(0)
   for (k in seq_len(n)) {
     c_ <- communs[k]
     t_r <- reference$types[[c_]]; t_o <- obtenu$types[[c_]]
@@ -1152,11 +1449,20 @@ comparer_references <- function(reference, obtenu, tolerances = TOLERANCES) {
       cm$chemin <- c(cm$chemin, c_); cm$cle <- c(cm$cle, tol$cle)
       cm$classe <- c(cm$classe, nom_classe(tol$tol)); cm$autres <- c(cm$autres, paste(tol$autres, collapse = ", "))
     }
+    # Règle absolue ((b) 3 et 5) : couverture et échelle lues côté référence,
+    # invariants (vii) à (x) contrôlés à chaque comparaison, même si le
+    # vecteur est identique (propriétés du fichier commité).
+    ech <- if (t_r == "double") echelle_de(c_, reference, echelles) else NULL
+    invalide <- !is.null(ech) && length(ech$invalide)
+    if (invalide) invalides <- c(invalides, paste0(c_, " : ", ech$invalide))
+    couvert <- if (!is.null(ech) && !invalide) ech$couvert else rep(FALSE, length(a))
+    if (any(couvert)) g$classe_absolue[k] <- paste(unique(ech$classe[couvert]), collapse = ", ")
     va <- if (t_r == "Date") unclass(a) else a; vb <- if (t_r == "Date") unclass(b) else b
     id <- if (t_r == "NULL") logical(0) else identiques_elements(va, vb)
-    if (all(id)) {
+    if (all(id) && !invalide) {
       g$type[k] <- t_r; g$longueur[k] <- length(a); g$cle[k] <- tol$cle; g$tolerance[k] <- tol$tol
       g$ecart_relatif_max[k] <- if (t_r == "double") 0 else NA_real_
+      if (any(couvert)) g$ecart_absolu_max[k] <- 0
       g$verdict[k] <- if (t_r == "double" && is.na(tol$tol)) "sans tolérance déclarée" else "identique"
       next
     }
@@ -1168,29 +1474,70 @@ comparer_references <- function(reference, obtenu, tolerances = TOLERANCES) {
                                           c_, length(pos_nf), i, texte_valeur(b[i], t_r), texte_valeur(a[i], t_r)))
     }
     diff <- which(!id & !non_fini)
-    rel <- if (t_r == "double" && length(diff))
-      abs(va[diff] - vb[diff]) / pmax(abs(va[diff]), abs(vb[diff])) else numeric(0)
-    meme_signe <- if (length(diff) && t_r == "double") sign(va[diff]) == sign(vb[diff]) & va[diff] != 0 & vb[diff] != 0 else logical(0)
     sans_tol <- t_r == "double" && is.na(tol$tol)
-    hors <- if (t_r != "double" || sans_tol) rep(TRUE, length(diff)) else !(meme_signe & rel <= tol$tol)
-    j <- if (length(rel)) diff[which.max(rel)] else if (length(diff)) diff[1L]
-         else if (length(pos_nf)) pos_nf[1L] else NA_integer_
+    # Éléments couverts : |a - b| <= tau x facteur x S_i, quels que soient les
+    # signes et la présence d'un zéro ; la classe relative n'est jamais un
+    # repli. Éléments non couverts : règle relative 3.3, inchangée.
+    dc <- diff[couvert[diff]]; dr <- diff[!couvert[diff]]
+    rel <- if (t_r == "double" && length(dr))
+      abs(va[dr] - vb[dr]) / pmax(abs(va[dr]), abs(vb[dr])) else numeric(0)
+    meme_signe <- if (length(dr) && t_r == "double") sign(va[dr]) == sign(vb[dr]) & va[dr] != 0 & vb[dr] != 0 else logical(0)
+    norm <- if (length(dc)) abs(va[dc] - vb[dc]) / (ech$facteur[dc] * ech$S[dc]) else numeric(0)
+    hors_r <- if (t_r != "double" || sans_tol) rep(TRUE, length(dr)) else !(meme_signe & rel <= tol$tol)
+    hors_c <- if (sans_tol) rep(TRUE, length(dc)) else !(norm <= ech$tau[dc])
+    # Position imprimée : sans élément couvert, celle de l'écart relatif
+    # maximal (règle inchangée) ; sinon, l'élément le plus défavorable,
+    # rapporté à sa propre borne.
+    j <- if (!length(dc)) {
+      if (length(rel)) dr[which.max(rel)] else if (length(dr)) dr[1L] else if (length(pos_nf)) pos_nf[1L] else NA_integer_
+    } else {
+      rapport <- c(if (length(dr)) rel / if (sans_tol || t_r != "double") NA_real_ else tol$tol, norm / ech$tau[dc])
+      rapport[is.na(rapport)] <- Inf
+      c(dr, dc)[which.max(rapport)]
+    }
     g$type[k] <- t_r; g$longueur[k] <- length(a); g$cle[k] <- tol$cle; g$tolerance[k] <- tol$tol
     g$n_differents[k] <- length(diff) + length(pos_nf)
+    g$n_non_finis[k] <- length(pos_nf)
     g$ecart_relatif_max[k] <- if (length(rel)) max(rel) else if (t_r == "double") 0 else NA_real_
+    if (any(couvert)) {
+      g$ecart_absolu_max[k] <- if (length(norm)) max(norm) else 0
+      m <- if (length(dc)) dc[which.max(norm)] else which(couvert)[1L]
+      g$echelle[k] <- ech$S[m]; g$facteur[k] <- ech$facteur[m]
+    }
     g$position[k] <- j
     if (!is.na(j)) { g$avant[k] <- texte_valeur(a[j], t_r); g$apres[k] <- texte_valeur(b[j], t_r) }
     g$verdict[k] <- if (sans_tol) "sans tolérance déclarée"
-                    else if (length(pos_nf) || any(hors)) "écart"
+                    else if (invalide) VERDICT_ECHELLE_INVALIDE
+                    else if (length(pos_nf) || any(hors_r) || any(hors_c)) "écart"
                     else if (length(diff)) "sous tolérance" else "identique"
   }
   g <- g[garde, , drop = FALSE]
   rownames(g) <- NULL
+  # Constat hors plateforme de référence ((f) 4) : en régime de constat
+  # (`constats` non vide, chemins du plan passés par la batterie seule), un
+  # vecteur double déclaré en « écart » par des paires de valeurs finies est
+  # requalifié, en dernier, si au moins un double de etapes/lissage/resultat/
+  # n'est pas identique dans la même comparaison (condition de cause). Jamais
+  # pour un écart structurel (absent de `g` ou position des non-finis), une
+  # entrée différente, un double sans tolérance, une déclaration d'échelle
+  # invalide ou un autre type.
+  if (length(constats) && !entree$differente && !anyNA(c(e_r, e_o))) {
+    # Cause établie par une différence de valeur (au moins un élément
+    # différent), non par le verdict : un double du lissage identique mais
+    # « sans tolérance déclarée » ou « déclaration d'échelle invalide » ne la
+    # remplit pas (constat mineur 1 de l'audit léger de l'étape (1) de B39).
+    cause <- any(g$type == "double" & startsWith(g$chemin, PREFIXE_CAUSE_CONSTAT) & g$n_differents > 0L)
+    if (cause) {
+      requalifie <- g$chemin %in% constats & g$type == "double" & g$verdict == "écart" & g$n_non_finis == 0L
+      g$verdict[requalifie] <- VERDICT_CONSTAT
+    }
+  }
   cm <- as.data.frame(cm, stringsAsFactors = FALSE)
   sans <- g$chemin[g$verdict == "sans tolérance déclarée"]
-  ok <- !entree$differente && !anyNA(c(e_r, e_o)) && !length(structure_) && all(g$verdict %in% c("identique", "sous tolérance"))
+  ok <- !entree$differente && !anyNA(c(e_r, e_o)) && !length(structure_) &&
+    all(g$verdict %in% c("identique", "sous tolérance", VERDICT_CONSTAT))
   list(ok = ok, entree = entree, structure = structure_, grandeurs = g, sans_tolerance = sans,
-       cles_multiples = cm)
+       cles_multiples = cm, echelles_invalides = invalides, constats = constats)
 }
 
 # Doubles de `grandeurs` qu'aucune clé ne classe (règle de complétude,
@@ -1214,26 +1561,49 @@ imprimer_comparaison <- function(r, titre = "") {
         sprintf("  ou la représentation canonique a changé (%s : « %s » (référence) contre « %s » (obtenu)) ; une entrée inchangée se prouve par la garde 3.2 de tests/test_reproductibilite.R",
                 CHEMIN_REPRESENTATION, r$entree$representation_reference, r$entree$representation_obtenue))
     else sprintf("  Entrée : empreinte des données identique (%s)", r$entree$reference))
-  out <- c(out, sprintf("  Bilan : %d grandeur(s) comparée(s) ; %d identique(s) au bit près ; %d à écart non nul sous tolérance ; %d en écart ; %d sans tolérance déclarée ; %d écart(s) structurel(s)",
+  # Régime de la comparaison ((g) 1) : strict sauf si la batterie a passé
+  # des chemins de constat (régime de constat, (f) 5).
+  n_constats <- sum(g$verdict == VERDICT_CONSTAT)
+  out <- c(out, if (length(r$constats))
+    sprintf("  Régime de la comparaison : constat hors plateforme de référence (%d chemin(s) déclaré(s) pour ce plan, ADR 0009, annotation du 26/11/2026, (f))", length(r$constats))
+    else "  Régime de la comparaison : strict")
+  out <- c(out, sprintf("  Bilan : %d grandeur(s) comparée(s) ; %d identique(s) au bit près ; %d à écart non nul sous tolérance ; %d en écart ; %d sans tolérance déclarée ; %d écart(s) structurel(s) ; %d constat(s) hors plateforme de référence ; %d déclaration(s) d'échelle invalide(s)",
                         nrow(g), sum(g$verdict == "identique"), sum(g$verdict == "sous tolérance"),
-                        sum(g$verdict == "écart"), sum(g$verdict == "sans tolérance déclarée"), length(r$structure)))
+                        sum(g$verdict == "écart"), sum(g$verdict == "sans tolérance déclarée"), length(r$structure),
+                        n_constats, sum(g$verdict == VERDICT_ECHELLE_INVALIDE)))
+  if (n_constats)
+    out <- c(out, sprintf("  NON JUGÉ hors plateforme de référence sur %d chemin(s) : le critère de non-régression est celui de la CI", n_constats))
   d <- g[g$type == "double" & !is.na(g$tolerance), , drop = FALSE]
   for (k in names(CLASSES_TOLERANCE)) {
     x <- d$ecart_relatif_max[d$tolerance == CLASSES_TOLERANCE[[k]]]
     out <- c(out, sprintf("  Écart relatif maximal, classe %-6s : %.3g (%d grandeur(s) double)", k,
                           if (length(x)) max(x) else 0, length(x)))
   }
+  # Une ligne par classe absolue, toujours imprimée, même nulle ((g) 1) :
+  # maximum de |a - b| / (facteur x S) sur les éléments couverts.
+  for (k in names(CLASSES_ABSOLUES)) {
+    x <- g$ecart_absolu_max[!is.na(g$classe_absolue) & g$classe_absolue == k]
+    out <- c(out, sprintf("  Écart rapporté à facteur x échelle maximal, classe %-9s : %.3g (%d grandeur(s) double)", k,
+                          if (length(x)) max(x) else 0, length(x)))
+  }
   if (length(r$structure)) out <- c(out, paste0("  STRUCTURE : ", r$structure))
+  for (m in r$echelles_invalides) out <- c(out, paste0("  DÉCLARATION D'ÉCHELLE INVALIDE : ", m))
   for (c_ in r$sans_tolerance) out <- c(out, sprintf("  grandeur sans tolérance déclarée : %s", c_))
   if (nrow(r$cles_multiples))
     out <- c(out, sprintf("  clé retenue : %s -> %s (classe %s ; aussi : %s)", r$cles_multiples$chemin,
                           r$cles_multiples$cle, r$cles_multiples$classe, r$cles_multiples$autres))
   e <- g[g$n_differents > 0L, , drop = FALSE]
+  # Une grandeur jugée par la règle absolue l'indique, avec S, facteur et sa
+  # classe ((g) 1) ; son écart relatif porte sur ses seuls éléments non
+  # couverts.
+  absolue <- ifelse(is.na(e$classe_absolue) | is.na(e$ecart_absolu_max), "",
+                    sprintf(" | règle absolue : |a - b| / (facteur x S) max %.3g, S = %.17g, facteur = %.17g, classe %s",
+                            e$ecart_absolu_max, e$echelle, e$facteur, e$classe_absolue))
   if (nrow(e))
     out <- c(out, "  Grandeurs à écart non nul (chemin | longueur | éléments différents | écart relatif max | position | avant | après | tolérance | verdict) :",
-             sprintf("    %s | %d | %d | %s | %d | %s | %s | %s | %s", e$chemin, e$longueur, e$n_differents,
+             sprintf("    %s | %d | %d | %s | %d | %s | %s | %s | %s%s", e$chemin, e$longueur, e$n_differents,
                      ifelse(is.na(e$ecart_relatif_max), "-", sprintf("%.3g", e$ecart_relatif_max)), e$position,
-                     e$avant, e$apres, ifelse(is.na(e$tolerance), "aucune", nom_classe(e$tolerance)), e$verdict))
+                     e$avant, e$apres, ifelse(is.na(e$tolerance), "aucune", nom_classe(e$tolerance)), e$verdict, absolue))
   c(out, sprintf("  Verdict : %s", if (r$ok) "OK" else "ECHEC"))
 }
 

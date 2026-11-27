@@ -119,8 +119,9 @@ verifier("A STATUTS_VALIDATION_LISSEE : mêmes (statistique, grandeur, sous_h0) 
             k("deviance", "p_asymptotique"), fixed = TRUE),
     sans_constat = !any(grepl("documenté", b$statut, fixed = TRUE)),
     ddl_interpolation = all(vapply(c("khi2_pearson", "deviance"), function(s) grepl(paste(
-      "contribution d'un segment qui compte exactement z cellules pondérées (z ordre des différences du lissage,",
-      "etapes/lissage/parametres/ordre_difference ; le lissage y interpole, chaque levier",
+      "contribution d'un segment qui compte exactement d_s cellules pondérées (levier > 0), d_s dimension de l'espace non",
+      "pénalisé du lissage (etapes/lissage/resultat/segments/dimension_non_penalisee, égale à l'ordre des différences z",
+      "sous Whittaker-Henderson, cas normal comme Poisson) ; le lissage y interpole, chaque levier",
       "pondéré vaut 1 en arithmétique exacte) posée au nombre exact de ses cellules retenues de poids nul, 0 quand",
       "toutes sont pondérées ; ddl_effectifs_retenus = nombre de ses cellules retenues pondérées, interpolation_exacte",
       "vrai ;"), k(s, "ddl"), fixed = TRUE), NA)),
@@ -206,6 +207,18 @@ verifier("B controler_parametres_validation() en appel direct (C-1 d'actuary, m2
       startsWith(conditionMessage(e), "controler_parametres_validation() : ") &&
       grepl("erreur de programmation", conditionMessage(e), fixed = TRUE),
     positionnee_avec = isTRUE(cpv("tv", "positionnee", c(40, 60), 40, 0.95, 9, pos))))
+})
+
+verifier("B controler_parametres_validation() en appel direct (#240) : positionnement omis (défaut NULL) sous positionnee : refus positionnement_absent (message exact, details), jamais une erreur R générique ; omis sous independante : TRUE", {
+  cpv <- tablexp:::controler_parametres_validation
+  r <- tryCatch({ cpv("tv", "positionnee", c(40, 60), 40, 0.95, 9); NULL }, error = function(e) e)
+  tous(list(
+    classe = inherits(r, "refus_tablexp"),
+    refus = controle(r, "validation", "positionnement_absent",
+                     paste("La relation « positionnee » valide la table positionnée de cette construction : l'étape",
+                           "positionnement doit figurer au plan (avant l'étape validation)."),
+                     list(relation_table = "positionnee")),
+    independante = isTRUE(cpv("tv", "independante", c(40, 60), 40, 0.95, 9))))
 })
 
 # --- C. Étape validation sous lissee ------------------------------------------------
@@ -436,11 +449,15 @@ verifier("C statistiques_validation() : somme_ddl requise sous la seule relation
 
 # Appel direct de calculer_validation() sous lissee, table construite
 # fabriquée à partir de celle de X.
-cv_l <- function(construite = L$resultat$table_lissee, ddl = V$parametres$ddl_effectifs, relation = "lissee",
-                 table = NULL, cle = NULL, z = LISSAGE$ordre_difference)
+# ddl : élément ddl_effectifs de la valeur de table_construite() (clés,
+# ddl_effectifs, dimension_non_penalisee ; ADR 0017, point 5.7, #242), non la
+# table de etapes/validation/parametres/ddl_effectifs.
+DDL_C <- tablexp:::table_construite(X$etapes, "sexe", "lissage")$ddl_effectifs
+cv_l <- function(construite = L$resultat$table_lissee, ddl = DDL_C, relation = "lissee",
+                 table = NULL, cle = NULL)
   tablexp:::calculer_validation(X$etapes$exposition$resultat$exposition, "sexe", FALSE, "dernier_anniversaire", table, cle,
                                 relation, c(40, 60), c(40, 50), 0.95, 99, V$resultat$monte_carlo$graine, NULL,
-                                construite, ddl, z)
+                                construite, ddl)
 verifier("C calculer_validation() appelé directement sur la table construite de X : identical() à l'étape de X (identité exacte)",
          identical(cv_l()[c("parametres", "resultat", "diagnostics")], V[c("parametres", "resultat", "diagnostics")]))
 verifier("C taux_table_egal_un (module validation) : q = 1 dans une cellule exposée de la table construite, message propre, details", {
@@ -450,23 +467,34 @@ verifier("C taux_table_egal_un (module validation) : q = 1 dans une cellule expo
                  "A = E^c (-ln(1 - q_x)) est infini, le modèle de Poisson ne s'applique pas."),
            list(cellules = 1L))
 })
-verifier("C calculer_validation() sous lissee : table construite ou ddl effectifs NULL, table construite sans colonne levier (ADR 0017, point 5.5), grille différente (âges permutés, segments permutés), ddl effectifs integer, ordre des différences NULL, integer, non entier, nul ou de longueur 2 (#239) -> erreur de programmation", {
+verifier("C calculer_validation() sous lissee : table construite ou ddl effectifs NULL, table construite sans colonne levier (ADR 0017, point 5.5), grille différente (âges permutés, segments permutés), ddl effectifs integer, colonne dimension_non_penalisee absente, double, avec NA (ADR 0017, point 5.7, #242) -> erreur de programmation", {
   t1 <- L$resultat$table_lissee
   perm <- t1[c(22:42, 1:21), ]; rownames(perm) <- NULL
   ages <- t1; ages$age <- rev(ages$age)
-  d_int <- V$parametres$ddl_effectifs; d_int$ddl_effectifs <- c(3L, 4L)
+  d_int <- DDL_C; d_int$ddl_effectifs <- c(3L, 4L)
   sans_lev <- t1[setdiff(names(t1), "levier")]
+  d_sans <- DDL_C[setdiff(names(DDL_C), "dimension_non_penalisee")]
+  d_dbl <- DDL_C; d_dbl$dimension_non_penalisee <- as.double(d_dbl$dimension_non_penalisee)
+  d_na <- DDL_C; d_na$dimension_non_penalisee[2L] <- NA_integer_
   tous(list(nul_t = erreur_programmation(cv_l(construite = NULL)), nul_d = erreur_programmation(cv_l(ddl = NULL)),
             sans_levier = erreur_programmation(cv_l(construite = sans_lev)),
             perm = erreur_programmation(cv_l(construite = perm)), ages = erreur_programmation(cv_l(construite = ages)),
             d_int = erreur_programmation(cv_l(ddl = d_int)),
-            z = all(vapply(list(NULL, 2L, 2.5, 0, c(2, 2)), function(z) erreur_programmation(cv_l(z = z)), NA))))
+            dim_absente = erreur_programmation(cv_l(ddl = d_sans)), dim_double = erreur_programmation(cv_l(ddl = d_dbl)),
+            dim_na = erreur_programmation(cv_l(ddl = d_na))))
+})
+verifier("C calculer_validation() sous lissee : dimension_non_penalisee négative ou supérieure au nombre de cellules du segment (21), 0 et 21 admis (ADR 0017, point 5.7 (ii), #242) -> erreur de programmation en appel direct", {
+  ddl_dim <- function(d) { x <- DDL_C; x$dimension_non_penalisee <- d; x }
+  tous(list(negative = erreur_programmation(cv_l(ddl = ddl_dim(c(-1L, 3L)))),
+            trop_grande = erreur_programmation(cv_l(ddl = ddl_dim(c(3L, 22L)))),
+            n_s_admis = !erreur_programmation(cv_l(ddl = ddl_dim(c(21L, 3L)))),
+            zero_admis = !erreur_programmation(cv_l(ddl = ddl_dim(c(0L, 3L))))))
 })
 verifier("C relation independante : table construite et ddl effectifs passés ignorés (identical() à l'appel sans eux) (critère C2)", {
   gm <- tablexp:::table_gompertz_makeham(2e-4, 2.5e-5, 1.1, 0:120)
   t_ref <- table_reference(data.frame(age = gm$age, sexe = "ensemble", qx = gm$qx), "GM", "importee", "test")
   identical(cv_l(relation = "independante", table = t_ref, cle = "tv"),
-            cv_l(construite = NULL, ddl = NULL, relation = "independante", table = t_ref, cle = "tv", z = NULL))
+            cv_l(construite = NULL, ddl = NULL, relation = "independante", table = t_ref, cle = "tv"))
 })
 
 # --- D. Rapport figé, plan, importance_exclusions -----------------------------------
@@ -480,8 +508,8 @@ verifier("D rapport figé : titre propre à la relation lissee, mentions validat
                   fixed = TRUE),
     relation = grepl(e(m[["validation_lissee"]]), h, fixed = TRUE),
     interpolation = endsWith(m[["validation_lissee"]], paste(
-      "Dans un segment qui compte exactement z cellules pondérées (z ordre des différences du lissage), le lissage",
-      "interpole : la somme de ses leviers",
+      "Dans un segment qui compte exactement d_s cellules pondérées, d_s dimension de l'espace non pénalisé du lissage",
+      "(égale à l'ordre des différences z sous Whittaker-Henderson), le lissage interpole : la somme de ses leviers",
       "retenus est posée au nombre de ses cellules retenues pondérées, et sa contribution au ddl est le nombre exact",
       "de ses cellules retenues non pondérées (0 si toutes sont pondérées) ; colonne interpolation_exacte. Si le ddl",
       "vaut 0, les p ne sont pas produites (contraint_par_lissage).")),

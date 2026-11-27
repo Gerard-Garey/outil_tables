@@ -227,10 +227,11 @@ local({
     r <- tc(tp)
     identical(r, list(table = tp, plage_ages = c(50, 52), ddl_effectifs = NULL))
   })
-  verifier("D table_construite() : ddl_effectifs lu par propriété (table segments portant la colonne, table portant levier) : clés et ddl_effectifs, table rendue telle quelle ; sans les deux colonnes, NULL", {
-    sg <- data.frame(sexe = c("H", "F"), autre = 1:2, ddl_effectifs = c(3.5, 4), stringsAsFactors = FALSE)
+  verifier("D table_construite() : ddl_effectifs lu par propriété (table segments portant les colonnes ddl_effectifs et dimension_non_penalisee, table portant levier) : clés, ddl_effectifs et dimension_non_penalisee, table rendue telle quelle ; sans ces colonnes, NULL ; table_positionnee sans aucune des trois colonnes acceptée (ADR 0017, point 5.7 (ii), #242)", {
+    sg <- data.frame(sexe = c("H", "F"), autre = 1:2, ddl_effectifs = c(3.5, 4), dimension_non_penalisee = c(2L, 3L),
+                     stringsAsFactors = FALSE)
     r <- tc(tl, segments = sg)
-    identical(r$ddl_effectifs, sg[c("sexe", "ddl_effectifs")]) && identical(r$table, tl) &&
+    identical(r$ddl_effectifs, sg[c("sexe", "ddl_effectifs", "dimension_non_penalisee")]) && identical(r$table, tl) &&
       is.null(tc(tp, segments = sg[c("sexe", "autre")])$ddl_effectifs)
   })
   verifier("D table_construite() : position des colonnes non contrôlée ; sans segmentation, un seul segment", {
@@ -261,14 +262,17 @@ local({
   verifier("D table_construite() : segment en trop dans la table d'exposition (absent de la table construite), table d'exposition absente, table segments aux clés permutées ou ddl_effectifs integer -> erreur de programmation préfixée", {
     ex3 <- rbind(ex, data.frame(sexe = "X", age = 50L, exposition_centrale = 1, evenements = 0L, stringsAsFactors = FALSE))
     e0 <- etapes_de(tp); e0$exposition <- NULL
-    sg_perm <- data.frame(sexe = c("F", "H"), ddl_effectifs = c(3.5, 4), stringsAsFactors = FALSE)
-    sg_int <- data.frame(sexe = c("H", "F"), ddl_effectifs = c(3L, 4L), stringsAsFactors = FALSE)
+    sg_perm <- data.frame(sexe = c("F", "H"), ddl_effectifs = c(3.5, 4), dimension_non_penalisee = c(2L, 3L),
+                          stringsAsFactors = FALSE)
+    sg_int <- data.frame(sexe = c("H", "F"), ddl_effectifs = c(3L, 4L), dimension_non_penalisee = c(2L, 3L),
+                         stringsAsFactors = FALSE)
     tous(list(en_trop = prefixee(tc(tp, expo = ex3)),
               sans_exposition = prefixee(tablexp:::table_construite(e0, "sexe", "positionnement")),
               segments_permutes = prefixee(tc(tl, segments = sg_perm)), ddl_integer = prefixee(tc(tl, segments = sg_int))))
   })
   verifier("D table_construite(), colonne levier (ADR 0017, point 5.5 (i)-(ii)) : levier sans ddl_effectifs, ddl_effectifs sans levier, levier integer, levier NA, levier négatif, levier infini, somme par segment différente d'un ulp -> erreur de programmation préfixée par table_construite()", {
-    sg <- data.frame(sexe = c("H", "F"), ddl_effectifs = c(3.5, 4), stringsAsFactors = FALSE)
+    sg <- data.frame(sexe = c("H", "F"), ddl_effectifs = c(3.5, 4), dimension_non_penalisee = c(2L, 3L),
+                     stringsAsFactors = FALSE)
     l_int <- tl; l_int$levier <- c(1L, 2L, 1L, 1L, 1L, 2L)
     l_na <- tl; l_na$levier[2L] <- NA
     l_neg <- tl; l_neg$levier[2L] <- -0.5; l_neg$levier[3L] <- 3
@@ -288,6 +292,29 @@ local({
               negatif = cause(tc(l_neg, segments = sg), forme), infini = cause(tc(l_inf, segments = sg), forme),
               ulp = cause(tc(tl, segments = sg_ulp), "somme de la colonne levier par segment"),
               ulp_distinct = !identical(sg_ulp$ddl_effectifs[2L], 4)))
+  })
+  verifier("D table_construite(), colonne dimension_non_penalisee (ADR 0017, point 5.7 (ii), #242), table de 3 cellules par segment : levier et ddl_effectifs sans la colonne, colonne sans levier ni ddl_effectifs, double, NA, négative, supérieure au nombre de cellules du segment -> erreur de programmation préfixée par table_construite(), cause nommée ; bornes 0 et n_s acceptées, table rendue avec la colonne", {
+    sg <- data.frame(sexe = c("H", "F"), ddl_effectifs = c(3.5, 4), dimension_non_penalisee = c(2L, 3L),
+                     stringsAsFactors = FALSE)
+    avec <- function(d) { x <- sg; x$dimension_non_penalisee <- d; x }
+    cause <- function(expr, texte) {
+      e <- tryCatch({ force(expr); NULL }, error = function(e) e)
+      !is.null(e) && prefixee(stop(e)) && grepl(texte, conditionMessage(e), fixed = TRUE)
+    }
+    absente <- "colonne ddl_effectifs pr"
+    seule <- "colonne dimension_non_penalisee de la table segments pr"
+    forme <- "colonne dimension_non_penalisee de la table segments integer sans NA attendue"
+    bornes <- "hors de [0, nombre de cellules du segment]"
+    zero_n <- tc(tl, segments = avec(c(0L, 3L)))
+    tous(list(absente = cause(tc(tl, segments = sg[c("sexe", "ddl_effectifs")]), absente),
+              seule = cause(tc(tp, segments = sg[c("sexe", "dimension_non_penalisee")]), seule),
+              seule_levier = cause(tc(tl, segments = sg[c("sexe", "dimension_non_penalisee")]), "sans colonne ddl_effectifs"),
+              double = cause(tc(tl, segments = avec(c(2, 3))), forme),
+              na = cause(tc(tl, segments = avec(c(2L, NA))), forme),
+              negative = cause(tc(tl, segments = avec(c(-1L, 3L))), bornes),
+              trop_grande = cause(tc(tl, segments = avec(c(2L, 4L))), bornes),
+              bornes_acceptees = identical(zero_n$ddl_effectifs$dimension_non_penalisee, c(0L, 3L)) &&
+                identical(names(zero_n$ddl_effectifs), c("sexe", "ddl_effectifs", "dimension_non_penalisee"))))
   })
   verifier("D table_construite(), témoins de l'audit m1 (#224) : table d'exposition sans la colonne evenements, ou avec un age NA -> erreur de programmation préfixée par table_construite(), avant grille_plage()", {
     ex_na <- ex; ex_na$age[3L] <- NA

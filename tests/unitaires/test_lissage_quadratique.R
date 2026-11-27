@@ -389,7 +389,8 @@ verifier("G etapes$lissage : parametres (paramètres du plan dans l'ordre du cat
     grepl("chap. 3, IV.2.a (p. 31-32) et IV.2.d (p. 33), SHA-256", p$reference_methode, fixed = TRUE) &&
     identical(dim(p$constantes), c(0L, 3L)) && identical(names(p$constantes), c("constante", "valeur", "origine")) &&
     is.double(p$constantes$valeur) &&
-    identical(p$statuts$grandeur, c("table_lissee/qx", "table_lissee/levier", "regle_force", "segments/ddl_effectifs", "segments/fidelite",
+    identical(p$statuts$grandeur, c("table_lissee/qx", "table_lissee/levier", "regle_force", "segments/ddl_effectifs",
+                                    "segments/dimension_non_penalisee", "segments/fidelite",
                                     "segments/regularite", "segments/critere", "segments/residu_conservation_0",
                                     "segments/residu_conservation_1"))
 })
@@ -400,11 +401,12 @@ verifier("G table_lissee : data.frame nu, colonnes sexe, age (integer), qx, etat
     identical(unique(t$sexe), unique(X1$etapes$exposition$resultat$exposition$sexe)) &&
     all(t$qx > 0 & t$qx < 1) && all(t$etat == "observee") && all(t$poids > 0)
 })
-verifier("G segments : colonnes et types (dénombrements integer, ADR 0009, point 9.6) ; etat produite", {
+verifier("G segments : colonnes et types (dénombrements integer, ADR 0009, point 9.6 ; dimension_non_penalisee integer après ddl_effectifs, valeur z par segment, ADR 0017, point 5.7, #242) ; etat produite", {
   s <- L1$resultat$segments
   identical(names(s), c("sexe", "cellules", "cellules_ponderees", "cellules_interpolees", "evenements",
-                        "parametre_lissage", "ddl_effectifs", "fidelite", "regularite", "critere",
+                        "parametre_lissage", "ddl_effectifs", "dimension_non_penalisee", "fidelite", "regularite", "critere",
                         "residu_conservation_0", "residu_conservation_1", "etat")) &&
+    identical(s$dimension_non_penalisee, rep(as.integer(LISSAGE$ordre_difference), 2L)) &&
     all(vapply(s[c("cellules", "cellules_ponderees", "cellules_interpolees", "evenements")], is.integer, NA)) &&
     all(vapply(s[c("parametre_lissage", "ddl_effectifs", "fidelite", "regularite", "critere", "residu_conservation_0",
                    "residu_conservation_1")], is.double, NA)) &&
@@ -430,10 +432,10 @@ verifier("G table_lissee recalculée par lisser_quadratique() sur les entrées d
     identical(s$ddl_effectifs[s$sexe == "H"], r$ddl_effectifs) &&
     identical(s$residu_conservation_1[s$sexe == "H"], r$residu_conservation_1)
 })
-verifier("G contrat de la table construite : table_construite() rend table_lissee et ddl_effectifs (clés, ddl) (ADR 0017, point 1.5)", {
+verifier("G contrat de la table construite : table_construite() rend table_lissee et ddl_effectifs (clés, ddl, dimension_non_penalisee) (ADR 0017, points 1.5 et 5.7)", {
   r <- tablexp:::table_construite(X1$etapes, "sexe", "lissage")
   identical(r$table, L1$resultat$table_lissee) && identical(r$plage_ages, c(40, 60)) &&
-    identical(r$ddl_effectifs, L1$resultat$segments[c("sexe", "ddl_effectifs")])
+    identical(r$ddl_effectifs, L1$resultat$segments[c("sexe", "ddl_effectifs", "dimension_non_penalisee")])
 })
 verifier("G cellule intérieure sans ligne (H, âge 50) : état interpolee, poids 0, qx dans ]0, 1[ ; Ē^i sur les cellules définies ; décomptes", {
   d <- jeu(); d <- d[!(d$sexe == "H" & d$age == 50), ]
