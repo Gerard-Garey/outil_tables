@@ -22948,8 +22948,9 @@ paramètres (attribut \code{parametres}), sont construites par le module~:
     paramètres $a \ge 0$, $b > 0$, $c > 0$ sont des réels finis déclarés,
     sans valeur par défaut, et $e^{c}$ doit être fini en double précision
     ($c \le \ln(\text{plus grand double}) \approx 709{,}78$~: au-delà,
-    $q_x$ vaudrait 1 à tort)~; les âges sont des entiers $\ge 0$ déclarés~;
-    sinon, refus \code{loi\_invalide}. Le risque cumulé est
+    $q_x$ vaudrait 1 à tort)~; sinon, refus \code{loi\_invalide}~; les
+    âges déclarés suivent la règle commune aux trois tables
+    (ci-dessous, «~Âges déclarés~»). Le risque cumulé est
     $H(x) = a\,x + \ln(1 + b\,e^{cx})/c$, et la probabilité annuelle est
     l'intégrale exacte de $\mu$ sur $[x, x+1)$ (résultat exact, calcul
     direct)~:
@@ -23008,6 +23009,45 @@ paramètres (attribut \code{parametres}), sont construites par le module~:
     rachat par ancienneté (axe secondaire) est hors du périmètre de la
     branche.
 \end{itemize}
+
+\noindent
+\textbf{Âges déclarés} (issue~\#234). Les trois constructeurs contrôlent
+leurs âges par une même règle, que porte la fonction
+\code{defaut\_ages\_synthetiques()}~: le vecteur
+\code{ages} doit être numérique, non vide, fait d'entiers de 0 à
+\code{.Machine\$integer.max} ($2^{31} - 1 = 2\,147\,483\,647$, plus grand
+entier du moteur), si bien que la conversion en entier qui suit est
+exacte, sans valeur manquante ni avertissement. Sinon, refus
+\code{loi\_invalide} (module \code{simulation}~; \code{details\$ages}~:
+le vecteur reçu), de message «~\textit{Loi}~: les âges sont des entiers
+de 0 à 2147483647~; \textit{défaut}.~», où \textit{Loi} vaut
+«~Gompertz-Makeham~», «~Logistique~» ou «~Table constante~» et où
+\textit{défaut} décrit le premier âge fautif dans l'ordre du vecteur, avec
+sa position $j$ et sa valeur $v$ écrite au format \code{\%.17g}
+(dix-sept chiffres significatifs, qui désignent le double reçu sans
+ambiguïté~: 0{,}1 est cité «~0.10000000000000001~»)~: «~âge «~NA~»
+manquant (position $j$)~», puis, dans cet ordre de priorité, «~âge
+«~$v$~» non fini~» (\code{NaN}, \code{Inf}, \code{-Inf}), «~non
+entier~», «~négatif~» et «~supérieur au plus grand entier du moteur~»,
+chacun suivi de la position~; un vecteur vide donne «~aucun âge reçu~», un
+vecteur non numérique «~âges de classe $k$ reçus, un vecteur numérique est
+attendu~» ($k$~: sa classe). Avant l'issue, un âge infini ou supérieur à
+l'entier maximal (\code{Inf}, \code{3e9}) franchissait ce contrôle,
+levait l'avertissement de R «~NAs introduced by coercion to integer
+range~», puis était refusé sous le motif générique
+\code{table\_colonne\_mal\_typee} de \code{table\_reference()}, dont le
+message parle de valeur manquante (\emph{constat} de mesure de
+l'issue~\#234)~; les tables construites sur des âges valides sont
+inchangées. La borne supérieure est une limite de représentation,
+\textbf{non un plafond actuariel}~: aucune source n'en fixe, et le
+constructeur ne refuse pas un âge sans sens démographique (choix de
+conception, sans source). Le garde-fou est en aval~: le simulateur refuse
+une loi qui ne couvre pas les âges atteignables (\code{table\_trop\_courte})
+ou y atteint $q_x = 1$ (\code{qx\_egal\_a\_un}~;
+section~\ref{sec:portefeuille-simule}), ce qui arrive pour
+Gompertz-Makeham aux grands âges~: sous la loi des tests ci-dessus, $q_x$
+vaut 1 en double précision dès 149~ans (approximation numérique, valeur
+calculée).
 
 \subsubsection*{Hypothèse de répartition dans l'année}
 
@@ -25403,9 +25443,10 @@ identique, attribut compris, dans un autre processus R.
 \catalogue{fonctions-simulation}{COMBINAISONS\_DEFAUTS} & constante & --- & combinaisons de types admises sur une même ligne (liste fermée) \\
 \catalogue{fonctions-simulation}{ORDRE\_TIRAGES\_DEFAUTS} & constante & --- & ordre des tirages des défauts, consigné dans l'attribut \code{defauts} \\
 \catalogue{fonctions-simulation}{DEFAUTS\_FORMES} & constante & --- & règles des défauts par forme, lues par le nom de forme (\code{lignes} pour \code{forme = NULL}, \code{agregats}, \code{stocks\_successifs})~: catalogue, combinaisons, domaine de \code{cible}, unités à cible requise, types exclusifs (stocks successifs~: \code{inventaire\_perdu}~; champ absent pour les autres formes), ordre des tirages et texte de validité consignés~; l'entrée \code{lignes} reprend à l'identique les trois constantes précédentes (tableaux~\ref{tab:catalogue-defauts}, \ref{tab:catalogue-defauts-agregats} et~\ref{tab:catalogue-defauts-stocks}) \\
-\catalogue{fonctions-simulation}{table\_gompertz\_makeham()} & interne & $A$, $B$, $c$, âges & table synthétique de Gompertz-Makeham \\
-\catalogue{fonctions-simulation}{table\_logistique()} & interne & $a$, $b$, $c$, âges & table synthétique logistique (Kannisto si $a = 0$)~; refus \code{loi\_invalide} \\
-\catalogue{fonctions-simulation}{table\_constante()} & interne & $q$, âges, nom & table synthétique à $q_x$ constant \\
+\catalogue{fonctions-simulation}{defaut\_ages\_synthetiques()} & interne & âges & \code{""} si les âges forment un vecteur numérique non vide d'entiers de 0 à \code{.Machine\$integer.max}, sinon le texte du défaut du premier âge fautif (manquant, non fini, non entier, négatif, supérieur au plus grand entier du moteur), valeur citée au format \code{\%.17g} et position, ou du vecteur vide ou non numérique~; règle unique des âges des trois tables synthétiques, aide de message (section~\ref{sec:loi-vraie}, «~Âges déclarés~»~; issue~\#234) \\
+\catalogue{fonctions-simulation}{table\_gompertz\_makeham()} & interne & $A$, $B$, $c$, âges & table synthétique de Gompertz-Makeham~; refus \code{loi\_invalide} (paramètres, puis âges par l'aide ci-dessus) \\
+\catalogue{fonctions-simulation}{table\_logistique()} & interne & $a$, $b$, $c$, âges & table synthétique logistique (Kannisto si $a = 0$)~; refus \code{loi\_invalide} (paramètres, puis âges par l'aide ci-dessus) \\
+\catalogue{fonctions-simulation}{table\_constante()} & interne & $q$, âges, nom & table synthétique à $q_x$ constant~; refus \code{loi\_invalide} ($q$, puis âges par l'aide ci-dessus) \\
 \catalogue{fonctions-simulation}{loi\_effective()} & interne & loi d'une transition, cause, sexes & $q^{s}_x$ et $\mu_x$ par sexe~; refus \code{loi\_invalide}, dans l'ordre~: une loi qui n'est pas la liste (\code{table}, \code{facteurs}), une table de classe d'encodage \code{bytes} (issue~\#150), une table à axe temporel, \code{annee} ou \code{generation} (issue~\#272), une table qui n'est pas l'objet que rendrait le constructeur, jugée par l'assistant d'état du module \code{donnees} avant toute lecture de colonne, cohérence de la liste des colonnes et de leurs noms comprise (issues~\#253 et~\#365), puis la forme exacte des facteurs \\
 \catalogue{fonctions-simulation}{jours\_civils()} & interne & année, mois, jour & jours depuis 1970-01-01 (arithmétique entière) \\
 \catalogue{fonctions-simulation}{jour\_anniversaire()} & interne & composantes de naissance, âge & jour de l'anniversaire (29~février~: 1\textsuperscript{er}~mars des années non bissextiles) \\
