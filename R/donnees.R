@@ -2706,7 +2706,8 @@ lignes_citees_table <- function(k, sexes, axe, valeurs, ages) {
 #                  source : arrêté, URL, fichier de provenance) ;
 #   statut       : synthetique, embarquee ou importee ;
 #   parametres   : liste non vide des paramètres pour une table synthétique,
-#                  NULL sinon ;
+#                  dont aucun nom ni aucune valeur chaîne, à toute profondeur,
+#                  n'est d'encodage « bytes » (#256) ; NULL sinon ;
 #   forme_origine: qx ou lx (forme de la transcription) ; une colonne lx
 #                  exige « lx », une colonne qx est admise sous l'une ou
 #                  l'autre.
@@ -2715,8 +2716,9 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
     refuser("donnees", "table_nom_manquant", formuler("La table de référence doit avoir un nom (chaîne non vide, sans attribut)."))
   # Chaîne d'encodage « bytes » (#158 ; règle de #128) : chaine_unique() l'admet
   # (type character, aucun attribut), et le nom ou la source serait écrit dans
-  # la fiche, où octets_chaines() la refuse (chaine_codage_bytes) après tous les
-  # calculs ; refus ici, sous le motif de l'argument, sans lire les octets.
+  # la fiche, où octets_chaines() la refuse (chaine_codage_bytes), à l'étape (d) de
+  # controler_forme_tables(), avant toute étape ; refus ici, sous le motif de
+  # l'argument, sans lire les octets.
   # statut et forme_origine, valeurs d'un ensemble fermé, sont déjà refusés par
   # %in% (mesuré). Le nom et la source bytes ne se citent pas (refus sans
   # details) ; details$statut et details$classe portent, eux, la valeur reçue
@@ -2746,6 +2748,32 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
   if (statut != "synthetique" && !is.null(parametres))
     refuser("donnees", "table_parametres_inattendus",
             formuler("Table « %s » de statut « %s » : aucun paramètre de loi attendu.", nom_cite, citer(statut)))
+  # Nom ou valeur « bytes » à toute profondeur de `parametres` (#256 ; règle de
+  # #128, comme le nom et la source, #158) : les paramètres s'écrivent dans la
+  # fiche, où octets_chaines() les refuserait (chaine_codage_bytes), à l'étape
+  # (d) de controler_forme_tables(), avant toute étape ; refus ici, sous le
+  # motif de l'argument, sans rien citer.
+  # Parcours par niveaux, sans pile d'appels (une liste très profonde ne lève
+  # pas d'erreur R : sa profondeur est refusée plus tard, à l'écriture de la
+  # fiche) ni copie répétée d'une pile (coût linéaire), et sans dispatch :
+  # noms_bytes() lit les noms par attr(), .subset2() les éléments,
+  # longueur_lue() la longueur ; Encoding() ne traduit rien (R/outils.R).
+  parametres_bytes <- function(p) {
+    niveau <- list(p)
+    while (length(niveau)) {
+      if (any(vapply(niveau, function(v) length(noms_bytes(v)) > 0L || (is.character(v) && any(Encoding(v) == "bytes")), NA)))
+        return(TRUE)
+      listes <- niveau[vapply(niveau, is.list, NA)]
+      niveau <- unlist(lapply(listes, function(v) lapply(seq_len(longueur_lue(v)), function(i) .subset2(v, i))),
+                       recursive = FALSE)
+    }
+    FALSE
+  }
+  if (parametres_bytes(parametres))
+    refuser("donnees", "table_parametres_manquants",
+            formuler(paste("Table synthétique « %s » : ses paramètres portent un nom ou une valeur d'encodage « bytes » (à toute",
+                           "profondeur), non convertible en UTF-8 sans deviner : ils ne sont pas lus. Passer des paramètres",
+                           "(liste non vide) sans encodage bytes."), nom_cite))
   if (!chaine_unique(forme_origine) || !(forme_origine %in% FORMES_ORIGINE))
     refuser("donnees", "table_forme_inconnue",
             formuler("Table « %s » : forme d'origine (chaîne sans attribut) à prendre dans %s.", nom_cite, liste_guillemets(FORMES_ORIGINE)))

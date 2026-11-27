@@ -305,22 +305,23 @@ CAS_MAL_FORMEES <- list(
        "Table de clé « a » : objet modifié après table_reference()."),
   list("q_x porté à 2", list(a = within(T1, qx[1L] <- 2)), "table_qx_hors_bornes", "aucun refus",
        "refusé par table_reference() (motif table_qx_hors_bornes)"),
-  # Nom et source d'encodage bytes (#158) : refusés par le constructeur, donc
-  # par la reconstruction du contrôle (b), avant l'écriture de la fiche ; les
-  # noms et valeurs de `parametres`, que le constructeur ne contrôle pas,
-  # restent refusés à l'écriture (chaine_codage_bytes).
+  # Nom et source d'encodage bytes (#158), nom et valeur de paramètre d'encodage
+  # bytes (#256) : refusés par le constructeur, donc par la reconstruction du
+  # contrôle (b), avant l'écriture de la fiche (un paramètre bytes était refusé
+  # à l'écriture, chaine_codage_bytes, avant #256 ; ici l'objet valide reçoit,
+  # après coup, des paramètres que le constructeur refuse).
   list("nom de table d'encodage bytes", list(a = structure(T1, nom = nom_bytes)), "table_nom_manquant",
        "aucun refus", "refusé par table_reference() (motif table_nom_manquant)"),
   list("source de table d'encodage bytes", list(a = structure(T1, source = nom_bytes)), "table_source_manquante",
        "aucun refus", "refusé par table_reference() (motif table_source_manquante)"),
   list("nom de paramètre d'encodage bytes",
-       list(a = table_reference(TR, "s", "synthetique", "x", parametres = structure(list(1), names = nom_bytes))),
-       "chaine_codage_bytes", "écriture du texte de fiche sans refus",
-       "métadonnée sans écriture exacte dans la fiche (refus chaine_codage_bytes, a/parametres/@noms)"),
+       list(a = structure(table_reference(TR, "s", "synthetique", "x", parametres = list(p = 1)),
+                          parametres = structure(list(1), names = nom_bytes))),
+       "table_parametres_manquants", "aucun refus", "refusé par table_reference() (motif table_parametres_manquants)"),
   list("valeur de paramètre d'encodage bytes",
-       list(a = table_reference(TR, "s", "synthetique", "x", parametres = list(p = nom_bytes))),
-       "chaine_codage_bytes", "écriture du texte de fiche sans refus",
-       "métadonnée sans écriture exacte dans la fiche (refus chaine_codage_bytes, a/parametres/p)"),
+       list(a = structure(table_reference(TR, "s", "synthetique", "x", parametres = list(p = 1)),
+                          parametres = list(p = nom_bytes))),
+       "table_parametres_manquants", "aucun refus", "refusé par table_reference() (motif table_parametres_manquants)"),
   list("fonction dans parametres", list(a = table_reference(TR, "s", "synthetique", "x", parametres = list(f = identity))),
        "serialisation_impossible", "écriture du texte de fiche sans refus",
        "métadonnée sans écriture exacte dans la fiche (refus serialisation_impossible, a/parametres/f)"))
@@ -359,11 +360,14 @@ verifier("D tables_reference_mal_formees sous LC_ALL=C, clé non ASCII d'encodag
 verifier("D tables_reference_mal_formees : motif du constructeur et chemin dans les details", {
   r1 <- refus_de(controler_forme_tables(list(a = within(T1, qx[1L] <- 2))))
   r2 <- refus_de(controler_forme_tables(list(a = table_reference(TR, "s", "synthetique", "x",
-                                                                 parametres = structure(list(1), names = nom_bytes)))))
+                                                                 parametres = list(f = identity)))))
   r3 <- refus_de(controler_forme_tables(list(a = structure(T1, nom = nom_bytes))))
+  r4 <- refus_de(controler_forme_tables(list(a = structure(table_reference(TR, "s", "synthetique", "x", parametres = list(p = 1)),
+                                                           parametres = structure(list(1), names = nom_bytes)))))
   identical(r1$details$cle, "a") && identical(r1$details$motif_constructeur, "table_qx_hors_bornes") &&
-    identical(r2$details$chemin, "a/parametres/@noms") && identical(r2$details$motif_constructeur, NA_character_) &&
+    identical(r2$details$chemin, "a/parametres/f") && identical(r2$details$motif_constructeur, NA_character_) &&
     identical(r3$details$motif_constructeur, "table_nom_manquant") && identical(r3$details$chemin, NA_character_) &&
+    identical(r4$details$motif_constructeur, "table_parametres_manquants") && identical(r4$details$chemin, NA_character_) &&
     identical(names(r1$details), c("cle", "lu", "attendu", "motif_constructeur", "chemin"))
 })
 # Refus de lire_texte() à la relecture de l'élément de fiche (étape (d) de

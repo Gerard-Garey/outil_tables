@@ -2801,6 +2801,54 @@ verifier("table_reference : x de classe c(\"autre\", \"data.frame\") (sans encod
          inherits(tr(x = structure(TR, class = c("autre", "data.frame"))), "table_reference"))
 verifier("table_reference : x non data.frame sans classe bytes -> message « un data.frame est attendu » inchangé",
          isTRUE(contient(refus(tr(x = 1)), "un data.frame est attendu")))
+# Nom ou valeur d'encodage bytes à toute profondeur de `parametres` (#256, règle
+# de #128) : refus table_parametres_manquants dès la construction, jugé après le
+# nom, le statut, la source et le contrôle des paramètres (manquants, inattendus),
+# message d'une ligne marqué UTF-8, sans erreur R, aucune valeur citée ; avant
+# #256, l'objet était construit et refusé à l'écriture de la fiche
+# (chaine_codage_bytes) ; contre-épreuves : mêmes paramètres sans encodage bytes.
+nom_octets <- function(v) structure(list(v), names = OCTETS)
+profond <- local({ p <- OCTETS; for (i in seq_len(3000L)) p <- list(p); p })
+CAS_PARAM_BYTES <- list(
+  list("nom, profondeur 1", nom_octets(1)),
+  list("valeur, profondeur 1", list(p = OCTETS)),
+  list("valeur parmi d'autres éléments de profondeur 1", list(A = 2e-4, p = c("x", OCTETS, "y"))),
+  list("nom, profondeur 2", list(a = nom_octets(1))),
+  list("valeur, profondeur 2", list(a = list(b = OCTETS))),
+  list("nom, profondeur 3, sous des listes sans nom", list(list(list(nom_octets(1))))),
+  list("valeur, profondeur 3, vecteur de chaînes", list(a = list(b = list(c = c("x", OCTETS))))),
+  list("nom de vecteur atomique nommé, profondeur 2", list(a = list(b = structure(1, names = OCTETS)))),
+  list("valeur, profondeur 3000 (liste très profonde)", profond))
+for (k in CAS_PARAM_BYTES) {
+  x <- refus_ou_erreur(tr(parametres = k[[2]]))
+  verifier(sprintf("table_reference : paramètres, %s, d'encodage bytes -> refus table_parametres_manquants, message propre, sans valeur citée", k[[1]]),
+           if (is.null(x)) "aucun refus" else if (!inherits(x, "refus_tablexp")) conditionMessage(x)
+           else identical(x$motif, "table_parametres_manquants") && identical(x$module, "donnees") && ligne_utf8(x) &&
+             isTRUE(contient(x, "Table synthétique « essai » : ses paramètres portent un nom ou une valeur d'encodage « bytes »",
+                             "à toute profondeur", "sans deviner", "sans encodage bytes")) &&
+             !grepl("<chaîne d'encodage bytes>", conditionMessage(x), fixed = TRUE))
+}
+verifier("table_reference : paramètres bytes et nom bytes -> le nom est refusé d'abord",
+         identical(refus(tr(nom = OCTETS, parametres = list(p = OCTETS)))$motif, "table_nom_manquant"))
+verifier("table_reference : paramètres bytes et source bytes -> la source est refusée d'abord",
+         identical(refus(tr(source = OCTETS, parametres = list(p = OCTETS)))$motif, "table_source_manquante"))
+verifier("table_reference : paramètres bytes et statut importee -> table_parametres_inattendus d'abord",
+         identical(refus(tr(statut = "importee", parametres = list(p = OCTETS)))$motif, "table_parametres_inattendus"))
+verifier("table_reference : paramètres bytes et forme_origine inconnue -> les paramètres sont refusés d'abord",
+         identical(refus(tr(forme_origine = "zz", parametres = list(p = OCTETS)))$motif, "table_parametres_manquants"))
+# Contre-épreuves : chaînes sans encodage bytes (ASCII, UTF-8 non ASCII, latin-1
+# déclaré), à toute profondeur ; l'objet porte les paramètres reçus, tels quels.
+PARAM_LATIN1 <- "d\xe9c"; Encoding(PARAM_LATIN1) <- "latin1"
+PARAM_VALIDES <- list(A = 2e-4, ages = c(0L, 120L), loi = list(nom = "Gompertz-Makeham", unite = c(un = "an")),
+                      accentues = stats::setNames(list(c("\u00e9t\u00e9", PARAM_LATIN1), list(1, "x")), c("d\u00e9c\u00e8s", "")))
+verifier("table_reference : paramètres sans encodage bytes (ASCII, UTF-8, latin-1 ; profondeur 3) admis, parametres identiques à l'entrée (contre-épreuve)", {
+  y <- tryCatch(tr(parametres = PARAM_VALIDES), error = function(e) e)
+  if (inherits(y, "error")) conditionMessage(y) else inherits(y, "table_reference") && identical(attr(y, "parametres"), PARAM_VALIDES)
+})
+verifier("table_reference : paramètres sans repérage faux (NULL, fonction, entier, NA, vecteur nommé ordinaire, liste vide imbriquée) -> admis",
+         inherits(tr(parametres = list(a = 1, b = list(NULL, TRUE, identity, 1L, NA_character_, c(u = "x"), list()))), "table_reference"))
+verifier("table_reference : paramètres : data.frame à nom de colonne bytes -> refus table_parametres_manquants sans erreur R",
+         identical(refus(tr(parametres = list(d = structure(data.frame(a = 1), names = OCTETS))))$motif, "table_parametres_manquants"))
 # Sous LC_ALL=C (sous-processus, bibliothèque des batteries) : un nom qui n'est pas bytes
 # est cité exactement comme le ferait sprintf() sur le nom reçu (oracle : la formule
 # d'avant #111, octet pour octet, sans traduction ajoutée par le masquage (un nom latin1
