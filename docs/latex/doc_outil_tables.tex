@@ -22914,13 +22914,20 @@ hors de $[0, 1]$ (motif \code{table\_qx\_hors\_bornes} cité).
 \textbf{Le changement restreint les entrées admises}~: avant
 l'issue~\#253, dont le seul contrôle de la table était sa classe
 \code{table\_reference} (\code{inherits()}), ces tables étaient
-acceptées, refusées sous un autre message ou faisaient lever une erreur R
+acceptées, refusées sous un autre message, faisaient lever une erreur R
+ou arrêtaient R (liste plus courte que ses noms, ci-dessus)
 (contre-épreuve des tests de l'issue sur l'état antérieur). En revanche, une modification qui laisse
 l'objet identique à sa reconstruction passe~: un $q_x$ modifié dans
 $[0, 1]$, un nom ou des paramètres changés vers une valeur que le
 constructeur admet~; c'est alors la table réellement reçue qui est
-simulée. Le contrôle garantit la forme et les valeurs contrôlées par le
-constructeur, non la provenance de la table. Une table valide est lue
+simulée, et c'est elle que consigne l'attribut \code{simulation} (loi
+vraie, section~\ref{sec:portefeuille-simule})~: la loi vraie d'un jeu
+simulé est cette table, en valeurs, non la loi que décrivent ses
+paramètres, déclarés et non vérifiés (section~\ref{sec:table-reference},
+«~Statut des paramètres d'une table synthétique~»~; un $q_x$ modifié
+laisse des paramètres qui ne reproduisent plus la table). Le contrôle
+garantit la forme et les valeurs contrôlées par le constructeur, non la
+provenance de la table. Une table valide est lue
 telle quelle, sans correction~; son état est jugé sur la table entière,
 quels que soient les sexes tirés.
 
@@ -22935,7 +22942,8 @@ constructeur~: la reconstruction étend au simulateur la garantie qu'elle
 donne à la construction (section~\ref{sec:tables-reference-recues})~:
 une table retouchée n'entre pas sous l'identité d'une table contrôlée, et
 une colonne qui ferait lever une erreur R à la lecture est refusée, sous
-un motif nommé, avant d'être lue.
+un motif nommé, avant toute lecture par le simulateur (la reconstruction,
+qui la lit sous \code{tryCatch()}, convertit l'erreur en refus).
 
 \medskip
 Trois tables synthétiques, de statut \code{synthetique} et porteuses de leurs
