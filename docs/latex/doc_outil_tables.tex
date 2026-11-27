@@ -13752,7 +13752,7 @@ ne redonnent pas le total des événements est une erreur de programmation.\par}
     polynôme de récession, et ce maximum est alors unique~; (2)~il n'en
     existe aucun si et seulement si $C \ge z$. La condition ne dépend ni de
     $\lambda$, ni des valeurs de $E^c$ et de $D$, mais seulement des
-    cellules exposées et de celles qui ont des décès. Lecture~: sous $z =
+    cellules exposées et de celles qui ont des décès. La preuve ci-dessous n'emploie pas l'hypothèse «~première et dernière cellules de la plage exposées~»~: le théorème vaut sans elle, une cellule sans exposition n'entrant que dans la pénalité, que $Kd = 0$ annule, et le décompte ne portant que sur les cellules exposées~; elle est conservée dans l'énoncé parce que le moteur la garantit (refus \code{lissage\_plage\_bornee\_sans\_exposition}, décision D11) et que les vérifications exhaustives ne portent que sur des configurations qui la remplissent. Lecture~: sous $z =
     1$, au moins un décès~; sous $z = 2$, au moins deux cellules avec
     décès, ou une seule qui ne soit pas la première ou la dernière cellule
     exposée (le test A6, décès au seul âge extrême, donne $C = 1$)~; sous
@@ -13813,10 +13813,7 @@ ne redonnent pas le total des événements est une erreur de programmation.\par}
     $R$ de longueur $L$ impaire, de voisins exposés $e_- < r_1$ et $r_L <
     e_+$ (sans décès, donc $p(e_\pm) \le 0$), soit $p$ compte, avec
     multiplicité, au moins $L + 1$ racines dans $]e_-, e_+[$, soit ses
-    seules racines y sont les $r_j$, simples~: $p$ y change alors de signe
-    un nombre impair de fois, il est strictement positif juste à droite de
-    $e_-$ ou juste à gauche de $e_+$, et, étant au plus nul en cette
-    cellule, il s'y annule~; le bloc en «~réclame~» la racine. Les
+    seules racines y sont les $r_j$, simples~: $p$ y change alors de signe en chaque $r_j$, soit un nombre impair de fois~: de signe constant sur $]e_-, r_1[$ et sur $]r_L, e_+[$, il y est de signes opposés, donc strictement positif sur l'un des deux~; par continuité, il est positif ou nul en l'extrémité correspondante, $e_-$ ou $e_+$, et, étant au plus nul en cette cellule exposée, il s'y annule~; le bloc en «~réclame~» la racine. Les
     intervalles $]e_-, e_+[$ de deux blocs sont disjoints et ne contiennent
     aucune cellule exposée hors du bloc~; une cellule réclamée, exposée
     sans décès, n'est ni dans $\mathcal P$ ni dans un tel intervalle, et
