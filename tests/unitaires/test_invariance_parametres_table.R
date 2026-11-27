@@ -277,18 +277,18 @@ sites_parametres <- function(dossier) {
   }
   acc
 }
-SITES_ADMIS <- c("R/construire_table.R::controler_forme_tables", "R/rapport.R::element_table_fiche")
-verifier("C R/ : les lectures de l'attribut parametres sont exactement les deux sites admis, chacune une seule fois (fichier::fonction ; construction (b) de controler_forme_tables(), element_table_fiche())", {
+SITES_ADMIS <- c("R/donnees.R::etat_table_reference", "R/rapport.R::element_table_fiche")
+verifier("C R/ : les lectures de l'attribut parametres sont exactement les deux sites admis, chacune une seule fois (fichier::fonction ; reconstruction de etat_table_reference() (module donnees, #253 ; lue par controler_forme_tables() et loi_effective()), element_table_fiche())", {
   s <- sites_parametres(file.path(RACINE, "R"))
   if (identical(sort(s), SITES_ADMIS)) TRUE else paste("sites relevés :", paste(s, collapse = " ; "))
 })
 
-# Copie de R/construire_table.R et R/rapport.R (sites admis) dans un dossier R/
+# Copie de R/donnees.R et R/rapport.R (sites admis) dans un dossier R/
 # temporaire, avec les lignes de `ajout` en fichier supplémentaire ; `modifier`
 # remplace, dans R/rapport.R, une ligne (motif fixe) par un texte.
 copie_temoin <- function(ajout = character(0), modifier = NULL) {
   d <- file.path(tempfile("copie_R_"), "R"); dir.create(d, recursive = TRUE)
-  for (f in c("construire_table.R", "rapport.R")) file.copy(file.path(RACINE, "R", f), d)
+  for (f in c("donnees.R", "rapport.R")) file.copy(file.path(RACINE, "R", f), d)
   if (!is.null(modifier)) {
     ch <- file.path(d, "rapport.R")
     l <- readLines(ch, encoding = "UTF-8", warn = FALSE)

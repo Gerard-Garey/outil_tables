@@ -732,9 +732,11 @@ ordres_canoniques <- function()
 # table_reference exacte et colonnes du constructeur ; (b) reconstruction par
 # table_reference() sur le data.frame nu de ses colonnes et ses métadonnées,
 # sans refus ; (c) objet identical() à sa reconstruction (ordre canonique,
-# valeurs contrôlées, attributs) ; (d) élément de fiche (element_table_fiche(),
-# module rapport) écrit en forme « texte » sous sa clé, puis relu identical()
-# (décision Q1 du mainteneur, 06/11/2026). Premier défaut : refus
+# valeurs contrôlées, attributs) ; (a) à (c) sont lues par
+# etat_table_reference() (module donnees ; #253), que lit aussi le simulateur ;
+# (d) élément de fiche (element_table_fiche(), module rapport) écrit en forme
+# « texte » sous sa clé, puis relu identical() (décision Q1 du mainteneur,
+# 06/11/2026). Premier défaut : refus
 # tables_reference_mal_formees (module construire_table). Rend NULL sans
 # table, sinon list(tables = objets, champ = éléments de fiche), tous deux
 # nommés par clé, dans l'ordre des clés.
@@ -763,7 +765,6 @@ controler_forme_tables <- function(tables) {
   cles <- enc2utf8(attr(tables, "names", exact = TRUE))
   o <- order(cles, method = "radix")
   objets <- champ <- stats::setNames(vector("list", length(o)), cles[o])
-  classe_attendue <- c("table_reference", "data.frame")
   for (i in o) {
     k <- cles[i]
     x <- .subset2(tables, i)
@@ -774,34 +775,19 @@ controler_forme_tables <- function(tables) {
                              "valeurs contrôlées), et ses métadonnées doivent s'écrire dans la fiche."),
                        citer(k), texte),
               list(cle = k, lu = lu, attendu = attendu, motif_constructeur = motif, chemin = chemin))
-    modifie <- formuler("objet modifié après table_reference()")
-    # (a) Classe exacte, lue par attr() (une classe « bytes » ne lève pas).
-    cl <- attr(x, "class", exact = TRUE)
-    if (!identical(cl, classe_attendue))
-      mal_formee(formuler("objet de classe %s au lieu de table_reference", paste(citer(class(x)), collapse = "/")),
-                 class(x), classe_attendue)
-    # Colonnes : age, sexe, qx, puis au plus un axe temporel, celui que rend
-    # axe_temporel_table() (module donnees ; ADR 0019, point 2.2).
-    colonnes <- attr(x, "names", exact = TRUE)
-    axe <- axe_temporel_table(x)
-    if (!identical(colonnes, c("age", "sexe", "qx", if (!is.na(axe)) axe)))
-      mal_formee(modifie, colonnes, "age, sexe, qx [, annee ou generation] (colonnes de table_reference())")
-    # (b) Reconstruction : data.frame nu des colonnes, métadonnées lues dans
-    # les attributs (un attribut absent est passé NULL, que le constructeur
-    # refuse) ; une erreur R du data.frame nu vaut objet modifié.
-    r <- tryCatch({
-      nu <- data.frame(lapply(stats::setNames(colonnes, colonnes), function(n) .subset2(x, n)),
-                       stringsAsFactors = FALSE)
-      table_reference(nu, attr(x, "nom", exact = TRUE), attr(x, "statut", exact = TRUE),
-                      attr(x, "source", exact = TRUE), attr(x, "parametres", exact = TRUE),
-                      attr(x, "forme_origine", exact = TRUE))
-    }, refus_tablexp = function(e) e, error = function(e) NULL)
-    if (is.null(r)) mal_formee(modifie, "data.frame nu non reconstructible", "colonnes de table_reference()")
-    if (inherits(r, "refus_tablexp"))
-      mal_formee(formuler("refusé par table_reference() (motif %s)", citer(r$motif)), r$motif, "aucun refus",
-                 motif = r$motif)
-    # (c) Identité avec la reconstruction.
-    if (!identical(x, r)) mal_formee(modifie, texte_moteur("objet reçu"), "objet reconstruit par table_reference()")
+    # (a) à (c) : état de l'objet (etat_table_reference(), module donnees ; #253,
+    # le simulateur lit la même règle) : classe exacte lue par attr() (une
+    # classe « bytes » ne lève pas), colonnes du constructeur (age, sexe, qx,
+    # puis au plus un axe temporel, celui que rend axe_temporel_table() ; ADR
+    # 0019, point 2.2), liste des colonnes cohérente avec ses noms (#365 : une
+    # liste plus courte que ses noms n'est pas lue), reconstruction par
+    # table_reference() sur le data.frame nu des colonnes et les métadonnées de
+    # l'objet (un attribut absent est passé NULL, que le constructeur refuse ;
+    # une erreur R du data.frame nu vaut objet modifié), enfin identité avec la
+    # reconstruction.
+    etat <- etat_table_reference(x)
+    if (!is.null(etat))
+      mal_formee(formuler("%s", etat$constat), etat$lu, etat$attendu, etat$motif_constructeur)
     # (d) Écriture et relecture de l'élément de fiche, sous sa clé.
     el <- element_table_fiche(x)
     ecrit <- stats::setNames(list(el), k)

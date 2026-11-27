@@ -322,6 +322,11 @@ CAS_MAL_FORMEES <- list(
        list(a = structure(table_reference(TR, "s", "synthetique", "x", parametres = list(p = 1)),
                           parametres = list(p = nom_bytes))),
        "table_parametres_manquants", "aucun refus", "refusé par table_reference() (motif table_parametres_manquants)"),
+  # Vecteur atomique classé table_reference, noms de colonnes exacts (#253) : pas une liste, donc
+  # aucune garde de cohérence des colonnes ; la reconstruction le refuse faute de nom.
+  list("vecteur atomique classé table_reference aux noms age, sexe, qx",
+       list(a = structure(c(1, 2, 3), names = c("age", "sexe", "qx"), class = c("table_reference", "data.frame"))),
+       "table_nom_manquant", "aucun refus", "refusé par table_reference() (motif table_nom_manquant)"),
   list("fonction dans parametres", list(a = table_reference(TR, "s", "synthetique", "x", parametres = list(f = identity))),
        "serialisation_impossible", "écriture du texte de fiche sans refus",
        "métadonnée sans écriture exacte dans la fiche (refus serialisation_impossible, a/parametres/f)"))
@@ -331,6 +336,48 @@ for (cas in CAS_MAL_FORMEES)
                           "construire_table", "tables_reference_mal_formees", cas[[3L]], cas[[4L]],
                           c(cas[[5L]], if (identical(cas[[4L]], ATTENDU_ARG)) "(ADR 0015, point 1.1)"
                                        else "doit être l'objet rendu par table_reference(), sans modification")))
+# Liste des colonnes plus courte que ses noms (#365, F344) : sous une classe dont
+# length() rend 1, `[.data.frame` rend une liste d'un élément munie des trois
+# noms, puis reclassée table_reference. Refusée sous le texte « objet modifié
+# après table_reference() », details$lu « data.frame nu non reconstructible »
+# (figé ici ; texte inchangé par #253, qui lit cette règle par
+# etat_table_reference()). Un sous-processus : l'objet se fabrique sous une
+# méthode length.k355 que le processus de test ne porte pas, et la lecture d'une
+# colonne d'un tel objet arrête R sur l'état antérieur du simulateur (#365).
+local({
+  entree <- tempfile("t253_", fileext = ".rds"); sortie <- tempfile("t253_", fileext = ".rds"); script <- tempfile("t253_", fileext = ".R")
+  on.exit(unlink(c(entree, sortie, script)))
+  saveRDS(list(base = BASE, roles = ROLES, plan = PLAN), entree)
+  writeLines(c(
+    "a <- commandArgs(TRUE)",
+    sprintf("suppressPackageStartupMessages(library(tablexp, lib.loc = %s))", deparse(.harnais$bibliotheque)),
+    "length.k355 <- function(x) 1L",
+    "e <- readRDS(a[1L])",
+    "TRI <- data.frame(age = 0:2, sexe = 'H', qx = c(.01, .02, .03))",
+    "x <- structure(TRI, class = c('k355', 'data.frame'))[-2L, , drop = FALSE]; class(x) <- c('table_reference', 'data.frame')",
+    "r <- tryCatch(construire_table(e$base, e$roles, e$plan, tables_reference = list(a = x)), refus_tablexp = function(c) c,",
+    "              error = function(c) c)",
+    "saveRDS(list(classe = class(r), module = r$module, motif = r$motif, message = conditionMessage(r), details = r$details), a[2L])"),
+    script)
+  p <- executer_rscript(script, c(shQuote(entree), shQuote(sortie)))
+  verifier("D tables_reference_mal_formees, liste de 1 colonne pour 3 noms (classe table_reference) : refus du module construire_table, message et details exacts, une ligne UTF-8, sous-processus", {
+    if (!file.exists(sortie)) sprintf("aucun résultat : code de sortie %d (%s)", p$statut, paste(utils::tail(p$sortie, 3L), collapse = " | "))
+    else {
+      x <- readRDS(sortie)
+      attendu <- paste0("Table de clé « a » : objet modifié après table_reference(). Chaque élément de « tables_reference » doit être ",
+                        "l'objet rendu par table_reference(), sans modification (classe, attributs, ordre canonique des lignes, ",
+                        "valeurs contrôlées), et ses métadonnées doivent s'écrire dans la fiche.")
+      if (!"refus_tablexp" %in% x$classe) sprintf("condition %s : %s", paste(x$classe, collapse = "/"), paste(x$message, collapse = ""))
+      else if (!identical(x$module, "construire_table") || !identical(x$motif, "tables_reference_mal_formees")) sprintf("%s / %s", x$module, x$motif)
+      else if (!identical(x$message, attendu)) paste("message :", x$message)
+      else if (grepl("[\n\v\f]", x$message) || !validUTF8(x$message) || !identical(Encoding(x$message), "UTF-8")) "message sur plusieurs lignes ou non marqué UTF-8"
+      else if (!identical(x$details, list(cle = "a", lu = "data.frame nu non reconstructible", attendu = "colonnes de table_reference()",
+                                          motif_constructeur = NA_character_, chemin = NA_character_)))
+        paste("details :", paste(deparse(x$details), collapse = " "))
+      else TRUE
+    }
+  })
+})
 # Clé non écrivable dans la fiche (audit de #73, m2) : message de l'argument
 # inchangé, clé en cause et motif de l'écrivain dans les details seulement.
 verifier("D tables_reference_mal_formees, clé aux octets non UTF-8 : details$cle, $chemin et $motif_ecriture (chaine_non_utf8), message de l'argument", {

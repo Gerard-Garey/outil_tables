@@ -3071,6 +3071,56 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
             source = source, forme_origine = forme_origine, parametres = parametres)
 }
 
+# État d'un objet reçu comme table de référence (ADR 0015, point 1.3 ; #253,
+# #365), seule lecture de cette règle, lue par controler_forme_tables() (module
+# construire_table, étapes (a) à (c)) et par loi_effective() (module
+# simulation) : l'objet est exactement celui que rend table_reference().
+# Rend NULL s'il l'est, sinon le premier écart, list(constat, lu, attendu,
+# motif_constructeur) : `constat` est le texte de l'écart (inséré dans le
+# message du refus de l'appelant, qui refuse : cette fonction ne refuse pas),
+# `lu` et `attendu` les valeurs comparées, `motif_constructeur` le motif du
+# refus de table_reference() à la reconstruction, NA sinon. Ordre des
+# contrôles : (1) classe exacte table_reference/data.frame, lue par attr() (une
+# classe « bytes » ne lève pas) ; (2) noms des colonnes (attr() : age, sexe, qx,
+# puis au plus un axe temporel, celui que rend axe_temporel_table()) ; (3) si
+# l'objet est une liste : cohérence de ses colonnes avec ses noms (colonnes_lues(),
+# F344), avant toute lecture de colonne (#365 : sous une liste plus courte que
+# ses noms, x$sexe arrête R) ; un objet qui n'est pas une liste (vecteur
+# atomique classé table_reference) va à (4), sans lecture par `$` ; (4) reconstruction par table_reference() sur le
+# data.frame nu des colonnes et les métadonnées lues dans les attributs (un
+# attribut absent est passé NULL, que le constructeur refuse ; une erreur R du
+# data.frame nu, par exemple sur une colonne de classe « bytes », vaut objet
+# non reconstructible, #253) ; (5) identical() à la reconstruction (ordre
+# canonique, valeurs contrôlées, attributs).
+etat_table_reference <- function(x) {
+  constat <- function(texte, lu, attendu, motif = NA_character_)
+    list(constat = texte, lu = lu, attendu = attendu, motif_constructeur = motif)
+  modifie <- formuler("objet modifié après table_reference()")
+  classe_attendue <- c("table_reference", "data.frame")
+  if (!identical(attr(x, "class", exact = TRUE), classe_attendue))
+    return(constat(formuler("objet de classe %s au lieu de table_reference", paste(citer(class(x)), collapse = "/")),
+                   class(x), classe_attendue))
+  colonnes <- attr(x, "names", exact = TRUE)
+  axe <- axe_temporel_table(x)
+  if (!identical(colonnes, c("age", "sexe", "qx", if (!is.na(axe)) axe)))
+    return(constat(modifie, colonnes, "age, sexe, qx [, annee ou generation] (colonnes de table_reference())"))
+  if (is.list(x) && !colonnes_lues(x)$coherente)
+    return(constat(modifie, "data.frame nu non reconstructible", "colonnes de table_reference()"))
+  r <- tryCatch({
+    nu <- data.frame(lapply(stats::setNames(colonnes, colonnes), function(n) .subset2(x, n)),
+                     stringsAsFactors = FALSE)
+    table_reference(nu, attr(x, "nom", exact = TRUE), attr(x, "statut", exact = TRUE),
+                    attr(x, "source", exact = TRUE), attr(x, "parametres", exact = TRUE),
+                    attr(x, "forme_origine", exact = TRUE))
+  }, refus_tablexp = function(e) e, error = function(e) NULL)
+  if (is.null(r)) return(constat(modifie, "data.frame nu non reconstructible", "colonnes de table_reference()"))
+  if (inherits(r, "refus_tablexp"))
+    return(constat(formuler("refusé par table_reference() (motif %s)", citer(r$motif)), r$motif, "aucun refus",
+                   motif = r$motif))
+  if (!identical(x, r)) return(constat(modifie, texte_moteur("objet reçu"), "objet reconstruit par table_reference()"))
+  NULL
+}
+
 # --- tables embarquées (ADR 0018 ; ADR 0015, point 6) -----------------------------
 
 # Déclaration des tables embarquées (ADR 0018, point 1.1) : une ligne par

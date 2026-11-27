@@ -406,19 +406,17 @@ loi_effective <- function(loi_t, cause, sexes) {
     refuser("simulation", "loi_invalide",
             formuler("Loi « %s » : liste (table, facteurs) attendue.", cause), list(cause = cause))
   tab <- loi_t$table; f <- loi_t$facteurs
-  # Classe d'encodage « bytes » lue par classe_bytes() avant inherits(), qui
-  # lève une erreur R sur elle (#150) ; refus propre à ce cas.
+  # Classe d'encodage « bytes » lue par classe_bytes() en premier (#150) : refus
+  # propre à ce cas (inherits() levait une erreur R sur elle), message conservé.
   if (classe_bytes(tab))
     refuser("simulation", "loi_invalide",
             formuler("Loi « %s » : la table porte une classe d'encodage « bytes » (classe %s), non convertible en UTF-8 sans deviner ; passer l'objet rendu par table_reference(), sans modification.",
                      cause, paste(citer(class(tab)), collapse = "/")),
             list(cause = cause))
-  if (!inherits(tab, "table_reference"))
-    refuser("simulation", "loi_invalide",
-            formuler("Loi « %s » : la table doit être de classe table_reference (ADR 0007, point 7).", cause),
-            list(cause = cause))
   # Axe temporel lu par le prédicat unique (axe_temporel_table(), module
-  # donnees ; ADR 0019, point 2) : aucune table à axe n'est simulée.
+  # donnees ; ADR 0019, point 2) : aucune table à axe n'est simulée. Lu avant
+  # l'état de la table : il ne lit que les noms de colonnes, et un objet forgé
+  # à axe garde son refus propre.
   axe <- axe_temporel_table(tab)
   if (identical(axe, "annee"))
     refuser("simulation", "loi_invalide",
@@ -429,6 +427,18 @@ loi_effective <- function(loi_t, cause, sexes) {
             formuler("Loi « %s » : table de génération (colonne generation) non prise en charge par le simulateur minimal.",
                      cause),
             list(cause = cause))
+  # Table reçue : exactement l'objet que rend table_reference() (etat_table_reference(),
+  # module donnees ; ADR 0015, point 1.3, comme construire_table(), #253) :
+  # classe exacte, colonnes, liste des colonnes cohérente avec ses noms (#365),
+  # reconstruction sans refus ni erreur R (colonne de classe « bytes »), identité
+  # avec elle. Un objet modifié après table_reference() est refusé, jamais lu :
+  # aucune lecture de colonne (tab$sexe) ne précède ce contrôle.
+  etat <- etat_table_reference(tab)
+  if (!is.null(etat))
+    refuser("simulation", "loi_invalide",
+            formuler(paste("Loi « %s » : la table n'est pas l'objet rendu par table_reference() (%s). Passer l'objet rendu par",
+                           "table_reference(), sans modification (ADR 0015, point 1.3)."), cause, etat$constat),
+            c(list(cause = cause), etat))
   # Facteurs : forme exacte (#58, forme_exacte()) : double ou integer, seul
   # attribut names (ni classe, ni dim), de noms exactement H et F, sans tri :
   # setequal() ne dépend pas de la locale et ne lève pas pour un nom non ASCII

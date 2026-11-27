@@ -288,10 +288,94 @@ local({
   verifier("table de classe c(<bytes>, ...) sur la transition rachat : refus loi_invalide, transition citée",
            verdict(attrape(simuler(loi(rachat = structure(RACHAT, class = c(b, class(RACHAT)))), PF, PER, GRAINE)),
                    "Loi « rachat » : la table porte une classe d'encodage « bytes »"))
-  # Témoin : une classe sans encodage bytes en tête n'est pas refusée pour cela.
-  verifier("table de classe c(\"autre\", \"table_reference\", \"data.frame\") (sans encodage bytes) : acceptée",
-           is.null(attrape(simuler(loi(deces = structure(GM, class = c("autre", class(GM)))),
-                                   modifyList(PF, list(n = 100)), PER, GRAINE))))
+  # Témoin : une classe sans encodage bytes en tête n'est pas refusée pour cela
+  # (classe d'encodage) : elle l'est depuis #253 comme objet autre que celui de
+  # table_reference() (classe exacte), sous le message de l'état de la table.
+  x <- attrape(simuler(loi(deces = structure(GM, class = c("autre", class(GM)))), modifyList(PF, list(n = 100)), PER, GRAINE))
+  verifier("table de classe c(\"autre\", \"table_reference\", \"data.frame\") (sans encodage bytes) : refus loi_invalide (classe exacte, #253), message de l'état de la table, pas celui de la classe bytes",
+           identical(verdict(x, "Loi « deces » : la table n'est pas l'objet rendu par table_reference() (objet de classe autre/table_reference/data.frame au lieu de table_reference)."), TRUE) &&
+             !grepl("bytes", conditionMessage(x), fixed = TRUE))
+})
+# Table reçue revalidée comme l'est celle de construire_table() (#253, ADR 0015,
+# point 1.3 ; etat_table_reference(), module donnees) : l'objet est exactement
+# celui que rend table_reference(), sinon refus loi_invalide nommé avant toute
+# lecture de colonne, au lieu d'une erreur R. Contre-épreuve : le cas de la
+# colonne `sexe` de classe c(<bytes>, "factor") lève sur l'état antérieur
+# l'erreur R « translating strings with "bytes" encoding is not allowed »
+# (mesuré à f2d532c) ; les autres cas y étaient acceptés ou refusés sous un autre
+# message. Messages écrits à la main.
+local({
+  b <- "\xe9"; Encoding(b) <- "bytes"
+  attrape <- function(expr) tryCatch({ force(expr); NULL }, refus_tablexp = function(r) r, error = function(e) e)
+  # Colonne `sexe` remplacée sans dispatch (`$<-.data.frame` lèverait sur la
+  # classe bytes), classe de l'objet conservée.
+  sexe_bytes <- function(t) {
+    f <- factor(t$sexe); class(f) <- c(b, "factor")
+    cl <- attr(t, "class"); u <- unclass(t); u[["sexe"]] <- f; attr(u, "class") <- cl; u
+  }
+  ligne_utf8 <- function(m) !grepl("[\n\v\f]", m) && validUTF8(m) && identical(Encoding(m), "UTF-8")
+  gabarit <- function(cause, constat)
+    paste0("Loi « ", cause, " » : la table n'est pas l'objet rendu par table_reference() (", constat,
+           "). Passer l'objet rendu par table_reference(), sans modification (ADR 0015, point 1.3).")
+  MODIFIE <- "objet modifié après table_reference()"
+  verdict <- function(x, cause, constat, details) {
+    if (is.null(x)) return("aucun refus levé")
+    if (!inherits(x, "refus_tablexp")) return(sprintf("condition %s : %s", class(x)[1L], conditionMessage(x)))
+    if (!identical(x$module, "simulation") || !identical(x$motif, "loi_invalide")) return(sprintf("refus %s/%s", x$module, x$motif))
+    if (!identical(conditionMessage(x), gabarit(cause, constat))) return(paste("message :", conditionMessage(x)))
+    if (!ligne_utf8(conditionMessage(x))) return("message sur plusieurs lignes ou non marqué UTF-8")
+    if (!identical(x$details, c(list(cause = cause, constat = constat), details))) return(paste("details :", paste(deparse(x$details), collapse = " ")))
+    TRUE
+  }
+  T_SEXE <- sexe_bytes(GM)
+  verifier("#253 colonne sexe de classe c(<bytes>, \"factor\"), classe de l'objet table_reference/data.frame : refus loi_invalide (pas une erreur R), message et details exacts, une ligne UTF-8",
+           identical(attr(T_SEXE, "class"), c("table_reference", "data.frame")) &&
+             identical(verdict(attrape(simuler(loi(deces = T_SEXE), PF, PER, GRAINE)), "deces", MODIFIE,
+                               list(lu = "data.frame nu non reconstructible", attendu = "colonnes de table_reference()",
+                                    motif_constructeur = NA_character_)), TRUE))
+  verifier("#253 idem sur la transition rachat : cause citée",
+           identical(verdict(attrape(simuler(loi(rachat = sexe_bytes(RACHAT)), PF, PER, GRAINE)), "rachat", MODIFIE,
+                             list(lu = "data.frame nu non reconstructible", attendu = "colonnes de table_reference()",
+                                  motif_constructeur = NA_character_)), TRUE))
+  # Paramètres bytes posés après coup (#256) : la reconstruction hérite du refus
+  # du constructeur, dont le motif est cité.
+  for (cas in list(list("nom de paramètre", structure(list(1), names = b)), list("valeur de paramètre", list(p = b))))
+    verifier(sprintf("#253 table reçue dont %s est d'encodage bytes (posé après coup) : refus loi_invalide, motif table_parametres_manquants cité (#256)", cas[[1L]]),
+             identical(verdict(attrape(simuler(loi(deces = structure(GM, parametres = cas[[2L]])), PF, PER, GRAINE)),
+                               "deces", "refusé par table_reference() (motif table_parametres_manquants)",
+                               list(lu = "table_parametres_manquants", attendu = "aucun refus",
+                                    motif_constructeur = "table_parametres_manquants")), TRUE))
+  # Vecteur atomique classé table_reference aux noms exacts : pas une liste, la garde de cohérence
+  # des colonnes ne s'applique pas (colonnes_lues() : précondition liste) ; la reconstruction le
+  # refuse, motif du constructeur cité, sans erreur R.
+  ATOME <- structure(c(1, 2, 3), names = c("age", "sexe", "qx"), class = c("table_reference", "data.frame"))
+  verifier("#253 vecteur atomique classé table_reference (noms age, sexe, qx) : refus loi_invalide, motif table_nom_manquant cité, pas une erreur R",
+           identical(verdict(attrape(simuler(loi(deces = ATOME), PF, PER, GRAINE)),
+                             "deces", "refusé par table_reference() (motif table_nom_manquant)",
+                             list(lu = "table_nom_manquant", attendu = "aucun refus",
+                                  motif_constructeur = "table_nom_manquant")), TRUE))
+  verifier("#253 lignes permutées (GM[121:1, ]) : refus loi_invalide, objet reçu comme lu",
+           identical(verdict(attrape(loi_effective(list(table = GM[121:1, ], facteurs = c(H = 1, F = 1)), "deces", c("H", "F"))),
+                             "deces", MODIFIE, list(lu = "objet reçu", attendu = "objet reconstruit par table_reference()",
+                                                    motif_constructeur = NA_character_)), TRUE))
+  verifier("#253 colonne en trop : refus loi_invalide, colonnes lues dans details$lu",
+           identical(verdict(attrape(loi_effective(list(table = structure(cbind(GM, z = 1), class = class(GM)), facteurs = c(H = 1, F = 1)),
+                                                    "deces", c("H", "F"))), "deces", MODIFIE,
+                             list(lu = c("age", "sexe", "qx", "z"),
+                                  attendu = "age, sexe, qx [, annee ou generation] (colonnes de table_reference())",
+                                  motif_constructeur = NA_character_)), TRUE))
+  verifier("#253 data.frame simple : refus loi_invalide, classe citée",
+           identical(verdict(attrape(loi_effective(list(table = as.data.frame(GM), facteurs = c(H = 1, F = 1)), "deces", c("H", "F"))),
+                             "deces", "objet de classe data.frame au lieu de table_reference",
+                             list(lu = "data.frame", attendu = c("table_reference", "data.frame"),
+                                  motif_constructeur = NA_character_)), TRUE))
+  # Tables valides : objet inchangé et accepté tel quel (aucune copie, aucune correction).
+  # Embarquées lues sans refus (TF 00-02 est refusée à la lecture, hors de ce test) :
+  # table de génération comprise (colonne generation).
+  verifier("#253 tables valides (Gompertz-Makeham, constante, embarquées dont une table de génération) : etat_table_reference() rend NULL",
+           is.null(tablexp:::etat_table_reference(GM)) && is.null(tablexp:::etat_table_reference(RACHAT)) &&
+             all(vapply(c("TD 88-90", "TV 88-90", "TH 00-02", "TGF05", "Table unique 2024"),
+                        function(n) is.null(tablexp:::etat_table_reference(table_embarquee(n))), NA)))
 })
 verifier("portefeuille : champ manquant (origine) refusé, sans défaut implicite",
          leve_refus(simuler(loi(), PF[setdiff(names(PF), "origine")], PER, GRAINE), "portefeuille_invalide"))
