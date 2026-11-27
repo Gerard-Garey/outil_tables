@@ -44,7 +44,7 @@
 % Date fixe, mise a jour a la main a chaque modification du document
 % (docs/latex/CONVENTIONS.md, section 1) : jamais \today, qui ferait
 % dependre le PDF du jour de compilation.
-\newcommand{\datedoc}{26/11/2026}
+\newcommand{\datedoc}{27/11/2026}
 \newcommand{\versiondoc}{0.1}
 \newcommand{\statutdoc}{Projet}
 % Titre court utilise dans le pied de page (fancyhdr).
@@ -5134,22 +5134,28 @@ dans cet ordre, au premier défaut (tableau~\ref{tab:refus-tables-reference})~:
     sauf si son nom est celui d'une table du catalogue et son élément de
     fiche celui de cette table, empreinte de table et métadonnées
     comprises). Un attribut \code{nom} ou
-    \code{source} d'encodage \code{bytes} porté sur une table après le
-    constructeur est refusé à la reconstruction~(b), le constructeur le
+    \code{source} d'encodage \code{bytes}, ou un attribut
+    \code{parametres} dont un nom ou une valeur caractère, à toute
+    profondeur, porte cet encodage, posé sur une table après le
+    constructeur, est refusé à la reconstruction~(b), le constructeur le
     refusant (section~\ref{sec:table-reference}, «~Encodage \code{bytes}
     des métadonnées et de la table~»)~: raison «~refusé par
     table\_reference() (motif [motif])~», \code{details\$motif\_constructeur}
-    \code{table\_nom\_manquant} ou \code{table\_source\_manquante},
-    \code{details\$chemin} à \code{NA} (issue~\#158~; l'attribut était
+    \code{table\_nom\_manquant}, \code{table\_source\_manquante} ou
+    \code{table\_parametres\_manquants},
+    \code{details\$chemin} à \code{NA} (issues~\#158 et~\#256~; l'attribut était
     auparavant refusé à l'écriture d'essai~(d), sous
-    \code{chaine\_codage\_bytes}).
-    Un nom ou une valeur d'encodage \code{bytes} dans \code{parametres},
-    que le constructeur ne contrôle pas, est refusé à l'écriture
+    \code{chaine\_codage\_bytes}, avec, pour un paramètre,
+    \code{details\$chemin} \code{[clé]/parametres/[nom]} pour une valeur ou
+    \code{[clé]/parametres/@noms} pour un nom).
+    Un paramètre que le constructeur ne lit pas (fonction, niveau de
+    facteur, \code{dimnames}, classe ou autre attribut d'un paramètre,
+    d'encodage \code{bytes} ou non) est refusé à l'écriture
     d'essai~(d)~: raison «~métadonnée sans écriture exacte dans la fiche
-    (refus chaine\_codage\_bytes, [chemin])~», \code{details\$lu} le motif
+    (refus serialisation\_impossible, [chemin])~», \code{details\$lu} le motif
     de l'écrivain, \code{details\$chemin}
-    \code{[clé]/parametres/[nom]} pour une valeur ou
-    \code{[clé]/parametres/@noms} pour un nom.
+    \code{[clé]/parametres/[nom]} (\code{a/parametres/f} pour une
+    fonction rangée sous le nom \code{f} d'une table de clé \code{a}).
     Un refus du lecteur \code{lire\_texte()} à la relecture~(d) garde de
     même son motif et son chemin (issue~\#165)~: raison «~métadonnée sans
     écriture exacte dans la fiche (refus [motif], [chemin])~»,
@@ -8783,7 +8789,9 @@ forme\_origine)}, exportée pour l'import de tables par l'application~:
     noms compris, ni \code{NA} ni vide (\code{chaine\_unique()},
     section~\ref{sec:fonctions-outils}~; une chaîne nommée est refusée sous le
     motif du champ~; issue~\#48)~---, le nom et la source étant en outre
-    d'un encodage autre que \code{bytes} (ci-dessous), et \code{parametres}~: une liste non vide est \textbf{requise}
+    d'un encodage autre que \code{bytes} (ci-dessous), et \code{parametres}~: une liste non vide, dont aucun
+    nom ni aucune valeur caractère, à toute profondeur, n'est d'encodage
+    \code{bytes} (ci-dessous), est \textbf{requise}
     pour une table synthétique, qui n'a d'autre provenance que sa loi, et
     \textbf{interdite} pour une table embarquée ou importée, qu'elle ferait
     passer pour dérivée d'une loi.
@@ -8794,11 +8802,14 @@ forme\_origine)}, exportée pour l'import de tables par l'application~:
 \textbf{Statut des paramètres d'une table synthétique} (issue~\#163,
 option~(a), décision M279). Les \code{parametres} sont \textbf{déclarés par
 l'appelant, non vérifiés par le moteur}~: \code{table\_reference()} en exige
-une liste non vide sans en contrôler ni la forme ni la cohérence avec les
-$q_x$ (une liste \code{loi = "gompertz\_makeham"} avec $c = 1$ est admise,
+une liste non vide sans en contrôler ni la forme (hormis l'encodage
+\code{bytes} de ses noms et de ses valeurs caractère, ci-dessous,
+«~Encodage \code{bytes} des métadonnées et de la table~»~; issue~\#256)
+ni la cohérence avec les $q_x$ (une liste \code{loi = "gompertz\_makeham"} avec $c = 1$ est admise,
 alors que \code{table\_gompertz\_makeham()} refuse $c = 1$), et le contrôle de
 reconstruction de \code{construire\_table()} admet un attribut modifié après le
-constructeur. Il en va de même d'une table rendue par une loi du package
+constructeur, pourvu que celui-ci l'admette (un nom ou une valeur caractère
+d'encodage \code{bytes} y est refusé à la reconstruction). Il en va de même d'une table rendue par une loi du package
 (\code{table\_gompertz\_makeham()}, \code{table\_logistique()},
 \code{table\_constante()}), que le moteur ne distingue pas d'une table
 déclarée par l'appelant. La table entre en valeurs~: l'empreinte de table
@@ -8969,7 +8980,7 @@ version ne changent (ADR 0019, point~1.6).
 \medskip
 \noindent
 \textbf{Encodage \code{bytes} des métadonnées et de la table}
-(issue~\#158, règle de l'issue~\#128). Une chaîne d'encodage
+(issues~\#158 et~\#256, règle de l'issue~\#128). Une chaîne d'encodage
 \code{bytes} ne se convertit pas en UTF-8 sans deviner. Le nom et la
 source passent \code{chaine\_unique()}, qui admet une chaîne
 \code{bytes} (type \code{character}, aucun attribut), et
@@ -9026,11 +9037,32 @@ ment, arrêtait R par une erreur de segmentation (lecture de
 à ses noms (\emph{constat} de mesure sur le code qui précède
 l'issue, R~4.3.3), ou \code{table\_vide} pour une liste sans ligne
 (\emph{constat} de mesure de la revue finale sur le code qui précède
-l'issue, R~4.3.3). Les noms et les valeurs de
-\code{parametres} ne sont pas contrôlés par le constructeur~: une chaîne
-\code{bytes} y est refusée par l'écriture d'essai du contrôle des tables
-reçues (section~\ref{sec:tables-reference-recues}, «~Contrôle des tables reçues~», point~1~(d)),
-avant tout calcul.
+l'issue, R~4.3.3). Les \code{parametres} d'une table synthétique
+s'écrivent eux aussi dans la fiche~; un nom ou une valeur d'encodage
+\code{bytes} y était refusé par l'écriture d'essai du contrôle des tables
+reçues (section~\ref{sec:tables-reference-recues}, «~Contrôle des tables reçues~», point~1~(d),
+\code{chaine\_codage\_bytes}), avant toute étape. Depuis l'issue~\#256,
+le constructeur le refuse dès l'entrée, par la même règle que le nom et
+la source, sous \code{table\_parametres\_manquants}, sans lire les octets
+ni citer les paramètres (\code{details} vide)~: «~Table synthétique «~[nom]~»~: ses
+paramètres portent un nom ou une valeur d'encodage «~bytes~» (à toute
+profondeur), non convertible en UTF-8 sans deviner~: ils ne sont pas
+lus. Passer des paramètres (liste non vide) sans encodage bytes.~». Ce
+contrôle suit, dans l'étape «~paramètres~» de l'ordre ci-dessus, ceux de
+la présence des paramètres (\code{table\_parametres\_manquants} pour une
+table synthétique sans liste non vide, \code{table\_parametres\_inattendus}
+pour une table embarquée ou importée qui en porte). Il lit, à toute
+profondeur de la liste, les noms (\code{noms\_bytes()}) et les valeurs des
+vecteurs caractère, et rien d'autre~: les niveaux d'un facteur, les
+\code{dimnames}, la classe et les autres attributs d'un paramètre ne sont
+pas lus par le constructeur et relèvent de l'écrivain de la fiche, qui les
+refuse à l'écriture d'essai~(d) sous \code{serialisation\_impossible},
+qu'ils soient d'encodage \code{bytes} ou non. Le parcours se fait par
+niveaux de la liste, sans appel récursif ni dispatch sur la classe~: une
+liste de profondeur $10^5$ ne lève pas d'erreur R au constructeur
+(\emph{constat} de mesure, R~4.3.3), sa profondeur, au-delà de
+\code{PROFONDEUR\_MAX\_TEXTE}, étant refusée à l'écriture d'essai~(d), sous
+\code{serialisation\_impossible}.
 
 \medskip
 \noindent
@@ -10804,7 +10836,7 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{axe\_temporel\_table()} & interne & table & prédicat unique de l'axe d'une table d'après ses noms de colonnes (lus par \code{attr()})~: \code{annee}, \code{generation} ou \code{NA}~; un objet aux deux colonnes est rendu comme une table à \code{annee}~; lu par l'empreinte de table, le contrôle de forme des tables reçues, les contrôles d'entrée des étapes qui lisent une table et la loi effective du simulateur (issue~\#272) \\
 \catalogue{fonctions-donnees}{groupes\_cites\_table()} & interne & sexes, axe, valeurs de l'axe & groupe cité dans les refus du constructeur~: «~H~», «~H, année 1950~» ou «~F, génération 1950~»~; aide de message, seule définition du format (issues~\#270 et~\#272) \\
 \catalogue{fonctions-donnees}{lignes\_citees\_table()} & interne & lignes reçues, sexes, axe, valeurs de l'axe, âges & lignes citées avec leur groupe et leur âge («~2 (H, année 1950, âge 1)~»), séparées par des virgules, au plus \code{NB\_LIGNES\_CITEES} choisies par l'appelant~; aide de message (issue~\#270) \\
-\catalogue{fonctions-donnees}{table\_reference()} & exportée & table, nom, statut, source, paramètres, forme d'origine & objet \code{table\_reference} contrôlé, lignes dans l'ordre canonique (sexe, axe temporel, âge), noms de lignes automatiques~; au plus un axe temporel, \code{annee} ou \code{generation}, refus \code{table\_annee\_et\_generation} des deux (issue~\#272)~; table transcrite en $l_x$ convertie en $q_x = (l_x - l_{x+1})/l_x$ par groupe (sexe, axe), dernier âge de chaque groupe sans ligne, premier $l_x$ nul qui clôt le groupe, refus des $l_x$ non décroissants par paires d'âges (issues~\#146 et~\#272)~; nom réservé aux tables embarquées pour les statuts \code{importee} et \code{synthetique} (issue~\#263)~; nom, source et classe de la table sans encodage \code{bytes}, refusés sous \code{table\_nom\_manquant}, \code{table\_source\_manquante} et \code{table\_mal\_formee} (section~\ref{sec:table-reference}~; issue~\#158)~; liste des colonnes de la longueur de ses noms, jugée avant toute lecture de colonne par \code{colonnes\_lues()}, sinon \code{table\_mal\_formee} (issue~\#355) \\
+\catalogue{fonctions-donnees}{table\_reference()} & exportée & table, nom, statut, source, paramètres, forme d'origine & objet \code{table\_reference} contrôlé, lignes dans l'ordre canonique (sexe, axe temporel, âge), noms de lignes automatiques~; au plus un axe temporel, \code{annee} ou \code{generation}, refus \code{table\_annee\_et\_generation} des deux (issue~\#272)~; table transcrite en $l_x$ convertie en $q_x = (l_x - l_{x+1})/l_x$ par groupe (sexe, axe), dernier âge de chaque groupe sans ligne, premier $l_x$ nul qui clôt le groupe, refus des $l_x$ non décroissants par paires d'âges (issues~\#146 et~\#272)~; nom réservé aux tables embarquées pour les statuts \code{importee} et \code{synthetique} (issue~\#263)~; nom, source, paramètres (noms et valeurs caractère, à toute profondeur) et classe de la table sans encodage \code{bytes}, refusés sous \code{table\_nom\_manquant}, \code{table\_source\_manquante}, \code{table\_parametres\_}\allowbreak\code{manquants} et \code{table\_mal\_formee} (section~\ref{sec:table-reference}~; issues~\#158 et~\#256)~; liste des colonnes de la longueur de ses noms, jugée avant toute lecture de colonne par \code{colonnes\_lues()}, sinon \code{table\_mal\_formee} (issue~\#355) \\
 \catalogue{fonctions-donnees}{DECLARATIONS\_TABLES\_EMBARQUEES} & constante & --- & déclaration fermée des tables embarquées, \code{data.frame} nu~: \code{nom}, \code{identifiant} (de fichier), \code{sexe} (modalité déclarée), \code{format} (entier, 1 ou 2, déclaré et non déduit~; issue~\#272), une ligne par table dans l'ordre du catalogue (section~\ref{sec:table-reference}, «~Tables embarquées~») \\
 \catalogue{fonctions-donnees}{DOSSIER\_TABLES\_EMBARQUEES} & constante & --- & \code{inst/extdata/tables}, dossier des tables embarquées relatif à la racine des sources \\
 \catalogue{fonctions-donnees}{fichier\_table\_embarquee()} & interne & identifiant & chemin \code{<dossier>/}\allowbreak\code{<identifiant>.csv} du fichier de table \\
