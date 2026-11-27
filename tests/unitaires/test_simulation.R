@@ -71,6 +71,45 @@ verifier("table constante : q constant, statut synthetique, parametres (loi, q, 
 verifier("Gompertz-Makeham : c <= 1 refusé (loi_invalide)", leve_refus(table_gm(GM_A, GM_B, 1, 0:120), "loi_invalide"))
 verifier("table constante : q > 1 refusé (loi_invalide)", leve_refus(table_constante(1.5, 0:10, "x"), "loi_invalide"))
 
+# Âges des trois tables synthétiques (#234) : refus nommé à l'entrée, par le prédicat
+# unique defaut_ages_synthetiques(), citant la valeur fautive, sans aucun
+# avertissement de coercition (avant : Inf et 3e9 donnaient un avertissement
+# « NAs introduced by coercion to integer range », puis le refus générique
+# table_colonne_mal_typee).
+table_logistique <- tablexp:::table_logistique
+CONSTRUCTEURS_AGES <- list(
+  "Gompertz-Makeham" = function(ages) table_gm(GM_A, GM_B, GM_C, ages),
+  "logistique" = function(ages) table_logistique(2e-4, 2.5e-5, log(1.1), ages),
+  "constante" = function(ages) table_constante(0.05, ages, "x"))
+AGES_REFUSES <- list(  # âges reçus, texte cité attendu (NULL : défaut sans valeur)
+  "Inf" = list(c(0, Inf), "Inf"), "-Inf" = list(-Inf, "-Inf"), "NaN" = list(NaN, "NaN"),
+  "3e9" = list(c(0, 3e9), "3000000000"), "2147483648" = list(2147483648, "2147483648"),
+  "2.5" = list(2.5, "2.5"), "2 + 4 eps" = list(2 + 4 * .Machine$double.eps, "2.0000000000000009"),
+  "4503599627370495.5" = list(4503599627370495.5, "4503599627370495.5"), "-1" = list(-1, "-1"), "NA" = list(c(0, NA), "NA"),
+  "vide" = list(numeric(0), NULL), "texte" = list("0", NULL))
+avertissements_et_refus <- function(expr) {
+  w <- 0L
+  r <- withCallingHandlers(tryCatch({ force(expr); NULL }, refus_tablexp = function(c) c),
+                           warning = function(x) { w <<- w + 1L; invokeRestart("muffleWarning") })
+  list(avertissements = w, refus = r)
+}
+for (ctr in names(CONSTRUCTEURS_AGES)) for (cas in names(AGES_REFUSES)) {
+  verifier(sprintf("table %s : âges %s refusés (loi_invalide), valeur citée, aucun avertissement (#234)", ctr, cas), {
+    m <- avertissements_et_refus(CONSTRUCTEURS_AGES[[ctr]](AGES_REFUSES[[cas]][[1L]]))
+    cite <- AGES_REFUSES[[cas]][[2L]]
+    m$avertissements == 0L && inherits(m$refus, "refus_tablexp") && identical(m$refus$motif, "loi_invalide") &&
+      grepl("entiers de 0 à 2147483647", conditionMessage(m$refus), fixed = TRUE) &&
+      (is.null(cite) || grepl(paste0("« ", cite, " »"), conditionMessage(m$refus), fixed = TRUE))
+  })
+}
+verifier("table synthétique : âges valides inchangés (double entier = entier ; plus grand entier admis, sans avertissement)", {
+  m <- avertissements_et_refus(table_constante(0.05, .Machine$integer.max, "x"))
+  m$avertissements == 0L && is.null(m$refus) &&
+    identical(table_gm(GM_A, GM_B, GM_C, c(0, 1, 2)), table_gm(GM_A, GM_B, GM_C, 0:2)) &&
+    identical(table_logistique(2e-4, 2.5e-5, log(1.1), c(0, 1, 2)), table_logistique(2e-4, 2.5e-5, log(1.1), 0:2)) &&
+    identical(table_constante(0.05, c(0, 1, 2), "x")$age, 0:2)
+})
+
 # --- loi vraie effective -----------------------------------------------------------
 
 le <- loi_effective(list(table = GM, facteurs = c(H = 1, F = 0.6)), "deces", c("H", "F"))

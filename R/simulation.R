@@ -312,6 +312,39 @@ DEFAUTS_FORMES <- list(
 
 # --- tables synthétiques ------------------------------------------------------
 
+# Prédicat unique des âges des tables synthétiques (#234 ; aide de message au
+# sens de tests/controles/messages_refus.R, comme ecart_noms()) : "" si `ages`
+# est un vecteur numérique non vide d'entiers de 0 à .Machine$integer.max
+# (as.integer() est alors exact, sans coercition ni NA) ; sinon, le texte du
+# défaut du premier âge fautif (valeur citée, position), que le constructeur
+# insère dans son refus. Ordre des défauts d'un âge : manquant (NA), non fini (NaN, Inf, -Inf),
+# non entier, négatif, supérieur au plus grand entier du moteur.
+defaut_ages_synthetiques <- function(ages) {
+  if (!is.numeric(ages))
+    return(formuler("âges de classe %s reçus, un vecteur numérique est attendu",
+                    paste(citer(class(ages)), collapse = "/")))
+  if (!length(ages)) return(formuler("aucun âge reçu"))
+  # Chemin court des âges valides (un seul passage) ; NA et NaN donnent NA,
+  # que isTRUE() écarte vers le diagnostic ci-dessous.
+  if (isTRUE(all(ages >= 0 & ages <= .Machine$integer.max & ages == trunc(ages)))) return("")
+  # Les défauts s'excluent dans l'ordre : trunc(Inf) vaut Inf, un âge infini
+  # n'est donc pas décelé par le test d'entier, d'où le test de finitude d'abord.
+  manquant <- is.na(ages) & !is.nan(ages)
+  non_fini <- !manquant & !is.finite(ages)
+  non_entier <- !manquant & !non_fini & ages != trunc(ages)
+  negatif <- !manquant & !non_fini & ages < 0
+  grand <- !manquant & !non_fini & ages > .Machine$integer.max
+  fautif <- manquant | non_fini | non_entier | negatif | grand
+  if (!any(fautif)) return("")
+  j <- which(fautif)[1L]
+  v <- citer(sprintf("%.17g", as.double(ages[j])))
+  if (manquant[j]) formuler("âge « NA » manquant (position %d)", j)
+  else if (non_fini[j]) formuler("âge « %s » non fini (position %d)", v, j)
+  else if (non_entier[j]) formuler("âge « %s » non entier (position %d)", v, j)
+  else if (negatif[j]) formuler("âge « %s » négatif (position %d)", v, j)
+  else formuler("âge « %s » supérieur au plus grand entier du moteur (position %d)", v, j)
+}
+
 # Table de Gompertz-Makeham, mu(x) = A + B c^x, sans distinction de sexe :
 # q_x = 1 - exp(-A - B c^x (c - 1) / ln c), intégrale exacte de mu sur
 # [x, x+1) (A.2). Paramètres déclarés, sans valeur par défaut.
@@ -321,10 +354,11 @@ table_gompertz_makeham <- function(A, B, c, ages) {
     refuser("simulation", "loi_invalide",
             formuler("Gompertz-Makeham : A >= 0, B >= 0 et c > 1, réels finis, à déclarer."),
             list(A = A, B = B, c = c))
-  if (!is.numeric(ages) || !length(ages) || anyNA(ages) || any(ages != trunc(ages)) ||
-      any(ages < 0))
+  defaut <- defaut_ages_synthetiques(ages)
+  if (nzchar(defaut))
     refuser("simulation", "loi_invalide",
-            formuler("Gompertz-Makeham : les âges sont des entiers >= 0."), list(ages = ages))
+            formuler("Gompertz-Makeham : les âges sont des entiers de 0 à %d ; %s.", .Machine$integer.max, defaut),
+            list(ages = ages))
   ages <- as.integer(ages)
   qx <- 1 - exp(-A - B * c^ages * (c - 1) / log(c))
   table_reference(data.frame(age = ages, sexe = "ensemble", qx = qx, stringsAsFactors = FALSE),
@@ -355,10 +389,11 @@ table_logistique <- function(a, b, c, ages) {
     refuser("simulation", "loi_invalide",
             formuler("Logistique : a >= 0, b > 0 et c > 0, réels finis, exp(c) fini, à déclarer."),
             list(a = a, b = b, c = c))
-  if (!is.numeric(ages) || !length(ages) || anyNA(ages) || any(ages != trunc(ages)) ||
-      any(ages < 0))
+  defaut <- defaut_ages_synthetiques(ages)
+  if (nzchar(defaut))
     refuser("simulation", "loi_invalide",
-            formuler("Logistique : les âges sont des entiers >= 0."), list(ages = ages))
+            formuler("Logistique : les âges sont des entiers de 0 à %d ; %s.", .Machine$integer.max, defaut),
+            list(ages = ages))
   ages <- as.integer(ages)
   v <- stats::plogis(log(b) + c * ages)
   z <- expm1(c) * v
@@ -381,9 +416,10 @@ table_logistique <- function(a, b, c, ages) {
 table_constante <- function(q, ages, nom) {
   if (!is.numeric(q) || length(q) != 1L || !is.finite(q) || q < 0 || q > 1)
     refuser("simulation", "loi_invalide", formuler("Table constante : q réel fini dans [0, 1]."), list(q = q))
-  if (!is.numeric(ages) || !length(ages) || anyNA(ages) || any(ages != trunc(ages)) ||
-      any(ages < 0))
-    refuser("simulation", "loi_invalide", formuler("Table constante : les âges sont des entiers >= 0."),
+  defaut <- defaut_ages_synthetiques(ages)
+  if (nzchar(defaut))
+    refuser("simulation", "loi_invalide",
+            formuler("Table constante : les âges sont des entiers de 0 à %d ; %s.", .Machine$integer.max, defaut),
             list(ages = ages))
   ages <- as.integer(ages)
   table_reference(data.frame(age = ages, sexe = "ensemble", qx = rep(as.numeric(q), length(ages)),
