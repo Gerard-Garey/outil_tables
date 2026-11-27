@@ -15403,7 +15403,7 @@ paramètres estimés sur ces données~:
     pondérée (strictement positif en arithmétique exacte, il ne
     s'annulerait que sous le plus petit \code{double} positif~; aucun
     levier nul n'a été observé sur une cellule pondérée, constat rapporté
-    par l'ADR 0017, point~5.7~(viii)). Quand chaque segment interpole avec toutes
+    par l'ADR 0017, point~5.7~(viii)~; sous~(b), le levier $\hat m_x V_{xx}$ s'annule en flottant si $\hat m_x$ s'annule, ce qui se produit au maximum dégénéré décrit à la section~\ref{sec:lissage-poisson}, aujourd'hui refusé par le plafond d'itérations~; forme durable reportée, issue~\#386). Quand chaque segment interpole avec toutes
     ses cellules retenues pondérées, le ddl vaut exactement~0. La dimension
     $d_s$ est lue dans les degrés de liberté effectifs rendus par
     \code{table\_construite()} et passés en valeur~: la validation ne lit
