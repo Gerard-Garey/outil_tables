@@ -238,8 +238,9 @@ DEFAUTS_FORMES <- list(
                      "exclusions des motifs attendus déclarées : lignes exclues = lignes de l'attribut, motif par",
                      "motif. Exception : si ces exclusions ne conservent aucune cellule, refus",
                      "aucune_ligne_conservee ; si aucune cellule conservée n'a d'exposition strictement positive",
-                     "ni d'événement, refus periode_sans_exposition. Toute cellule exclue manque à la table",
-                     "(cellule_dupliquee : l'original et la copie) : relevé ages_manquants possible.")),
+                     "ni d'événement, refus periode_sans_exposition si le plan comporte l'étape exposition. Toute",
+                     "cellule exclue manque à la table (cellule_dupliquee : l'original et la copie) : relevé",
+                     "ages_manquants possible.")),
   # Stocks successifs (#191 ; spécification d'actuary-approfondi de #191,
   # § 1 à § 3 ; avis de forme d'architect, partie #191 ; décision du
   # mainteneur du 11/11/2026 : inventaire perdu, toutes les dates de la grille

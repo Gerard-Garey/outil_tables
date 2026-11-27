@@ -27,7 +27,7 @@ D <- as.Date
 simuler <- tablexp::simuler_portefeuille
 GRAINE_JEU <- 22001230L
 GRAINES_DEFAUTS <- c(detection = 22001231L, identite = 22001232L, refus = 22001233L, disjonction = 22001234L,
-                     main = 22001235L)
+                     main = 22001235L, exception_etape = 22001236L)
 
 PER <- list(debut = D("2015-01-01"), fin = D("2024-12-31"))
 VD <- list(depart = "vivant", arrivee = "deces")
@@ -302,6 +302,49 @@ verifier("A4 (disjonction) : une cellule altérée au plus une fois ; taux = 1 s
   !anyDuplicated(l$ligne) && all(l$ligne[l$role != "copie"] <= N) && all(l$ligne[l$role == "copie"] > N) &&
     sum(l$role != "copie") == N && all(dc$retenues[c(1L, 2L, 3L, 5L)] > 0L) && identical(dc$eligibles[4L], 0L) &&
     identical(dc$retenues[1L], 3L) && identical(dc$eligibles[5L], N - sum(dc$retenues[1:4]))
+})
+
+# #381 : texte de validité des défauts en agrégats, condition d'étape de l'exception
+# periode_sans_exposition (même condition que le texte des lignes, #235) ; chaîne
+# exacte, constante en \uXXXX (fichier lisible sous toute locale).
+TEXTE_VALIDITE_AGREGATS <- paste0(
+  "Motifs attendus sous ces conditions : recette agregats, r\u00f4les d\u00e9clar\u00e9s aux noms des ",
+  "colonnes (roles), transition de la forme, plan de p\u00e9riode \u00e9gale \u00e0 celle de la ",
+  "simulation, d\u00e9lai de d\u00e9claration nul, convention et par_annee de la forme (convention, ",
+  "par_annee). Aucune exclusion d\u00e9clar\u00e9e : refus ligne_invalide nommant les motifs attendus ",
+  "; toutes les exclusions des motifs attendus d\u00e9clar\u00e9es : lignes exclues = lignes de ",
+  "l'attribut, motif par motif. Exception : si ces exclusions ne conservent aucune cellule, ",
+  "refus aucune_ligne_conservee ; si aucune cellule conserv\u00e9e n'a d'exposition strictement ",
+  "positive ni d'\u00e9v\u00e9nement, refus periode_sans_exposition si le plan comporte l'\u00e9tape ",
+  "exposition. Toute cellule exclue manque \u00e0 la table (cellule_dupliquee : l'original et la ",
+  "copie) : relev\u00e9 ages_manquants possible.")
+verifier("défauts (#381) : texte de validité des agrégats identical() au texte spécifié, condition « si le plan comporte l'étape exposition » ; attribut et constante du catalogue",
+         {
+  a <- simuler(LOI, PF, PER, GRAINE_JEU, defauts = dft(list(list(type = "cellule_dupliquee", nombre = 2L))), forme = fa())
+  identical(attr(a, "defauts")$validite$texte, TEXTE_VALIDITE_AGREGATS) &&
+    identical(tablexp:::DEFAUTS_FORMES$agregats$validite, TEXTE_VALIDITE_AGREGATS)
+})
+# Exception du texte : toutes les cellules positives ou à événement sont altérées puis exclues, ne
+# restent que des cellules sans exposition ni événement (par année). Plan complet : refus de l'étape
+# exposition ; plan réduit à l'étape donnees, mêmes données et mêmes exclusions : aucun refus.
+verifier("défauts (#381) : agrégats par année, toutes les cellules à exposition ou événement exclues : plan complet -> refus exposition/periode_sans_exposition ; plan réduit à l'étape donnees -> aucun refus", {
+  f <- fa(par_annee = TRUE)
+  a <- simuler(LOI, PF, PER, GRAINE_JEU, forme = f,
+               defauts = dft(list(list(type = "evenements_sans_exposition", taux = 1), list(type = "exposition_negative", taux = 1)),
+                             GRAINES_DEFAUTS[["exception_etape"]]))
+  P <- PROPRES$da_annee
+  excl <- c("evenements_sans_exposition", "exposition_negative")
+  plan <- plan_ag(f, exclusions = excl, etapes = list())
+  plan_donnees <- plan; plan_donnees$etapes <- plan_donnees$etapes["donnees"]
+  refus_mm <- function(p) {
+    r <- rf(construire_table(a, roles_de(a), p))
+    if (is.null(r)) "aucun refus" else paste(r$module, r$motif, sep = "/")
+  }
+  conservees <- !(seq_len(nrow(a)) %in% attr(a, "defauts")$lignes$ligne)
+  all(P$exposition_centrale[!conservees] > 0 | P$evenements[!conservees] > 0) && any(conservees) &&
+    all(a$exposition_centrale[conservees] == 0 & a$evenements[conservees] == 0) &&
+    identical(names(plan_donnees$etapes), "donnees") &&
+    identical(refus_mm(plan), "exposition/periode_sans_exposition") && identical(refus_mm(plan_donnees), "aucun refus")
 })
 
 # --- A5 : recoupement contre le moteur en lignes -------------------------------------------
