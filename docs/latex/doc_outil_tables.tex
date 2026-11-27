@@ -5115,7 +5115,11 @@ dans cet ordre, au premier défaut (tableau~\ref{tab:refus-tables-reference})~:
     \code{sexe}, \code{qx}, puis l'axe temporel, \code{annee} ou
     \code{generation}, s'il est présent~; une table de génération passe donc
     ce contrôle, puis est refusée par l'étape qui la lit,
-    section~\ref{sec:table-reference}, «~Axe temporel~»)~; (b)~être
+    section~\ref{sec:table-reference}, «~Axe temporel~»), puis, s'il est
+    une liste, autant de colonnes que de noms (\code{colonnes\_lues()},
+    avant toute lecture de colonne~; issue~\#365), faute de quoi il est
+    refusé comme objet modifié, \code{details\$lu} «~data.frame nu non
+    reconstructible~»~; (b)~être
     reconstruit sans refus par \code{table\_reference()} à partir du
     \code{data.frame} nu de ses colonnes et de ses métadonnées~; (c)~être
     \code{identical()} à cette reconstruction (classe, attributs, ordre
@@ -5125,7 +5129,14 @@ dans cet ordre, au premier défaut (tableau~\ref{tab:refus-tables-reference})~:
     jugés par un assistant du module \code{donnees},
     \code{etat\_table\_reference()}, seule lecture de cette règle, que la
     loi effective du simulateur lit aussi (issue~\#253~;
-    section~\ref{sec:loi-vraie}, «~Table reçue~»). La lettre de l'ADR
+    section~\ref{sec:loi-vraie}, «~Table reçue~»). Pour une liste plus
+    courte que ses noms (objet de l'issue~\#365), la garde de cohérence ne
+    change pas le refus de \code{construire\_table()}~: sans elle, la
+    reconstruction~(b) levait une erreur R, convertie en ce même refus
+    (\emph{constat} de mesure sur le code qui précède l'issue, R~4.3.3)~;
+    elle exclut toute lecture de colonne d'une telle liste, lecture qui
+    arrêtait R dans le simulateur (section~\ref{sec:loi-vraie}, «~Table
+    reçue~»). La lettre de l'ADR
     n'exigeait que la classe~: la reconstruction garantit qu'une table
     retouchée après le constructeur (lignes permutées, valeur de $q_x$ portée
     hors de $[0, 1]$, attribut ajouté, ou modifié vers une valeur que le
@@ -7117,7 +7128,7 @@ locales.\par}
 \catalogue{fonctions-construire-table}{controler\_parametres\_recette()} & interne & plan, recette validée, catalogue des paramètres (injectable pour les tests) & \code{NULL} invisible, ou, étape par étape dans l'ordre du plan, refus \code{parametre\_manquant} (paramètre de la recette retenue absent) puis \code{parametre\_inattendu} (paramètre d'une autre recette présent)~; appelée par \code{controler\_plan\_roles()} après le contrôle de présence de la grille \\
 \catalogue{fonctions-construire-table}{controler\_parametres\_condition()} & interne & nom de l'étape, ses paramètres, son catalogue & \code{NULL} invisible, ou, gouvernant par gouvernant dans l'ordre du catalogue, refus \code{parametre\_manquant} (requis sous la valeur du gouvernant, absent) puis \code{parametre\_inattendu} (requis sous une autre valeur, présent), module \code{construire\_table}~; gouvernant absent ou non contrôlé~: erreur de programmation~; appelée par \code{valider\_plan()} pour chaque étape, après ses gouvernants et avant ses valeurs (section~\ref{sec:plan}) \\
 \catalogue{fonctions-construire-table}{ordres\_canoniques()} & interne & --- & vecteurs d'ordre des champs ensembles du plan, passés à \code{canoniser\_plan()}~: \code{etapes/}\allowbreak\code{coherence\_regularite/}\allowbreak\code{ordres} marqué \code{TRI\_NUMERIQUE} (tri croissant)~; \code{segmentation} (\code{ROLES\_SEGMENTATION}), \code{etapes/}\allowbreak\code{donnees/}\allowbreak\code{exclusions} (\code{c(MOTIFS\_LIGNES,} \code{MOTIFS\_TETE)}), \code{etapes/}\allowbreak\code{brut/}\allowbreak\code{estimateurs} (\code{ESTIMATEURS\_BRUT})~; fonction et non constante, construite à l'appel (section~\ref{sec:fiche}) \\
-\catalogue{fonctions-construire-table}{controler\_forme\_tables()} & interne & argument des tables de référence & \code{NULL} sans table (\code{NULL} ou liste vide), sinon les objets et leurs éléments de fiche, par clé triée par octets~; contrôle~1 de la section~\ref{sec:tables-reference-recues} (forme, classe, reconstruction, identité, écriture et relecture de l'élément~; classe, reconstruction et identité jugées par l'assistant d'état du module \code{donnees}, issue~\#253), refus \code{tables\_reference\_}\allowbreak\code{mal\_formees}~; partagé par la construction et le rejeu \\
+\catalogue{fonctions-construire-table}{controler\_forme\_tables()} & interne & argument des tables de référence & \code{NULL} sans table (\code{NULL} ou liste vide), sinon les objets et leurs éléments de fiche, par clé triée par octets~; contrôle~1 de la section~\ref{sec:tables-reference-recues} (forme, classe, reconstruction, identité, écriture et relecture de l'élément~; classe, colonnes, cohérence de la liste des colonnes, reconstruction et identité jugées par l'assistant d'état du module \code{donnees}, issues~\#253 et~\#365), refus \code{tables\_reference\_}\allowbreak\code{mal\_formees}~; partagé par la construction et le rejeu \\
 \catalogue{fonctions-construire-table}{cles\_citees()} & interne & plan, chemins des paramètres qui citent une clé & \code{data.frame} (\code{cle}, \code{parametre}) des clés citées par les étapes présentes au plan, dans l'ordre des chemins, une ligne par élément d'un vecteur de clés (vide~: aucune)~; une clé citée deux fois y figure deux fois~; chemins parcourus par \code{lire\_chemin()} (issue~\#301) \\
 \catalogue{fonctions-construire-table}{ecarts\_catalogue()} & interne & élément de fiche d'une table de référence, table du catalogue de même nom & champs en écart, comparés par \code{identical()} à l'élément formé par \code{element\_table\_fiche()}, dans l'ordre de \code{CHAMPS\_TABLE\_FICHE} (vide sans écart), et leurs valeurs brutes de l'élément et du catalogue, sans citation~; assistant commun du refus \code{table\_embarquee\_}\allowbreak\code{discordante} et du témoin «~catalogue~» du rejeu (issue~\#267) \\
 \catalogue{fonctions-construire-table}{controler\_tables\_reference()} & interne & tables reçues, plan~; chemins des paramètres et catalogue (par défaut, les deux constantes de ce rôle) & valeur de \code{fiche\$tables\_reference}~; les quatre contrôles des tables reçues, dans l'ordre (section~\ref{sec:tables-reference-recues}), appelé une fois par \code{construire\_table()} \\
@@ -7503,7 +7514,10 @@ contrôle~(1~bis) d'une extraction de lignes emploie aussi (ci-dessous,
 l'empilement des stocks successifs (\code{empiler\_stocks()},
 ci-dessous) et le constructeur des tables de référence
 (\code{table\_reference()}, section~\ref{sec:table-reference}),
-chacun sous son propre motif (issue~\#355)~: le nombre de
+chacun sous son propre motif (issue~\#355), ainsi que l'état d'une table
+reçue (\code{etat\_table\_reference()}, qui ne refuse pas~: refus de son
+appelant, contrôle des tables reçues ou loi effective du simulateur,
+section~\ref{sec:tables-reference-recues}~; issue~\#365)~: le nombre de
 colonnes sur la liste elle-même, \code{length(unclass(donnees))}, le
 nombre de noms par \code{noms\_colonnes\_lus()} (attribut \code{names}
 lu par \code{attr()}~; un attribut absent vaut autant de noms vides que
@@ -10804,7 +10818,7 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{classes\_colonnes\_citees()} & interne & positions citées, classes des colonnes & classes distinctes des colonnes citées (au plus \code{NB\_LIGNES\_CITEES}), jointes par «~,~»~: conseil du refus d'une extraction fausse sous une entrée de classe exactement \code{data.frame} (issue~\#319) \\
 \catalogue{fonctions-donnees}{colonnes\_classe\_citees()} & interne & noms de colonnes, leurs classes & «~«~nom~» (classe c)~», joints par «~,~»~: colonnes de rôle citées par le contrôle~(3) de l'extraction sous une entrée de classe exactement \code{data.frame} (issue~\#319) \\
 \catalogue{fonctions-donnees}{noms\_colonnes\_lus()} & interne & liste & noms des colonnes, lus sans dispatch (\code{attr()}), chaînes vides à défaut~; seule lecture des noms de colonnes de la fonction \code{decomptes\_colonnes()}, de la fonction suivante et du contrôle d'une extraction de lignes (issues~\#319, \#322 et~\#344) \\
-\catalogue{fonctions-donnees}{colonnes\_lues()} & interne & liste & cohérence de la liste des colonnes et de ses noms, lue sans dispatch, seule lecture de cette règle~: nombre de colonnes (\code{length(unclass())}), nombre de noms (fonction précédente~; attribut absent~: accord), et leur égalité~; rend une liste à trois éléments, les deux nombres en \code{integer} et l'accord~; appelée par le contrôle des décomptes de lignes, par le contrôle d'une extraction de lignes, par \code{decomptes\_colonnes()}, par \code{empiler\_stocks()} et par \code{table\_reference()} (section~\ref{sec:controles-donnees}, «~Liste des colonnes et noms de colonnes de longueurs différentes~»~; issues~\#344 et~\#355) \\
+\catalogue{fonctions-donnees}{colonnes\_lues()} & interne & liste & cohérence de la liste des colonnes et de ses noms, lue sans dispatch, seule lecture de cette règle~: nombre de colonnes (\code{length(unclass())}), nombre de noms (fonction précédente~; attribut absent~: accord), et leur égalité~; rend une liste à trois éléments, les deux nombres en \code{integer} et l'accord~; appelée par le contrôle des décomptes de lignes, par le contrôle d'une extraction de lignes, par \code{decomptes\_colonnes()}, par \code{empiler\_stocks()}, par \code{table\_reference()} et par \code{etat\_table\_reference()} (section~\ref{sec:controles-donnees}, «~Liste des colonnes et noms de colonnes de longueurs différentes~»~; issues~\#344, \#355 et~\#365) \\
 \catalogue{fonctions-donnees}{constat\_colonnes\_lues()} & interne & rendu de la fonction précédente & constat d'une liste incohérente, «~liste de N colonne(s) pour M nom(s) de colonne~», formé une fois et cité tel quel par le refus du contrôle des décomptes de lignes, par celui du contrôle~(1~bis) d'une extraction de lignes, où il remplace tout le constat des noms, et par les refus \code{empilement\_}\allowbreak\code{table\_invalide} et \code{table\_mal\_formee} d'une liste incohérente (issues~\#344, \#345 et~\#355) \\
 \catalogue{fonctions-donnees}{premiere\_ecart\_colonnes()} & interne & noms des colonnes extraites et de l'entrée, décomptes des colonnes extraites, nombre de lignes attendu, indicateur des éléments \code{NULL} & première position écartée du contrôle~(1~bis) de l'extraction~: plus petite des positions où le nom diffère, où le décompte de la colonne extraite n'est pas celui attendu ou est illisible, et où une colonne manque ou excède~; indique si une autre position écartée la suit, l'élément extrait à la première étant \code{NULL} (extraction décalée) ou non~; \code{NULL} sans écart (issue~\#319) \\
 \catalogue{fonctions-donnees}{colonnes\_ecart\_citees()} & interne & noms des colonnes extraites et de l'entrée, première position écartée (\code{NULL} par défaut) & morceaux du constat du contrôle~(1~bis)~: nombre de colonnes s'il diffère, colonnes absentes et en trop (au plus \code{NB\_LIGNES\_CITEES} de chaque sorte, puis leur nombre restant), colonnes sans nom comptées, à défaut d'écart de noms «~mêmes noms de colonnes, dans un autre ordre ou répétés~»~; puis la colonne de l'entrée à la première position écartée, avec sa position et sa classe, et la mention du décalage ou des autres écarts~; appelée sur une extraction dont la liste des colonnes a la longueur de ses noms seulement, une liste incohérente recevant le constat de \code{constat\_colonnes\_lues()} (section~\ref{sec:controles-donnees}~; issues~\#319 et~\#345) \\
@@ -22831,7 +22845,7 @@ de 1 pour \code{F}) sont construits et contrôlés~; ils sont consignés dans
 
 \medskip
 \noindent
-\textbf{Table reçue} (issue~\#253). La table de chaque loi est ensuite
+\textbf{Table reçue} (issues~\#253 et~\#365). La table de chaque loi est ensuite
 jugée, avant le contrôle des facteurs et avant toute lecture de colonne,
 par la règle du contrôle des tables reçues de \code{construire\_table()}
 (section~\ref{sec:tables-reference-recues}, contrôle~1, points~(a)
@@ -22860,7 +22874,19 @@ facteurs. Sont ainsi refusés sans erreur R une colonne de classe
 "factor")} faisait lever l'erreur R «~translating strings with "bytes"
 encoding is not allowed~» à la sélection des lignes d'un sexe, constat
 de l'issue~\#253), un nom de colonne \code{bytes}
-(section~\ref{sec:refus}), une sous-classe ou un \code{data.frame}
+(section~\ref{sec:refus}), une liste plus courte que ses noms (objet de
+l'issue~\#365~: liste d'une colonne munie des noms \code{age},
+\code{sexe}, \code{qx}, que rend l'extraction \code{[.data.frame} sous
+une classe dont la méthode \code{length()} rend~1, puis reclassée
+\code{table\_reference}~; constat «~objet modifié après
+table\_reference()~», \code{details\$lu} «~data.frame nu non
+reconstructible~», \code{details\$motif\_constructeur} à \code{NA}~;
+elle arrêtait R par une erreur de segmentation, code de sortie~139, à la
+lecture \code{tab\$sexe} de \code{loi\_effective()}, \emph{constat} de
+mesure en sous-processus sur le code qui précède l'issue, R~4.3.3~;
+test en sous-processus,
+\code{tests/unitaires/test\_simulation\_table\_incoherente.R}, pour une
+table de décès puis de rachat), une sous-classe ou un \code{data.frame}
 simple, des lignes permutées, une colonne ajoutée, un attribut retiré ou
 porté à une valeur que le constructeur refuse (par exemple des
 paramètres d'encodage \code{bytes}, motif
@@ -25380,7 +25406,7 @@ identique, attribut compris, dans un autre processus R.
 \catalogue{fonctions-simulation}{table\_gompertz\_makeham()} & interne & $A$, $B$, $c$, âges & table synthétique de Gompertz-Makeham \\
 \catalogue{fonctions-simulation}{table\_logistique()} & interne & $a$, $b$, $c$, âges & table synthétique logistique (Kannisto si $a = 0$)~; refus \code{loi\_invalide} \\
 \catalogue{fonctions-simulation}{table\_constante()} & interne & $q$, âges, nom & table synthétique à $q_x$ constant \\
-\catalogue{fonctions-simulation}{loi\_effective()} & interne & loi d'une transition, cause, sexes & $q^{s}_x$ et $\mu_x$ par sexe~; refus \code{loi\_invalide}, dans l'ordre~: une loi qui n'est pas la liste (\code{table}, \code{facteurs}), une table de classe d'encodage \code{bytes} (issue~\#150), une table à axe temporel, \code{annee} ou \code{generation} (issue~\#272), une table qui n'est pas l'objet que rendrait le constructeur, jugée par l'assistant d'état du module \code{donnees} avant toute lecture de colonne (issue~\#253), puis la forme exacte des facteurs \\
+\catalogue{fonctions-simulation}{loi\_effective()} & interne & loi d'une transition, cause, sexes & $q^{s}_x$ et $\mu_x$ par sexe~; refus \code{loi\_invalide}, dans l'ordre~: une loi qui n'est pas la liste (\code{table}, \code{facteurs}), une table de classe d'encodage \code{bytes} (issue~\#150), une table à axe temporel, \code{annee} ou \code{generation} (issue~\#272), une table qui n'est pas l'objet que rendrait le constructeur, jugée par l'assistant d'état du module \code{donnees} avant toute lecture de colonne, cohérence de la liste des colonnes et de leurs noms comprise (issues~\#253 et~\#365), puis la forme exacte des facteurs \\
 \catalogue{fonctions-simulation}{jours\_civils()} & interne & année, mois, jour & jours depuis 1970-01-01 (arithmétique entière) \\
 \catalogue{fonctions-simulation}{jour\_anniversaire()} & interne & composantes de naissance, âge & jour de l'anniversaire (29~février~: 1\textsuperscript{er}~mars des années non bissextiles) \\
 \catalogue{fonctions-simulation}{composantes\_distinctes()} & interne & jours & composantes de date, calculées sur les valeurs distinctes \\
