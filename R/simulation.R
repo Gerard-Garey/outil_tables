@@ -470,12 +470,15 @@ loi_effective <- function(loi_t, cause, sexes) {
             formuler("Loi « %s » : table de génération (colonne generation) non prise en charge par le simulateur minimal.",
                      cause),
             list(cause = cause))
-  # Table reçue : exactement l'objet que rend table_reference() (etat_table_reference(),
-  # module donnees ; ADR 0015, point 1.3, comme construire_table(), #253) :
-  # classe exacte, colonnes, liste des colonnes cohérente avec ses noms (#365),
-  # reconstruction sans refus ni erreur R (colonne de classe « bytes »), identité
-  # avec elle. Un objet modifié après table_reference() est refusé, jamais lu :
-  # aucune lecture de colonne (tab$sexe) ne précède ce contrôle.
+  # Table reçue : un objet identique à sa reconstruction par table_reference()
+  # (etat_table_reference(), module donnees ; ADR 0015, point 1.3, comme
+  # construire_table(), #253) : classe exacte, colonnes, liste des colonnes
+  # cohérente avec ses noms (#365), reconstruction sans refus ni erreur R
+  # (colonne de classe « bytes »), identité avec elle. Un objet que
+  # table_reference() ne rendrait pas à l'identique, pour ses colonnes et ses
+  # métadonnées, est refusé, jamais lu ; une modification qui laisse l'objet
+  # identique à sa reconstruction (par exemple un q_x modifié dans [0, 1]) passe.
+  # Aucune lecture de colonne (tab$sexe) ne précède ce contrôle.
   etat <- etat_table_reference(tab)
   if (!is.null(etat))
     refuser("simulation", "loi_invalide",

@@ -2748,11 +2748,15 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
   if (statut != "synthetique" && !is.null(parametres))
     refuser("donnees", "table_parametres_inattendus",
             formuler("Table « %s » de statut « %s » : aucun paramètre de loi attendu.", nom_cite, citer(statut)))
-  # Nom ou valeur « bytes » à toute profondeur de `parametres` (#256 ; règle de
-  # #128, comme le nom et la source, #158) : les paramètres s'écrivent dans la
-  # fiche, où octets_chaines() les refuserait (chaine_codage_bytes), à l'étape
-  # (d) de controler_forme_tables(), avant toute étape ; refus ici, sous le
-  # motif de l'argument, sans rien citer.
+  # Nom ou valeur « bytes » de `parametres` (#256 ; règle de #128, comme le nom
+  # et la source, #158) : les paramètres s'écrivent dans la fiche, où
+  # octets_chaines() les refuserait (chaine_codage_bytes), à l'étape (d) de
+  # controler_forme_tables(), avant toute étape ; refus ici, sous le motif de
+  # l'argument, sans rien citer. Le prédicat lit, à toute profondeur, les noms
+  # (noms_bytes()) et les valeurs des vecteurs caractère, rien d'autre : les
+  # niveaux d'un facteur, les dimnames, la classe et les autres attributs ne sont
+  # pas lus ici et relèvent de l'écrivain de la fiche (étape (d), motif
+  # serialisation_impossible).
   # Parcours par niveaux, sans pile d'appels (une liste très profonde ne lève
   # pas d'erreur R : sa profondeur est refusée plus tard, à l'écriture de la
   # fiche) ni copie répétée d'une pile (coût linéaire), et sans dispatch :
@@ -3074,11 +3078,14 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
 # État d'un objet reçu comme table de référence (ADR 0015, point 1.3 ; #253,
 # #365), seule lecture de cette règle, lue par controler_forme_tables() (module
 # construire_table, étapes (a) à (c)) et par loi_effective() (module
-# simulation) : l'objet est exactement celui que rend table_reference().
-# Rend NULL s'il l'est, sinon le premier écart, list(constat, lu, attendu,
-# motif_constructeur) : `constat` est le texte de l'écart (inséré dans le
-# message du refus de l'appelant, qui refuse : cette fonction ne refuse pas),
-# `lu` et `attendu` les valeurs comparées, `motif_constructeur` le motif du
+# simulation) : l'objet est identique à sa reconstruction par table_reference()
+# sur ses colonnes et ses métadonnées (contrôles (1) à (5) ci-dessous ; une
+# modification qui laisse l'objet identique à sa reconstruction, par exemple un
+# q_x modifié dans [0, 1], n'est pas détectée). Rend NULL s'il l'est, sinon le
+# premier écart, list(constat, lu, attendu, motif_constructeur) : `constat` est
+# le texte de l'écart (inséré dans le message du refus de l'appelant, qui
+# refuse : cette fonction ne refuse pas), `lu` et `attendu` les valeurs
+# comparées, `motif_constructeur` le motif du
 # refus de table_reference() à la reconstruction, NA sinon. Ordre des
 # contrôles : (1) classe exacte table_reference/data.frame, lue par attr() (une
 # classe « bytes » ne lève pas) ; (2) noms des colonnes (attr() : age, sexe, qx,
