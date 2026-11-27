@@ -13928,15 +13928,7 @@ ne redonnent pas le total des événements est une erreur de programmation.\par}
       \ln (2j)! - \ln (2j+1)! + \sum_{k=-j}^{j} \ln(n + k)\Bigr],
     \]
     évaluée par \code{lgamma()} et \code{log()} en $O(z)$ opérations
-    (issue~\#249, point~1~; ADR 0017, point~9.5). La forme close est
-    vérifiée exactement, en entiers, contre $\det(KK^{\mathsf T})$ calculé
-    par l'élimination de Bareiss, sur les 70 couples $z = 1$ à~4, $n$ de
-    $z + 1$ à~20, par les tests (section~\ref{sec:lissage-verifications}),
-    et sur 1\,190 couples ($n \le 300$) par l'avis
-    d'\code{actuary-approfondi} du 15/11/2026 (constat rapporté)~; la
-    dernière étape de la preuve écrite (déterminant de Gram de la base
-    binomiale par les normes des polynômes de Tchebychev discrets) n'est
-    pas vérifiée sur une source (ADR 0017, point~9.5). Elle remplace la
+    (issue~\#249, point~1~; ADR 0017, point~9.5). La forme close est un résultat exact. Sa preuve écrite (avis d'\code{actuary-approfondi} du 15/11/2026) établit $\det(KK^{\mathsf T}) = \det(B^{\mathsf T}B)$, $B$ matrice $n \times z$ de terme $\binom{x}{j}$ ($x = 0, \dots, n - 1$, $j < z$), puis évalue ce déterminant de Gram de la base binomiale par les normes des polynômes de Tchebychev discrets~; cette dernière étape n'est pas vérifiée sur une source (ADR 0017, point~9.5). Elle est remplacée par une vérification exacte, en rationnels, de la formule contre $\det(B^{\mathsf T}B)$ sur les 1\,190 couples $z = 1$ à~4, $n$ de $z + 1$ à~300 (même avis, constat rapporté)~: l'identité est ainsi établie exactement pour tous les ordres admis et toute plage d'au plus 300 âges~; au-delà, elle repose sur l'étape non vérifiée. La formule est en outre confrontée directement à $\det(KK^{\mathsf T})$ entier exact, calculé par l'élimination de Bareiss, sur les 70 couples $z = 1$ à~4, $n$ de $z + 1$ à~20, par les tests (section~\ref{sec:lissage-verifications}), et sur 166 couples ($n \le 121$) par le même avis (constat rapporté). Elle remplace la
     somme des logarithmes des $n - z$ plus grandes valeurs propres de
     $K^{\mathsf T}K$ par \code{eigen()}, approximation numérique dont
     l'erreur atteignait $-1{,}35 \cdot 10^{-6}$ à $(n, z) = (71, 4)$ et
@@ -14099,7 +14091,7 @@ ne redonnent pas le total des événements est une erreur de programmation.\par}
     d'arrondi déplace lambda\^{} au-delà de la tolérance de Brent (1e-6 en ln
     lambda), de l'ordre de 1e-5 en relatif sur un jeu simulé de 71 âges par
     segment (constat de mesure~: jusqu'à 2,1e-5 sous permutation des lignes
-    de l'entrée)~»~; \code{segments/laml}~: approximation de Laplace, valeur
+    de l'entrée)~»~; ce maximum a été mesuré sur le code de \code{148893c} (remesure (0$'$)), avant la forme close et la règle d'arrêt de l'issue~\#249~; sur le code final de la branche (\code{c7e79b7}, R~4.3.3, hors plateforme de référence), les mêmes 23 permutations des lignes de l'entrée de R16 (graines 22028701 à 22028703 et 22028711 à 22028730) donnent au plus $2{,}46 \cdot 10^{-5}$ (constat de simulation)~: l'ordre de grandeur tient, le maximum cité est dépassé, et la correction du texte du moteur est l'objet de l'issue~\#388~; la classe \code{optimisation} ($10^{-3}$) garde une marge d'environ~40~; \code{segments/laml}~: approximation de Laplace, valeur
     au maximum approché, sans le terme $-\sum \ln D!$, constant en
     $\lambda$~; terme $\ln\lvert K^{\mathsf T}K\rvert_+$, constant en
     $\lambda$, par la forme close ci-dessus (résultat exact~; valeur
