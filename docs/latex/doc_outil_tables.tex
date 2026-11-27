@@ -22905,9 +22905,11 @@ test en sous-processus,
 \code{tests/unitaires/test\_simulation\_table\_incoherente.R}, pour une
 table de décès puis de rachat), une sous-classe ou un \code{data.frame}
 simple, des lignes permutées, une colonne ajoutée, un attribut retiré ou
-porté à une valeur que le constructeur refuse (par exemple des
-paramètres d'encodage \code{bytes}, motif
-\code{table\_parametres\_manquants} cité~; issue~\#256), un $q_x$ porté
+porté à une valeur que le constructeur refuse (par exemple un nom ou une
+valeur caractère d'encodage \code{bytes} dans les paramètres, motif
+\code{table\_parametres\_manquants} cité~; issue~\#256~; un niveau de
+facteur ou des \code{dimnames} d'un paramètre, que le constructeur ne lit
+pas, passent ce contrôle, le simulateur n'écrivant aucune fiche), un $q_x$ porté
 hors de $[0, 1]$ (motif \code{table\_qx\_hors\_bornes} cité).
 \textbf{Le changement restreint les entrées admises}~: avant
 l'issue~\#253, dont le seul contrôle de la table était sa classe
