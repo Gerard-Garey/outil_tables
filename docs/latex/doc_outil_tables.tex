@@ -2859,16 +2859,11 @@ bande~: dans R16, \code{residu\_conservation\_0} du segment de
 $0{,}59\,\tau S$, et \code{residu\_conservation\_1} du même segment
 $0{,}26\,\tau \cdot 120 \cdot S$ (lecture de
 \code{tests/reference/R16.tsv}). Pour ces éléments, la comparaison ne
-juge plus que l'ordre de grandeur du résidu de convergence~; elle ne
-prouve pas la nullité, qui reste portée par les tests unitaires
-(conservation à $10^{-8} \sum D$ près, \code{tests/unitaires/}\allowbreak\code{test\_lissage\_poisson.R},
-critère~A1), et elle borne le résidu obtenu par
+juge plus que l'ordre de grandeur du résidu de convergence~; elle ne prouve pas la nullité à la convergence près~: sous~(b), le résidu n'est nul qu'au maximum exact, et la propriété $\lvert\text{résidu}\rvert \le 10^{-8} \sum D$ reste portée par les tests unitaires (\code{tests/unitaires/}\allowbreak\code{test\_lissage\_poisson.R}, critère~A1), borne cent fois plus lâche que la bande de \code{residu\_conservation\_0}~; la comparaison borne en revanche le résidu obtenu par
 $|b| \le |a| + \tau \cdot \text{facteur} \cdot S$. Un changement du
 régime de convergence se lit ailleurs, sur
 \code{segments/iterations} (\code{integer}, exact) et sur les chemins de
-classe \code{optimisation}. Sur la plateforme de référence, où toutes
-les grandeurs de R1 à R17 sont identiques au bit près, la règle ne
-change aucun verdict~: «~identique~» précède toute règle.\par}
+classe \code{optimisation}. Sur la plateforme de référence, où les références sont produites et où la promesse de reproductibilité attend des grandeurs identiques au bit près, la règle ne change aucun verdict~: «~identique~» précède toute règle.\par}
 
 \medskip
 \noindent
