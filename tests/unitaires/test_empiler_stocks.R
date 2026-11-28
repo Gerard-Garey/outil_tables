@@ -260,6 +260,241 @@ local({
     })
 })
 
+# --- nombre de lignes et longueur de chaque colonne (#368) ----------------------------
+#
+# Spécification d'actuary (avis de l'étape (0') de B41) : le nombre de lignes lu
+# sans dispatch (.row_names_info(x, 2L)) doit être celui de chaque colonne ; sinon
+# refus empilement_table_invalide, première table en défaut (inventaires, puis
+# evenements), dans la boucle de #355, avant le contrôle de colonne_type. Avant
+# #368 (mesuré à 992749c) : une colonne plus courte était complétée par des NA
+# (six lignes dont sx = H, NA, NA), une plus longue tronquée, une table sans
+# attribut row.names perdait ses lignes, des noms de lignes illisibles
+# (row.names = c(NA_integer_, NA_integer_)) arrêtaient R (« argument must be
+# coercible to non-negative integer »). Une table vraiment vide (colonnes de
+# longueur 0) reste admise. Messages et details écrits à la main (texte de
+# l'avis) ; lignes_colonne est un double (décompte lu par decomptes_colonnes()).
+local({
+  I3 <- data.frame(id = 1:3, sx = c("H", "F", "H"), stringsAsFactors = FALSE)
+  E3 <- data.frame(id = 2:4, sx = c("F", "H", "H"), c = c("deces", "rachat", "deces"), stringsAsFactors = FALSE)
+  structure_df <- function(l, row.names) {
+    x <- structure(l, class = "data.frame")
+    if (!missing(row.names)) attr(x, "row.names") <- row.names
+    x
+  }
+  sans_noms <- structure_df(as.list(I3))
+  sans_noms_e <- structure_df(as.list(E3))
+  # Avertissements R comptés au second appel (comme au test de #355).
+  appel <- function(i, e, type = "t") {
+    f <- function() tryCatch(empiler_stocks(i, e, type), refus_tablexp = function(c) c, error = function(c) c)
+    r <- suppressWarnings(f())
+    n <- 0L
+    withCallingHandlers(f(), warning = function(w) { n <<- n + 1L; invokeRestart("muffleWarning") })
+    list(r = r, n = n)
+  }
+  debut <- function(t) paste0("Empilement des stocks successifs : la table « ", t, " » est un data.frame mal formé, dont ",
+                              "les noms de lignes et les colonnes ne donnent pas un même nombre de lignes (")
+  fin <- paste0(" ; classe data.frame). Le moteur ne choisit pas entre ces décomptes, et ne les corrige pas (une colonne ",
+                "plus courte serait complétée par des valeurs manquantes, une plus longue tronquée) : passer un data.frame ",
+                "dont les noms de lignes et chaque colonne comptent le même nombre de lignes.")
+  cas <- list(
+    list("colonne sx de 1 valeur pour 3 lignes (inventaires)",
+         structure_df(list(id = 1:3, sx = "H"), c(NA_integer_, -3L)), E3, "t",
+         paste0(debut("inventaires"), "noms de lignes : 3 ; colonne « sx » : 1", fin),
+         list(table = "inventaires", classe = list(inventaires = "data.frame"), lignes = 3L, colonne = "sx",
+              position = 2L, lignes_colonne = 1)),
+    list("colonne sx de 4 valeurs pour 3 lignes (inventaires)",
+         structure_df(list(id = 1:3, sx = c("H", "F", "H", "F")), c(NA_integer_, -3L)), E3, "t",
+         paste0(debut("inventaires"), "noms de lignes : 3 ; colonne « sx » : 4", fin),
+         list(table = "inventaires", classe = list(inventaires = "data.frame"), lignes = 3L, colonne = "sx",
+              position = 2L, lignes_colonne = 4)),
+    list("colonne c de 2 valeurs pour 3 lignes (evenements)", I3,
+         structure_df(list(id = 2:4, sx = c("F", "H", "H"), c = c("deces", "rachat")), c(NA_integer_, -3L)), "t",
+         paste0(debut("evenements"), "noms de lignes : 3 ; colonne « c » : 2", fin),
+         list(table = "evenements", classe = list(evenements = "data.frame"), lignes = 3L, colonne = "c",
+              position = 3L, lignes_colonne = 2)),
+    list("inventaires sans attribut row.names, colonnes de 3 valeurs (avant : trois lignes perdues)", sans_noms, E3, "t",
+         paste0(debut("inventaires"), "noms de lignes : 0 ; colonne « id » : 3 ; colonne « sx » : 3", fin),
+         list(table = "inventaires", classe = list(inventaires = "data.frame"), lignes = 0L, colonne = c("id", "sx"),
+              position = 1:2, lignes_colonne = c(3, 3))),
+    list("evenements avec row.names = integer(0), colonnes de 3 valeurs", I3,
+         structure_df(as.list(E3), integer(0)), "t",
+         paste0(debut("evenements"), "noms de lignes : 0 ; colonne « id » : 3 ; colonne « sx » : 3 ; colonne « c » : 3", fin),
+         list(table = "evenements", classe = list(evenements = "data.frame"), lignes = 0L, colonne = c("id", "sx", "c"),
+              position = 1:3, lignes_colonne = c(3, 3, 3))),
+    list("inventaires aux noms de lignes illisibles (avant : erreur R)",
+         structure_df(list(id = 1:2, sx = c("H", "F")), c(NA_integer_, NA_integer_)), E3, "t",
+         paste0(debut("inventaires"), "noms de lignes : illisibles", fin),
+         list(table = "inventaires", classe = list(inventaires = "data.frame"), lignes = NA_integer_,
+              colonne = character(0), position = integer(0), lignes_colonne = numeric(0))),
+    list("les deux tables en défaut (première table en défaut : inventaires)", sans_noms, sans_noms_e, "t",
+         paste0(debut("inventaires"), "noms de lignes : 0 ; colonne « id » : 3 ; colonne « sx » : 3", fin),
+         list(table = "inventaires", classe = list(inventaires = "data.frame"), lignes = 0L, colonne = c("id", "sx"),
+              position = 1:2, lignes_colonne = c(3, 3))),
+    list("inventaires en défaut et colonne_type invalide (nombre de lignes jugé avant colonne_type)", sans_noms, E3, 1,
+         paste0(debut("inventaires"), "noms de lignes : 0 ; colonne « id » : 3 ; colonne « sx » : 3", fin),
+         list(table = "inventaires", classe = list(inventaires = "data.frame"), lignes = 0L, colonne = c("id", "sx"),
+              position = 1:2, lignes_colonne = c(3, 3))))
+  for (c1 in cas)
+    verifier(sprintf("#368 refus (valeur écrite à la main) : %s -> donnees/empilement_table_invalide, message et details exacts, une ligne marquée UTF-8, aucune erreur R, 0 avertissement R", c1[[1L]]), {
+      a <- appel(c1[[2L]], c1[[3L]], c1[[4L]])
+      x <- a$r
+      if (!inherits(x, "refus_tablexp")) {
+        if (inherits(x, "error")) paste("erreur R :", conditionMessage(x)) else "aucun refus levé"
+      }
+      else if (!identical(x$module, "donnees") || !identical(x$motif, "empilement_table_invalide"))
+        sprintf("%s / %s", x$module, x$motif)
+      else if (!identical(conditionMessage(x), c1[[5L]])) paste("message :", conditionMessage(x))
+      else if (grepl("[\n\v\f]", conditionMessage(x)) || !validUTF8(conditionMessage(x)) ||
+               !identical(Encoding(conditionMessage(x)), "UTF-8")) "message sur plusieurs lignes ou non marqué UTF-8"
+      else if (!identical(x$details, c1[[6L]])) paste("details :", paste(deparse(x$details), collapse = " "))
+      else if (a$n != 0L) sprintf("%d avertissement(s) R", a$n)
+      else TRUE
+    })
+  # Contre-épreuves : tables bien formées, dont la table vraiment vide (colonnes de
+  # longueur 0 : aucune ligne d'inventaire, trois lignes d'événement) ; valeurs
+  # écrites à la main.
+  verifier("#368 table vraiment vide (inventaires de colonnes de longueur 0) : admise, trois lignes d'événement, aucune ligne perdue ni ajoutée (valeur écrite à la main)", {
+    a <- appel(I3[0L, ], E3)
+    identical(a$r, data.frame(id = 2:4, sx = c("F", "H", "H"), c = c("deces", "rachat", "deces"),
+                              t = rep("evenement", 3L), stringsAsFactors = FALSE)) && a$n == 0L
+  })
+  verifier("#368 témoin : deux data.frame bien formés rendent la table de six lignes écrite à la main, colonne c complétée par NA aux trois lignes d'inventaire (complétion de structure, aucune ligne créée)", {
+    a <- appel(I3, E3)
+    identical(a$r, data.frame(id = c(1:3, 2:4), sx = c("H", "F", "H", "F", "H", "H"),
+                              c = c(NA, NA, NA, "deces", "rachat", "deces"),
+                              t = rep(c("inventaire", "evenement"), each = 3L), stringsAsFactors = FALSE)) && a$n == 0L
+  })
+  # Colonne liste classée dont la méthode length() ou dim() lève une erreur R
+  # (revue finale de B41 ; #368 comptait les lignes d'une telle colonne par NROW(),
+  # avec dispatch : erreur R nue, là où avant #368 (mesuré à 3ed3973) le refus
+  # empilement_colonne_non_atomique était levé). Une telle colonne n'est pas
+  # comptée : son refus est celui d'avant, une colonne atomique discordante de la
+  # même table reste refusée par #368. Méthodes S3 de session dans globalenv(),
+  # retirées ensuite ; les data.frame sont formés avant leur pose (leur
+  # construction appelle length()). Valeurs écrites à la main.
+  k <- structure(list(1, 2, 3), class = "k368")
+  k2 <- structure(list(1, 2), class = "k368")
+  I_k <- structure_df(list(id = 1:3, l = k), c(NA_integer_, -3L))
+  E_k <- structure_df(list(id = 2:4, l = k), c(NA_integer_, -3L))
+  I_k_court <- structure_df(list(id = 1:3, l = k2), c(NA_integer_, -3L))
+  I_k_et_court <- structure_df(list(id = 1:3, l = k, sx = "H"), c(NA_integer_, -3L))
+  methodes <- list(length = list(length.k368 = function(x) stop("length.k368 : erreur de session")),
+                   dim = list(dim.k368 = function(x) stop("dim.k368 : erreur de session")),
+                   `length et dim` = list(length.k368 = function(x) stop("length.k368 : erreur de session"),
+                                          dim.k368 = function(x) stop("dim.k368 : erreur de session")))
+  motif_non_atomique <- function(a, table) {
+    x <- a$r
+    if (!inherits(x, "refus_tablexp")) {
+      if (inherits(x, "error")) paste("erreur R :", conditionMessage(x)) else "aucun refus levé"
+    }
+    else if (!identical(x$module, "donnees") || !identical(x$motif, "empilement_colonne_non_atomique"))
+      sprintf("%s / %s", x$module, x$motif)
+    else if (!identical(x$details, list(table = table, colonne = "l"))) paste("details :", paste(deparse(x$details), collapse = " "))
+    else if (a$n != 0L) sprintf("%d avertissement(s) R", a$n)
+    else TRUE
+  }
+  for (m in names(methodes)) {
+    for (n in names(methodes[[m]])) assign(n, methodes[[m]][[n]], envir = globalenv())
+    ap <- list(inv = appel(I_k, E3), eve = appel(I3, E_k), court = appel(I_k_court, E3), mixte = appel(I_k_et_court, E3))
+    for (n in names(methodes[[m]])) rm(list = n, envir = globalenv())
+    verifier(sprintf("#368 colonne liste classée l, méthode %s en erreur, dans inventaires : refus empilement_colonne_non_atomique (comme avant #368), aucune erreur R", m),
+             motif_non_atomique(ap$inv, "inventaires"))
+    verifier(sprintf("#368 colonne liste classée l, méthode %s en erreur, dans evenements : refus empilement_colonne_non_atomique, aucune erreur R", m),
+             motif_non_atomique(ap$eve, "evenements"))
+    verifier(sprintf("#368 colonne liste classée l de 2 valeurs pour 3 lignes, méthode %s en erreur : refus empilement_colonne_non_atomique (non comptée), aucune erreur R", m),
+             motif_non_atomique(ap$court, "inventaires"))
+    verifier(sprintf("#368 colonne liste classée l et colonne atomique sx de 1 valeur pour 3 lignes, méthode %s en erreur : refus #368, qui cite sx seule (acquis conservé), aucune erreur R", m), {
+      x <- ap$mixte$r
+      if (!inherits(x, "refus_tablexp")) {
+        if (inherits(x, "error")) paste("erreur R :", conditionMessage(x)) else "aucun refus levé"
+      }
+      else if (!identical(x$motif, "empilement_table_invalide")) x$motif
+      else if (!identical(x$details$colonne, "sx") || !identical(x$details$position, 3L) ||
+               !identical(x$details$lignes_colonne, 1)) paste("details :", paste(deparse(x$details), collapse = " "))
+      else if (ap$mixte$n != 0L) sprintf("%d avertissement(s) R", ap$mixte$n)
+      else TRUE
+    })
+  }
+  verifier("#368 les méthodes length.k368 et dim.k368 de session sont retirées de globalenv()",
+           !any(c("length.k368", "dim.k368") %in% ls(globalenv(), all.names = TRUE)))
+})
+
+# --- classe d'encodage bytes (#366) ---------------------------------------------------
+#
+# Spécification d'actuary (avis de l'étape (0') de B41) : une table dont la classe
+# porte une chaîne d'encodage « bytes » est refusée en tête de fonction, avant
+# is.data.frame() (motif empilement_table_invalide, toutes les tables en défaut
+# citées). Avant #366 (mesuré à 41093de) : erreur R « translating strings with
+# "bytes" encoding is not allowed », appel inherits(x, "data.frame") dans
+# is.data.frame(), que la table soit passée en inventaires ou en evenements. Une
+# classe ASCII n'est pas marquée « bytes » (Encoding() rend "unknown") : le cas
+# emploie une classe non ASCII. Messages et details écrits à la main (texte de
+# l'avis) ; la classe est citée sous le repère de neutraliser_citation().
+local({
+  I3 <- data.frame(id = 1:3, sx = c("H", "F", "H"), stringsAsFactors = FALSE)
+  E3 <- data.frame(id = 2:4, sx = c("F", "H", "H"), c = c("deces", "rachat", "deces"), stringsAsFactors = FALSE)
+  classe_b <- c("k\xe9", "data.frame")
+  Encoding(classe_b) <- c("bytes", "unknown")
+  avec_classe <- function(x) { class(x) <- classe_b; x }
+  Ib <- avec_classe(I3)
+  Eb <- avec_classe(E3)
+  appel <- function(i, e, type = "t") {
+    f <- function() tryCatch(empiler_stocks(i, e, type), refus_tablexp = function(c) c, error = function(c) c)
+    r <- suppressWarnings(f())
+    n <- 0L
+    withCallingHandlers(f(), warning = function(w) { n <<- n + 1L; invokeRestart("muffleWarning") })
+    list(r = r, n = n)
+  }
+  msg <- function(t) paste0("Empilement des stocks successifs : la classe de ", t, " porte une chaîne d'encodage « bytes » ",
+                            "(classe(s) reçue(s) : <chaîne d'encodage bytes>/data.frame), non convertible en UTF-8 sans ",
+                            "deviner : la table n'est pas lue. Passer, pour chaque table, un data.frame dont la classe ne ",
+                            "porte aucune chaîne d'encodage bytes.")
+  msg2 <- paste0("Empilement des stocks successifs : la classe de « inventaires », « evenements » porte une chaîne ",
+                 "d'encodage « bytes » (classe(s) reçue(s) : <chaîne d'encodage bytes>/data.frame ; ",
+                 "<chaîne d'encodage bytes>/data.frame), non convertible en UTF-8 sans deviner : la table n'est pas lue. ",
+                 "Passer, pour chaque table, un data.frame dont la classe ne porte aucune chaîne d'encodage bytes.")
+  cas <- list(
+    list("inventaires de classe bytes", Ib, E3, msg("« inventaires »"),
+         list(table = "inventaires", classe = list(inventaires = classe_b))),
+    list("evenements de classe bytes", I3, Eb, msg("« evenements »"),
+         list(table = "evenements", classe = list(evenements = classe_b))),
+    list("les deux tables de classe bytes (toutes citées)", Ib, Eb, msg2,
+         list(table = c("inventaires", "evenements"), classe = list(inventaires = classe_b, evenements = classe_b))))
+  verifier("#366 une classe non ASCII est marquée bytes, une classe ASCII ne l'est pas (hypothèse du test, valeur écrite à la main)",
+           identical(Encoding(class(Ib)), c("bytes", "unknown")) && !tablexp:::classe_bytes(I3) && tablexp:::classe_bytes(Ib) &&
+             !tablexp:::classe_bytes(structure(I3, class = c("k", "data.frame"))))
+  for (c1 in cas)
+    verifier(sprintf("#366 refus (valeur écrite à la main) : %s -> donnees/empilement_table_invalide, message et details exacts, une ligne marquée UTF-8, aucune erreur R, 0 avertissement R", c1[[1L]]), {
+      a <- appel(c1[[2L]], c1[[3L]])
+      x <- a$r
+      if (!inherits(x, "refus_tablexp")) {
+        if (inherits(x, "error")) paste("erreur R :", conditionMessage(x)) else "aucun refus levé"
+      }
+      else if (!identical(x$module, "donnees") || !identical(x$motif, "empilement_table_invalide"))
+        sprintf("%s / %s", x$module, x$motif)
+      else if (!identical(conditionMessage(x), c1[[4L]])) paste("message :", conditionMessage(x))
+      else if (grepl("[\n\v\f]", conditionMessage(x)) || !validUTF8(conditionMessage(x)) ||
+               !identical(Encoding(conditionMessage(x)), "UTF-8")) "message sur plusieurs lignes ou non marqué UTF-8"
+      else if (!identical(x$details, c1[[5L]])) paste("details :", paste(deparse(x$details), collapse = " "))
+      else if (a$n != 0L) sprintf("%d avertissement(s) R", a$n)
+      else TRUE
+    })
+  verifier("#366 témoin : deux data.frame de classe sans chaîne bytes (dont une classe ASCII supplémentaire) rendent la table de six lignes écrite à la main, aucun refus ni avertissement R", {
+    a <- appel(I3, E3)
+    ascii <- I3
+    class(ascii) <- c("k", "data.frame")
+    b <- appel(ascii, E3)
+    attendu <- data.frame(id = c(1:3, 2:4), sx = c("H", "F", "H", "F", "H", "H"),
+                          c = c(NA, NA, NA, "deces", "rachat", "deces"),
+                          t = rep(c("inventaire", "evenement"), each = 3L), stringsAsFactors = FALSE)
+    identical(a$r, attendu) && a$n == 0L && identical(b$r, attendu) && b$n == 0L
+  })
+  verifier("#366 class() et citer() ne lèvent pas d'erreur sur une classe bytes (précédent #158) : repère rendu, valeur écrite à la main", {
+    r <- tryCatch(tablexp:::citer(class(Ib)), error = function(e) e)
+    identical(r, c("<chaîne d'encodage bytes>", "data.frame"))
+  })
+})
+
 # --- forme consommée par la recette `stocks_successifs` (identité exacte) ------------
 
 PER_E <- list(debut = D("2015-01-01"), fin = D("2017-12-31"))

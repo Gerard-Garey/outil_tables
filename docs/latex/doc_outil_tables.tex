@@ -44,7 +44,7 @@
 % Date fixe, mise a jour a la main a chaque modification du document
 % (docs/latex/CONVENTIONS.md, section 1) : jamais \today, qui ferait
 % dependre le PDF du jour de compilation.
-\newcommand{\datedoc}{27/11/2026}
+\newcommand{\datedoc}{28/11/2026}
 \newcommand{\versiondoc}{0.1}
 \newcommand{\statutdoc}{Projet}
 % Titre court utilise dans le pied de page (fancyhdr).
@@ -952,7 +952,8 @@ du vecteur sous-jacent, \code{length(unclass(x))}, sans dispatch
 dispatch~»). Les contrôles des
 données et des rôles, l'écrivain unique, l'écriture de la fiche, le
 contrôle du rapport figé, le rejeu outillé, le constructeur des tables de
-référence et le simulateur les emploient, et refusent sous un motif nommé,
+référence, l'empilement des stocks successifs (issue~\#366) et le
+simulateur les emploient, et refusent sous un motif nommé,
 à toute position du nom ou de l'élément \code{bytes} dans la classe (pour
 le simulateur, une classe \code{bytes} de la loi vraie ou de la table d'une
 de ses lois seulement~; un nom de colonne \code{bytes} de cette table, ou
@@ -971,7 +972,19 @@ même (\code{type\_conforme()}~; section~\ref{sec:table-reference}~;
 issue~\#150), et pour une table de référence entière de classe
 \code{bytes}, \code{details\$classe} portant la classe reçue
 (\code{classe\_bytes()} avant \code{is.data.frame()}~;
-section~\ref{sec:table-reference}~; issue~\#158)~; \code{loi\_invalide} pour une loi vraie, ou la table d'une
+section~\ref{sec:table-reference}~; issue~\#158)~;
+\code{table\_parametres\_manquants} pour les paramètres d'une table
+synthétique de classe \code{bytes}, \code{details\$classe} portant la
+classe reçue (\code{classe\_bytes()}, longueur lue par
+\code{longueur\_lue()}~; section~\ref{sec:table-reference}~;
+issue~\#392)~;
+\code{empilement\_table\_invalide} pour une table de classe \code{bytes}
+reçue par \code{empiler\_stocks()}, \code{inventaires},
+\code{evenements} ou les deux, toutes les tables en défaut citées,
+\code{details\$classe} portant la classe reçue de chacune
+(\code{classe\_bytes()} avant \code{is.data.frame()}~;
+section~\ref{sec:controles-donnees}, «~Empilement des deux tables~»~;
+issue~\#366)~; \code{loi\_invalide} pour une loi vraie, ou la table d'une
 de ses lois, de classe \code{bytes} (section~\ref{sec:loi-vraie}~;
 issue~\#150)~; \code{type\_non\_canonique} ou
 \code{serialisation\_impossible} pour une valeur écrite de classe
@@ -993,12 +1006,16 @@ une classe \code{bytes} sur \code{plan/etapes}~:
 «~différente~» (section~\ref{sec:rejeu}). Une classe d'encodage
 \code{bytes} est citée sous le repère de la règle ci-dessus.
 \textbf{Statut et limites}~: pour les données, les colonnes de rôle, une
-table de référence et ses colonnes, et la loi du simulateur, \emph{lecture}
+table de référence, ses colonnes et ses paramètres, les deux tables d'\code{empiler\_stocks()}
+et la loi du simulateur, \emph{lecture}
 du code (\code{classe\_bytes()} y précède toute fonction qui dispatche~;
 pour la loi vraie elle-même, \code{forme\_exacte()}, qui n'admet aucune
 classe, et noms des \code{details} lus par \code{attr()}) et
 \emph{constat} des tests, l'élément \code{bytes} placé en tête ou après
-une autre classe (en tête seulement pour la loi vraie elle-même)~; pour l'écriture de la fiche, le rapport figé
+une autre classe (en tête seulement pour la loi vraie elle-même, et pour
+les deux tables d'\code{empiler\_stocks()}, l'élément après
+\code{data.frame} relevant d'un \emph{constat} de mesure, R~4.3.3~;
+issue~\#366)~; pour l'écriture de la fiche, le rapport figé
 et le rejeu, \emph{constat} des tests et de mesures sous les locales C et
 C.UTF-8, aux niveaux~1 à~7 de la fiche, non une propriété démontrée pour
 toute profondeur~; pour le témoin de la fiche (règle~V3,
@@ -1190,7 +1207,8 @@ issue~\#128) \\
 d'encodage \code{bytes}, \code{FALSE} sinon~; l'appelant retire alors la
 classe par \code{unclass()} avant toute fonction qui dispatche
 (issue~\#128), ou refuse sous un motif nommé (données, colonne de rôle,
-table d'une loi du simulateur~; issue~\#150) \\
+table d'une loi du simulateur~; issue~\#150~; tables d'\code{empiler\_stocks()}~;
+issue~\#366~; paramètres d'une table de référence~; issue~\#392) \\
 \catalogue{fonctions-outils}{lire\_champ()} & interne & \code{x} (liste),
 \code{nom} & premier élément de \code{x} de ce nom, \code{NULL} s'il est
 absent, comme \code{x[[nom]]}, mais trouvé par \code{match()} sur les noms
@@ -5169,7 +5187,8 @@ dans cet ordre, au premier défaut (tableau~\ref{tab:refus-tables-reference})~:
     comprises). Un attribut \code{nom} ou
     \code{source} d'encodage \code{bytes}, ou un attribut
     \code{parametres} dont un nom ou une valeur caractère, à toute
-    profondeur, porte cet encodage, posé sur une table après le
+    profondeur, ou la classe elle-même (issue~\#392) porte cet encodage,
+    posé sur une table après le
     constructeur, est refusé à la reconstruction~(b), le constructeur le
     refusant (section~\ref{sec:table-reference}, «~Encodage \code{bytes}
     des métadonnées et de la table~»)~: raison «~refusé par
@@ -5180,7 +5199,12 @@ dans cet ordre, au premier défaut (tableau~\ref{tab:refus-tables-reference})~:
     auparavant refusé à l'écriture d'essai~(d), sous
     \code{chaine\_codage\_bytes}, avec, pour un paramètre,
     \code{details\$chemin} \code{[clé]/parametres/[nom]} pour une valeur ou
-    \code{[clé]/parametres/@noms} pour un nom).
+    \code{[clé]/parametres/@noms} pour un nom~; une classe \code{bytes}
+    des paramètres faisait lever une erreur R à la reconstruction~(b),
+    convertie en refus sans motif du constructeur, \code{details\$lu}
+    «~data.frame nu non reconstructible~», \code{details\$motif\_constructeur}
+    à \code{NA}, \emph{constat} de mesure de \code{etat\_table\_reference()}
+    sur le code qui précède l'issue~\#392, \code{24bbd41}, R~4.3.3).
     Un paramètre que le constructeur ne lit pas (fonction, niveau de
     facteur, \code{dimnames}, classe ou autre attribut d'un paramètre,
     d'encodage \code{bytes} ou non) est refusé à l'écriture
@@ -7898,7 +7922,29 @@ sont pas recopiés, et le résultat est un \code{data.frame} nu, à noms de
 lignes automatiques. Seules les colonnes atomiques sans dimension, hors
 \code{raw} (qui n'a pas de valeur manquante), sont admises. Six refus,
 module \code{donnees}, dans cet ordre~: \code{empilement\_table\_invalide}
-(l'une des tables n'est pas un \code{data.frame}, ou est une valeur de
+(depuis l'issue~\#366, et avant tout autre contrôle, la classe de l'une
+des tables porte, à toute position, un élément d'encodage \code{bytes}~:
+\code{classe\_bytes()} est lue pour chaque table avant
+\code{is.data.frame()}, dont \code{inherits()} lèverait l'erreur R, et
+toutes les tables en défaut sont citées, au message~: «~Empilement des
+stocks successifs~: la classe de [tables] porte une chaîne d'encodage
+«~bytes~» (classe(s) reçue(s)~: [classes]), non convertible en UTF-8
+sans deviner~: la table n'est pas lue. Passer, pour chaque table, un
+data.frame dont la classe ne porte aucune chaîne d'encodage bytes.~»,
+[tables] les noms des tables en défaut entre guillemets, séparés par des
+virgules, [classes] la classe de chacune, éléments séparés par «~/~» et
+tables par «~;~», l'élément \code{bytes} cité sous le repère de la règle
+unique des refus (section~\ref{sec:refus}), \code{details} à deux
+clés~: \code{table} (noms des tables en défaut) et \code{classe}
+(classe reçue de chacune)~; auparavant, l'élément \code{bytes} placé en
+tête de la classe arrêtait l'empilement sur l'erreur R «~translating
+strings with "bytes" encoding is not allowed~», que la table soit
+\code{inventaires}, \code{evenements} ou les deux, et, placé après
+\code{data.frame}, la table était empilée sans refus (six lignes pour
+deux tables de trois lignes), \emph{constat} de mesure sur le code qui
+précède l'issue, \code{41093de}, R~4.3.3~; une classe ASCII n'est
+jamais marquée \code{bytes} par R~; ou l'une des tables n'est pas un
+\code{data.frame}, ou est une valeur de
 classe \code{data.frame} qui n'est pas une liste, comme un environnement
 ainsi classé~: le moteur ne lit pas de fichier~; ou, depuis
 l'issue~\#355, l'une des tables est un \code{data.frame} dont la liste
@@ -7919,7 +7965,55 @@ auparavant, une telle table arrêtait l'empilement sur l'erreur R
 «~subscript out of bounds~», et un environnement classé
 \code{data.frame} sur l'erreur R «~a character vector argument
 expected~», \emph{constat} de mesure sur le code qui précède l'issue,
-R~4.3.3)~; \code{empilement\_colonne\_type\_invalide} (\code{colonne\_type}
+R~4.3.3~; ou, depuis l'issue~\#368, l'une des tables est un
+\code{data.frame} dont les noms de lignes et les colonnes ne donnent pas
+un même nombre de lignes~: chaque table est jugée juste après le
+contrôle de l'issue~\#355, \code{inventaires} puis \code{evenements},
+avant toute lecture de colonne et avant \code{colonne\_type}, la première
+table en défaut étant citée~; son nombre de lignes, lu sans dispatch par
+\code{.row\_names\_info(, 2L)}, est comparé au nombre de lignes de chaque
+colonne, compté comme au contrôle des données («~Décomptes de lignes
+discordants~», ci-dessus)~: \code{dim[1]} pour une colonne munie d'un
+attribut \code{dim}, si bien qu'une matrice au nombre de lignes différent
+reçoit ce refus et non plus \code{empilement\_colonne\_non\_atomique},
+\code{longueur\_lue()} sinon~; une colonne liste munie d'une classe autre
+que \code{bytes} et sans attribut \code{dim} (\code{POSIXlt}, colonne
+\code{data.frame}, \code{I()} d'une liste) n'est pas comptée, son nombre
+de lignes ne se lisant que par une méthode \code{length()} ou
+\code{dim()}, qui peut lever une erreur R, et sa longueur lue sans
+dispatch étant fausse (onze composantes pour une colonne
+\code{POSIXlt} d'une, de deux ou de trois valeurs, \emph{constat} de
+mesure, R~4.3.3)~: elle reste refusée plus loin, au plus tard sous
+\code{empilement\_colonne\_non\_atomique}, sauf refus antérieur
+(\code{colonne\_type} invalide, \code{empilement\_noms\_invalides})~;
+message~: «~Empilement des stocks successifs~: la table «~[table]~» est
+un data.frame mal formé, dont les noms de lignes et les colonnes ne
+donnent pas un même nombre de lignes ([constat]~; classe [classe]). Le
+moteur ne choisit pas entre ces décomptes, et ne les corrige pas (une
+colonne plus courte serait complétée par des valeurs manquantes, une plus
+longue tronquée)~: passer un data.frame dont les noms de lignes et chaque
+colonne comptent le même nombre de lignes.~», [constat] valant «~noms de
+lignes~: [nombre]~» ou, si le nombre lu est \code{NA}, «~noms de
+lignes~: illisibles~», suivi des colonnes en défaut, chacune sous la
+forme «~colonne «~[nom]~»~: [décompte]~» (au plus
+\code{NB\_LIGNES\_CITEES}, soit dix~; \code{colonnes\_decompte\_citees()}),
+\code{details} à six clés~: \code{table}, \code{classe}, \code{lignes}
+(nombre de lignes lu, \code{NA} s'il est illisible), \code{colonne},
+\code{position}, \code{lignes\_colonne} (décomptes, en \code{double})~;
+une table sans attribut \code{row.names}, ou à \code{row.names} vide,
+mais à colonnes non vides, est ainsi refusée («~noms de lignes~: 0~»),
+et deux tables aux colonnes de longueur nulle restent empilées en une
+table vide~; auparavant, sur deux tables de trois lignes, une colonne
+d'une seule valeur était complétée par des valeurs manquantes dans
+\code{inventaires} et répétée dans \code{evenements}, une colonne de
+quatre valeurs tronquée (avec l'avertissement de R «~number of items to
+replace is not a multiple of replacement length~» dans
+\code{evenements}), la table empilée gardant six lignes, sans refus, une table sans noms de lignes
+perdait ses trois lignes dans la table empilée, et des noms de lignes
+illisibles arrêtaient l'empilement sur l'erreur R «~argument must be
+coercible to non-negative integer~», \emph{constat} de mesure sur le
+code qui précède l'issue, \code{992749c}, R~4.3.3)~;
+\code{empilement\_colonne\_type\_invalide} (\code{colonne\_type}
 n'est pas une chaîne unique, non vide, sans attribut, d'encodage autre que
 \code{bytes})~; \code{empilement\_noms\_invalides} (nom de colonne
 manquant, vide, en double ou d'encodage \code{bytes}~: les colonnes
@@ -8130,6 +8224,37 @@ contrôlé~: \code{preparer\_donnees()} extrait par
 demandées, dans l'ordre attendu, les rôles et l'étape appelante. Les
 numéros sont formés par l'appelant, entiers positifs, sans \code{NA}, au
 plus le nombre de lignes de l'entrée~: l'outil ne les contrôle pas.
+À l'étape \code{donnees}, \code{preparer\_donnees()} les contrôle
+elle-même, avant l'appel de l'outil, qu'il y ait une exclusion ou non
+(issue~\#372)~: les numéros des lignes conservées et ceux des lignes
+exclues, réunis, sont des entiers, sans \code{NA}, de~1 au nombre de
+lignes reçues, en même nombre que ces lignes et sans doublon, si bien
+que chaque ligne reçue y figure une fois et une seule~; sinon, erreur de
+programmation du package (\code{stop()}, non un refus). Ce nombre de
+lignes est lu sans dispatch sur une colonne de rôle, la première des
+rôles déclarés (\code{longueur\_lue(lire\_champ())}), et non sur le
+nombre de lignes que la fonction a lu d'abord
+(\code{.row\_names\_info()}) et dont elle forme les numéros~: une
+lecture faussée de celui-ci fausserait la garde avec eux. Aucune entrée
+admise n'atteint cette garde~: le contrôle des décomptes de lignes à
+l'entrée (ci-dessus, «~Décomptes de lignes discordants~») a imposé
+l'accord des noms de lignes et du nombre de lignes de chaque colonne,
+et le contrôle des types, qu'une colonne de rôle soit un vecteur
+atomique sans attribut \code{dim}, dont \code{longueur\_lue()} donne
+donc le nombre de lignes~; elle protège la construction contre un
+défaut du code du moteur. \textbf{Statut}~: \emph{lecture} du code pour
+cette inaccessibilité, non propriété démontrée~; \emph{constat} des
+tests (\code{tests/unitaires/test\_lignes\_sans\_dispatch.R}) pour son
+effet, sous chacune des trois recettes~: garde silencieuse et numéros
+des lignes conservées attendus sans exclusion et sous l'exclusion de la
+première ligne (propagée, sous \code{stocks\_successifs}, aux autres
+lignes de son unité), sur un \code{data.frame} sans classe propre comme
+sur une sous-classe munie d'une méthode \code{dim()} exacte~; refus
+\code{aucune\_ligne\_conservee} inchangé quand toutes les lignes sont
+exclues~; erreur de la garde sur une copie de \code{preparer\_donnees()}
+dont les numéros comptent une ligne de trop (section~\ref{sec:rapport-fige},
+«~Lecture sans dispatch~») et sur une copie où, sans exclusion, le
+deuxième numéro conservé répète le premier, la deuxième ligne manquant.
 L'étape donne le module du refus et le sujet de son message, lu dans la
 constante \code{SUJETS\_LIGNES\_EXTRAITES}, qui en a une entrée par
 étape appelante, soit deux~: «~Les lignes conservées~» pour l'étape
@@ -8319,8 +8444,17 @@ attribués. Une première position au-delà des colonnes de l'entrée
 (extraction plus longue) n'a pas de colonne à citer~: le message prend
 alors la première forme, sans attribution~; de même quand le nombre de
 colonnes de la liste n'est pas celui de ses noms, aucune position n'étant
-alors cherchée. \code{details} (huit
-champs)~: \code{classe} (classe des données), \code{classe\_rendue}
+alors cherchée. \code{details} (neuf
+champs, dans cet ordre)~: \code{cause} (contrôle en défaut, vecteur
+\code{character} de longueur~1, en ASCII, parmi \code{"0"}, \code{"1"}, \code{"1 bis"},
+\code{"2"}, \code{"3 a"} et \code{"3 b"}, pour les contrôles~(0),
+(1), (1~bis), liste incohérente comprise, (2), (3~a) et (3~b)~; elle
+est déterminée une seule fois, et le constat du message est choisi
+d'après elle, si bien que champ et message ne peuvent diverger (\emph{lecture} du
+code)~; elle
+distingue en particulier les causes~(3~a) et~(3~b), qui remplissent
+les mêmes champs~; les refus de même motif du contrôle des lignes
+reçues, ci-dessus, n'ont pas ce champ~; issue~\#369), \code{classe} (classe des données), \code{classe\_rendue}
 (classe du résultat de l'extraction), \code{lignes} (nombre de lignes
 extraites, \code{NA} s'il est illisible ou sous la cause~(0)),
 \code{attendu} (nombre de lignes demandées à l'extraction contrôlée~:
@@ -9057,7 +9191,8 @@ dont \code{inherits()} levait l'erreur R «~translating strings with
 attendu~» serait faux d'un data.frame sous-classé). Ordre des contrôles
 d'entrée~: nom, statut, nom réservé, source, paramètres, forme d'origine, classe
 \code{bytes}, \code{data.frame}, puis cohérence de la liste des colonnes
-et de leurs noms (issue~\#355). Le contrôle \code{data.frame} exige
+et de leurs noms (issue~\#355), puis nombre de lignes de chaque colonne
+(issue~\#368, ci-dessous). Le contrôle \code{data.frame} exige
 aussi une liste~: un environnement de classe \code{data.frame}, qui
 recevait \code{table\_colonne\_manquante} (constat faux~: toutes les
 colonnes citées comme manquantes), reçoit «~Table «~[nom]~»~: un
@@ -9082,7 +9217,59 @@ ment, arrêtait R par une erreur de segmentation (lecture de
 à ses noms (\emph{constat} de mesure sur le code qui précède
 l'issue, R~4.3.3), ou \code{table\_vide} pour une liste sans ligne
 (\emph{constat} de mesure de la revue finale sur le code qui précède
-l'issue, R~4.3.3). Les \code{parametres} d'une table synthétique
+l'issue, R~4.3.3). Depuis l'issue~\#368, juste après ce contrôle, avant
+toute lecture de colonne, donc avant \code{table\_colonne\_manquante}
+et \code{table\_vide}, le nombre de lignes de la table, lu sans
+dispatch par \code{.row\_names\_info(x, 2L)}, est comparé au nombre de
+lignes de chaque colonne, compté comme au contrôle des données
+(section~\ref{sec:controles-donnees}, «~Décomptes de lignes
+discordants~»)~: \code{dim[1]} pour une colonne munie d'un attribut
+\code{dim} (une matrice au nombre de lignes différent reçoit donc ce
+refus, et non plus, selon son nom, \code{table\_colonne\_inconnue} ou
+\code{table\_colonne\_mal\_typee}, sauf refus antérieur, une matrice
+\code{qx} étant auparavant admise, complétée par des valeurs manquantes
+ou tronquée~: \emph{constat} de mesure sur le code qui précède
+l'issue, \code{992749c}, R~4.3.3, matrices d'une colonne de trois et
+de huit lignes dans une table de six lignes),
+\code{longueur\_lue()} sinon. Une colonne liste munie d'une classe autre
+que \code{bytes} et sans attribut \code{dim} (\code{POSIXlt}, colonne
+\code{data.frame}, \code{I()} d'une liste) n'est pas comptée~: son
+nombre de lignes ne se lit que par une méthode \code{length()} ou
+\code{dim()}, qui peut lever une erreur R, et sa longueur lue sans
+dispatch est fausse (règle et mesures~: section~\ref{sec:controles-donnees},
+«~Empilement des deux tables~»)~; elle reste refusée plus loin, au plus
+tard sous \code{table\_colonne\_inconnue} (nom hors des colonnes
+admises) ou \code{table\_colonne\_mal\_typee} (nom admis), sauf refus
+antérieur (\code{table\_colonne\_manquante},
+\code{table\_annee\_et\_generation}, \code{table\_forme\_incoherente},
+\code{table\_vide}), et une colonne comptée discordante de la même table
+est refusée ici. Des noms de lignes illisibles (nombre lu \code{NA}) ou
+une colonne comptée de longueur différente sont refusés sous
+\code{table\_mal\_formee}, au message~: «~Table «~[nom]~»~: la table
+est un data.frame mal formé, dont les noms de lignes et les colonnes ne
+donnent pas un même nombre de lignes ([constat]~; classe [classe]). Le
+moteur ne choisit pas entre ces décomptes, et ne les corrige pas~: passer
+un data.frame dont les noms de lignes et chaque colonne comptent le même
+nombre de lignes.~», [constat] formé comme pour
+\code{empiler\_stocks()} («~noms de lignes~: [nombre]~» ou «~noms de
+lignes~: illisibles~», puis les colonnes en défaut, au plus
+\code{NB\_LIGNES\_CITEES}), \code{details} à cinq clés~:
+\code{classe}, \code{lignes} (\code{NA} s'il est illisible),
+\code{colonne}, \code{position}, \code{lignes\_colonne} (en
+\code{double}). Une table sans attribut \code{row.names}, ou à
+\code{row.names} vide, mais à colonnes non vides, est ainsi refusée
+sous ce motif («~noms de lignes~: 0~»)~; seule une table aux colonnes de
+longueur nulle reçoit \code{table\_vide}. Auparavant, sur une table de
+six lignes, une colonne \code{qx} plus courte était admise, le tri dans
+l'ordre canonique la complétant par des valeurs manquantes (cinq
+\code{qx} manquants pour une colonne d'une valeur, un pour cinq
+valeurs), sans refus ni avertissement~; une colonne \code{qx} de sept
+valeurs était tronquée~; une colonne \code{age} ou \code{sexe} plus
+courte ou plus longue arrêtait R («~argument lengths differ~»)~; une
+table sans noms de lignes recevait \code{table\_vide} à tort~; des noms
+de lignes illisibles arrêtaient R («~missing value where TRUE/FALSE
+needed~») (\emph{constat} de mesure sur le code qui précède l'issue,
+\code{992749c}, R~4.3.3). Les \code{parametres} d'une table synthétique
 s'écrivent eux aussi dans la fiche~; un nom ou une valeur d'encodage
 \code{bytes} y était refusé par l'écriture d'essai du contrôle des tables
 reçues (section~\ref{sec:tables-reference-recues}, «~Contrôle des tables reçues~», point~1~(d),
@@ -9096,7 +9283,8 @@ lus. Passer des paramètres (liste non vide) sans encodage bytes.~». Ce
 contrôle suit, dans l'étape «~paramètres~» de l'ordre ci-dessus, ceux de
 la présence des paramètres (\code{table\_parametres\_manquants} pour une
 table synthétique sans liste non vide, \code{table\_parametres\_inattendus}
-pour une table embarquée ou importée qui en porte). Il lit, à toute
+pour une table embarquée ou importée qui en porte) et celui de leur
+classe (issue~\#392, ci-dessous). Il lit, à toute
 profondeur de la liste, les noms (\code{noms\_bytes()}) et les valeurs des
 vecteurs caractère, et rien d'autre~: les niveaux d'un facteur, les
 \code{dimnames}, la classe et les autres attributs d'un paramètre ne sont
@@ -9107,7 +9295,33 @@ niveaux de la liste, sans appel récursif ni dispatch sur la classe~: une
 liste de profondeur $10^5$ ne lève pas d'erreur R au constructeur
 (\emph{constat} de mesure, R~4.3.3), sa profondeur, au-delà de
 \code{PROFONDEUR\_MAX\_TEXTE}, étant refusée à l'écriture d'essai~(d), sous
-\code{serialisation\_impossible}.
+\code{serialisation\_impossible}. Depuis l'issue~\#392 (décision P1 sur
+l'avis d'\code{actuary}~: refus dès la construction), le contrôle de
+présence lit la longueur des paramètres sans dispatch, par
+\code{longueur\_lue()}, et non plus par \code{length()}, puis, entre
+\code{table\_parametres\_inattendus} et le contrôle de l'issue~\#256,
+des paramètres dont la classe porte, à toute position, un élément
+d'encodage \code{bytes} (\code{classe\_bytes()}) sont refusés sous
+\code{table\_parametres\_manquants}, au message~: «~Table synthétique
+«~[nom]~»~: ses paramètres portent une classe d'encodage «~bytes~»
+(classe [classe]), non convertible en UTF-8 sans deviner~: ils ne sont
+pas lus. Passer des paramètres (liste non vide) dont la classe ne porte
+aucune chaîne d'encodage bytes.~», [classe] les éléments de la classe
+séparés par «~/~», chaque élément \code{bytes} cité sous le repère de la
+règle unique des refus (section~\ref{sec:refus}), \code{details\$classe}
+la classe reçue. Une liste vide ou une valeur qui n'est pas une liste,
+même de classe \code{bytes}, reste refusée par le contrôle de présence
+(«~ses paramètres (liste non vide) sont requis~»)~; une classe sans
+élément \code{bytes} reste admise, sans être lue~; une classe
+\code{bytes} à l'intérieur de la liste n'est pas lue par le constructeur
+et relève de l'écrivain de la fiche (ci-dessus). Auparavant,
+\code{length()} levait sur une telle classe l'erreur R «~translating
+strings with "bytes" encoding is not allowed~», liste vide comprise, et
+une méthode \code{length()} de la classe des paramètres qui rendait~0
+faisait refuser une liste non vide comme vide, sous
+\code{table\_parametres\_manquants}~; depuis, cette liste est admise
+(\emph{constat} de mesure sur le code qui précède l'issue,
+\code{24bbd41}, et sur l'état de la branche, R~4.3.3).
 
 \medskip
 \noindent
@@ -10829,9 +11043,9 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{controler\_recettes\_concurrentes()} & interne & rôles, catalogue & refus \code{recettes\_concurrentes} si des rôles propres à plusieurs recettes sont déclarés ensemble~; ne lit que les noms des rôles~; rend \code{NULL} \\
 \catalogue{fonctions-donnees}{deduire\_recette()} & interne & rôles, catalogue et matrice (par défaut, ceux du module~; injection en test) & seul endroit où s'écrit la sélection~: refus \code{recettes\_concurrentes}, puis recette dont tous les rôles requis sont déclarés, sinon refus \code{aucune\_recette}~; rend la recette, sa convention native, ses rôles requis et employés, sa forme rendue au noyau, ses motifs et ses lignes de la matrice reçue (aucune ligne pour une recette absente de cette matrice~; issue~\#196)~; appelée par \code{controler\_roles()}, valeur validée transmise aux étapes (issue~\#82) \\
 \catalogue{fonctions-donnees}{decompte\_lisible()} & interne & valeur rendue pour un décompte de lignes & vrai si la valeur, jugée avant toute conversion, est numérique (\code{is.numeric()}, avec dispatch, rendu autre que \code{TRUE} valant non), puis, privée de sa classe par \code{unclass()}, de longueur~1, non \code{NA}, entière, de~0 à \code{.Machine\$integer.max}~; règle commune des décomptes de lignes (section~\ref{sec:controles-donnees}, «~Décomptes de lignes discordants~»~; issues~\#312, \#319 et~\#322) \\
-\catalogue{fonctions-donnees}{decompte\_colonne()} & interne & colonne & nombre de lignes de la colonne, non converti~: \code{dim[1]} si elle porte un attribut \code{dim}, \code{NROW()} (avec dispatch) pour une liste munie d'une classe autre que \code{bytes}, \code{longueur\_lue()} sinon~; une erreur levée par une méthode se propage (issues~\#312 et~\#319) \\
-\catalogue{fonctions-donnees}{decomptes\_colonnes()} & interne & liste (données ou lignes extraites) & pour chaque colonne, parcourue par position (\code{unclass()}, sans dispatch ni copie)~: valeur rendue par la fonction précédente, lisibilité, décompte (en double, lu sur \code{unclass()}, \code{NA} s'il est illisible)~; noms des colonnes (fonction \code{noms\_colonnes\_lus()}, issue~\#322)~; partagée par le contrôle des décomptes de lignes et par l'outil de contrôle des extractions de lignes (entrée ci-dessous~: contrôles~(1~bis), sous une entrée de classe exactement \code{data.frame}, et~(2)), appelé sous les étapes \code{donnees} et \code{importance\_exclusions}~; précondition~: liste dont le nombre de colonnes est celui de ses noms (fonction \code{colonnes\_lues()}), que ses deux appelants contrôlent avant de l'appeler, sinon erreur de programmation (\code{stop()}~; issues~\#312, \#319, \#322 et~\#344) \\
-\catalogue{fonctions-donnees}{colonnes\_decompte\_citees()} & interne & positions des colonnes discordantes, décomptes (fonction précédente), classes des colonnes (\code{NULL} par défaut) & une chaîne par colonne citée, au plus \code{NB\_LIGNES\_CITEES}, puis «~et N autre(s) colonne(s)~»~: «~colonne «~nom~»~: N~», ou «~illisible~» avec le type et la longueur de la valeur rendue~; classe de la colonne après son nom si les classes sont données (issues~\#312 et~\#319) \\
+\catalogue{fonctions-donnees}{decompte\_colonne()} & interne & colonne & nombre de lignes de la colonne, non converti~: \code{dim[1]} si elle porte un attribut \code{dim}, \code{NROW()} (avec dispatch) pour une liste munie d'une classe autre que \code{bytes}, \code{longueur\_lue()} sinon~; une erreur levée par une méthode se propage (issues~\#312 et~\#319)~; argument \code{par\_methode} (\code{TRUE} par défaut)~: sous \code{FALSE}, une liste munie d'une classe autre que \code{bytes} et sans attribut \code{dim} n'est pas comptée, \code{NROW()} n'est pas appelée et la fonction rend \code{NULL} (issue~\#368) \\
+\catalogue{fonctions-donnees}{decomptes\_colonnes()} & interne & liste (données ou lignes extraites) & pour chaque colonne, parcourue par position (\code{unclass()}, sans dispatch ni copie)~: valeur rendue par la fonction précédente, lisibilité, décompte (en double, lu sur \code{unclass()}, \code{NA} s'il est illisible), colonnes non comptées (\code{ignorees}~: rendu \code{NULL} sous \code{par\_methode = FALSE}, toutes \code{FALSE} sinon~; issue~\#368)~; noms des colonnes (fonction \code{noms\_colonnes\_lus()}, issue~\#322)~; partagée par le contrôle des décomptes de lignes et par l'outil de contrôle des extractions de lignes (entrée ci-dessous~: contrôles~(1~bis), sous une entrée de classe exactement \code{data.frame}, et~(2)), appelé sous les étapes \code{donnees} et \code{importance\_exclusions}, avec \code{par\_methode = TRUE}, et par \code{empiler\_stocks()} et \code{table\_reference()}, avec \code{par\_methode = FALSE} (issue~\#368)~; précondition~: liste dont le nombre de colonnes est celui de ses noms (fonction \code{colonnes\_lues()}), que ses quatre appelants contrôlent avant de l'appeler, sinon erreur de programmation (\code{stop()}~; issues~\#312, \#319, \#322 et~\#344) \\
+\catalogue{fonctions-donnees}{colonnes\_decompte\_citees()} & interne & positions des colonnes discordantes, décomptes (fonction précédente), classes des colonnes (\code{NULL} par défaut) & une chaîne par colonne citée, au plus \code{NB\_LIGNES\_CITEES}, puis «~et N autre(s) colonne(s)~»~: «~colonne «~nom~»~: N~», ou «~illisible~» avec le type et la longueur de la valeur rendue~; classe de la colonne après son nom si les classes sont données (issues~\#312 et~\#319)~; appelée aussi, sans les classes, par \code{empiler\_stocks()} et \code{table\_reference()} (issue~\#368) \\
 \catalogue{fonctions-donnees}{classes\_colonnes\_citees()} & interne & positions citées, classes des colonnes & classes distinctes des colonnes citées (au plus \code{NB\_LIGNES\_CITEES}), jointes par «~,~»~: conseil du refus d'une extraction fausse sous une entrée de classe exactement \code{data.frame} (issue~\#319) \\
 \catalogue{fonctions-donnees}{colonnes\_classe\_citees()} & interne & noms de colonnes, leurs classes & «~«~nom~» (classe c)~», joints par «~,~»~: colonnes de rôle citées par le contrôle~(3) de l'extraction sous une entrée de classe exactement \code{data.frame} (issue~\#319) \\
 \catalogue{fonctions-donnees}{noms\_colonnes\_lus()} & interne & liste & noms des colonnes, lus sans dispatch (\code{attr()}), chaînes vides à défaut~; seule lecture des noms de colonnes de la fonction \code{decomptes\_colonnes()}, de la fonction suivante et du contrôle d'une extraction de lignes (issues~\#319, \#322 et~\#344) \\
@@ -10862,12 +11076,12 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{faits\_unites\_stocks()} & interne & unité de chaque ligne, lignes d'inventaire et d'événement, indice dans la grille, date et cause de sortie, nombre d'unités & par unité~: indices $f$ et $l$ du premier et du dernier inventaire, nombres de lignes d'inventaire et d'événement, plus petite et plus grande date de sortie, cause du premier événement \\
 \catalogue{fonctions-donnees}{evaluer\_motifs\_stocks()} & interne & données, rôles, valeurs validées \code{p} (dont la grille), segmentation & numéros des lignes porteuses de chaque motif (ligne, puis unité sur les unités exemptes de motif de ligne), lignes de propagation et nombre d'unités concernées (section~\ref{sec:controles-donnees})~; nombre de lignes des données lu sans dispatch (issue~\#354) \\
 \catalogue{fonctions-donnees}{observations\_stocks()} & interne & lignes retenues, leurs numéros, rôles, segmentation, valeurs validées \code{p}, données reçues & une observation par unité, rangée par identifiant, unité \code{tete} ou \code{contrat}, classes P0, E, ES, HF et fins S, C~; relevés par classe, par inventaire et par intervalle~; refus \code{inventaire\_sans\_ligne}~; erreur de programmation sur une unité incohérente (motifs non appliqués) \\
-\catalogue{fonctions-donnees}{empiler\_stocks()} & exportée & table des inventaires, table des événements, nom de la colonne du type de ligne & table empilée~: lignes d'inventaire puis d'événement dans l'ordre reçu, colonne du type déclarée par la table d'origine, colonnes absentes complétées par des valeurs manquantes, sans conversion~; six refus \code{empilement\_*}, dont \code{empilement\_}\allowbreak\code{table\_invalide} d'une table dont la liste des colonnes n'a pas la longueur de ses noms, jugée par \code{colonnes\_lues()} avant toute lecture de colonne (section~\ref{sec:controles-donnees}~; issue~\#355) \\
+\catalogue{fonctions-donnees}{empiler\_stocks()} & exportée & table des inventaires, table des événements, nom de la colonne du type de ligne & table empilée~: lignes d'inventaire puis d'événement dans l'ordre reçu, colonne du type déclarée par la table d'origine, colonnes absentes complétées par des valeurs manquantes, sans conversion~; six refus \code{empilement\_*}, dont \code{empilement\_}\allowbreak\code{table\_invalide}, en premier, d'une table dont la classe porte un élément d'encodage \code{bytes}, jugé par \code{classe\_bytes()} avant \code{is.data.frame()}, toutes les tables en défaut citées (issue~\#366), puis d'une table dont la liste des colonnes n'a pas la longueur de ses noms, jugée par \code{colonnes\_lues()} avant toute lecture de colonne (section~\ref{sec:controles-donnees}~; issue~\#355)~; nombres de lignes des deux tables lus sans dispatch (\code{.row\_names\_info()}~; section~\ref{sec:rapport-fige}, «~Lecture sans dispatch~»~; issue~\#367)~; puis, pour chaque table, nombre de lignes de chaque colonne comparé à celui des noms de lignes (\code{decomptes\_colonnes()} sous \code{par\_methode = FALSE}, liste classée sans \code{dim} non comptée), sinon \code{empilement\_}\allowbreak\code{table\_invalide}, \code{details} à six clés, avant \code{colonne\_type} (issue~\#368) \\
 \catalogue{fonctions-donnees}{fusionner\_intervalles()} & interne & têtes, entrées, fins & composantes fusionnées et relevés~; refus \code{dates\_hors\_plage} \\
 \catalogue{fonctions-donnees}{libelles\_facteur()} & interne & facteur, positions & libellés des éléments désignés, lus sans dispatch~: codes par \code{.subset()}, niveaux par l'attribut \code{levels}, noms des niveaux retirés~; égaux, pour un facteur sans classe propre, à sa conversion en chaînes, \code{NA} et niveaux inutilisés ou nommés compris~; contrôle~(3~b) d'une extraction de lignes, après le contrôle~(3~a) de bonne forme, un code hors des niveaux y étant lu \code{NA} (section~\ref{sec:controles-donnees}~; issues~\#322 et~\#357~; décision M558) \\
 \catalogue{fonctions-donnees}{SUJETS\_LIGNES\_EXTRAITES} & constante & --- & sujet du message de refus de la fonction suivante, une entrée par étape appelante (clé~: nom de l'étape, module du refus), deux clés~: \code{donnees} («~Les lignes conservées~», issue~\#322) et \code{importance\_exclusions} (lignes relues par cette étape, issue~\#320~; section~\ref{sec:importance-exclusions})~; texte du moteur \\
-\catalogue{fonctions-donnees}{controler\_lignes\_extraites()} & interne & données, lignes extraites par l'appelant, numéros des lignes demandées, rôles, étape (\code{donnees} par défaut) & postcondition d'une extraction de lignes par la méthode \code{[} de la classe des données~: contrôles~(0) à~(3), sans dispatch, rien du résultat n'étant lu avant le contrôle~(0), le nombre de colonnes du contrôle~(1~bis) lu sur la liste (\code{length(unclass())}, par \code{colonnes\_lues()}~; issue~\#344) et comparé au nombre des noms et à celui de l'entrée avant toute lecture des colonnes, une liste incohérente recevant le seul constat de \code{constat\_colonnes\_lues()} (issue~\#345), le contrôle~(3) en deux temps, bonne forme de chaque facteur extrait par \code{facteur\_bien\_forme()}, toutes les colonnes en défaut citées, puis, à défaut d'écart, identité des colonnes de rôle (issue~\#357), refus \code{donnees\_mal\_formees} du module de l'étape, message citant la classe des colonnes en cause sous une entrée de classe exactement \code{data.frame}, \code{details} à huit champs~; étape hors des clés de la constante précédente~: erreur de programmation (\code{stop()}), avant tout contrôle~; numéros non contrôlés~; rend \code{TRUE}, invisible~; appelée sous les étapes \code{donnees} et \code{importance\_exclusions} (section~\ref{sec:controles-donnees}, «~Extraction des lignes conservées et son contrôle~»~; issues~\#319, \#322, \#320, \#345 et~\#357) \\
-\catalogue{fonctions-donnees}{preparer\_donnees()} & interne & données, rôles, valeurs validées \code{p}, segmentation, exclusions, recette validée & fonction d'étape \code{donnees}~: paramètres effectifs, résultat, diagnostics, avertissements~; nombre de lignes des données lu sans dispatch (\code{.row\_names\_info()}~; issue~\#354)~; évaluation des motifs, observations et relevés selon la recette (\code{evaluer\_motifs()} et \code{construire\_observations()} sous \code{lignes\_dates\_completes}, \code{evaluer\_motifs\_agregats()} et \code{observations\_agregats()} sous \code{agregats}, \code{evaluer\_motifs\_stocks()} et \code{observations\_stocks()} sous \code{stocks\_successifs}), squelette commun, qui exclut aussi les lignes de propagation (\code{NULL} hors stocks)~; colonnes de rôle lues par \code{lire\_champ()} (issue~\#140)~; sous une exclusion, lignes conservées extraites par la méthode \code{[} de la classe de l'entrée, puis contrôlées sans dispatch par la fonction précédente (forme, nombre de lignes, colonnes, décompte de chaque colonne, bonne forme de chaque facteur extrait, identité des colonnes de rôle), refus \code{donnees\_mal\_formees} sinon (section~\ref{sec:controles-donnees}~; issues~\#319, \#322 et~\#357)~; ne contrôle ni les paramètres ni les rôles, contrôlés par \code{construire\_table()} (issues~\#22 et~\#82) \\
+\catalogue{fonctions-donnees}{controler\_lignes\_extraites()} & interne & données, lignes extraites par l'appelant, numéros des lignes demandées, rôles, étape (\code{donnees} par défaut) & postcondition d'une extraction de lignes par la méthode \code{[} de la classe des données~: contrôles~(0) à~(3), sans dispatch, rien du résultat n'étant lu avant le contrôle~(0), le nombre de colonnes du contrôle~(1~bis) lu sur la liste (\code{length(unclass())}, par \code{colonnes\_lues()}~; issue~\#344) et comparé au nombre des noms et à celui de l'entrée avant toute lecture des colonnes, une liste incohérente recevant le seul constat de \code{constat\_colonnes\_lues()} (issue~\#345), le contrôle~(3) en deux temps, bonne forme de chaque facteur extrait par \code{facteur\_bien\_forme()}, toutes les colonnes en défaut citées, puis, à défaut d'écart, identité des colonnes de rôle (issue~\#357), refus \code{donnees\_mal\_formees} du module de l'étape, message citant la classe des colonnes en cause sous une entrée de classe exactement \code{data.frame}, \code{details} à neuf champs, dont \code{cause} en premier, le contrôle en défaut (\code{"0"} à \code{"3 b"}~; issue~\#369)~; étape hors des clés de la constante précédente~: erreur de programmation (\code{stop()}), avant tout contrôle~; numéros non contrôlés~; rend \code{TRUE}, invisible~; appelée sous les étapes \code{donnees} et \code{importance\_exclusions} (section~\ref{sec:controles-donnees}, «~Extraction des lignes conservées et son contrôle~»~; issues~\#319, \#322, \#320, \#345, \#357 et~\#369) \\
+\catalogue{fonctions-donnees}{preparer\_donnees()} & interne & données, rôles, valeurs validées \code{p}, segmentation, exclusions, recette validée & fonction d'étape \code{donnees}~: paramètres effectifs, résultat, diagnostics, avertissements~; nombre de lignes des données lu sans dispatch (\code{.row\_names\_info()}~; issue~\#354)~; évaluation des motifs, observations et relevés selon la recette (\code{evaluer\_motifs()} et \code{construire\_observations()} sous \code{lignes\_dates\_completes}, \code{evaluer\_motifs\_agregats()} et \code{observations\_agregats()} sous \code{agregats}, \code{evaluer\_motifs\_stocks()} et \code{observations\_stocks()} sous \code{stocks\_successifs}), squelette commun, qui exclut aussi les lignes de propagation (\code{NULL} hors stocks)~; colonnes de rôle lues par \code{lire\_champ()} (issue~\#140)~; sous une exclusion, lignes conservées extraites par la méthode \code{[} de la classe de l'entrée, puis contrôlées sans dispatch par la fonction précédente (forme, nombre de lignes, colonnes, décompte de chaque colonne, bonne forme de chaque facteur extrait, identité des colonnes de rôle), refus \code{donnees\_mal\_formees} sinon (section~\ref{sec:controles-donnees}~; issues~\#319, \#322 et~\#357)~; avant ce contrôle, avec ou sans exclusion, numéros des lignes conservées et exclues confrontés aux lignes reçues, chacune une fois, nombre de lignes lu sans dispatch sur une colonne de rôle (\code{lire\_champ()}, \code{longueur\_lue()}), sinon erreur de programmation (\code{stop()}), inatteignable par une entrée admise (issue~\#372)~; ne contrôle ni les paramètres ni les rôles, contrôlés par \code{construire\_table()} (issues~\#22 et~\#82) \\
 \catalogue{fonctions-donnees}{UNITE\_AGREGAT} & constante & --- & textes de l'avertissement \code{unite\_agregat} (recette \code{agregats}, unité non déterminée), par porteur de la transition (tête, contrat)~; fin révisée par l'issue~\#361 (erreur de sens propre à chaque grandeur, réserve asymptotique~; section~\ref{sec:unite-observation}) \\
 \catalogue{fonctions-donnees}{avertir\_releves\_agregats()} & interne & avertissements, relevés & avertissements des relevés de la recette \code{agregats}, quand les deux expositions sont déclarées~: $E^i < E^c$ (\code{exposition\_initiale\_}\allowbreak\code{inferieure\_centrale}), $E^i - E^c > D$ (\code{complement\_superieur\_}\allowbreak\code{aux\_evenements}), au-delà de la tolérance relative \code{TOLERANCE\_}\allowbreak\code{RELEVES\_AGREGATS}, que le texte de l'avertissement mentionne~; jamais un refus \\
 \catalogue{fonctions-donnees}{avertir\_releves\_stocks()} & interne & avertissements, relevés & avertissements des relevés de la recette \code{stocks\_successifs}~: \code{entrees\_entre\_inventaires} (unités E), \code{evenements\_hors\_fenetre} (unités HF)~; le relevé des unités ES est averti par l'étape \code{exposition}~; jamais un refus \\
@@ -10881,7 +11095,7 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{axe\_temporel\_table()} & interne & table & prédicat unique de l'axe d'une table d'après ses noms de colonnes (lus par \code{attr()})~: \code{annee}, \code{generation} ou \code{NA}~; un objet aux deux colonnes est rendu comme une table à \code{annee}~; lu par le constructeur, l'empreinte de table, l'état d'une table reçue (issue~\#253), les contrôles d'entrée des étapes qui lisent une table et la loi effective du simulateur (issue~\#272) \\
 \catalogue{fonctions-donnees}{groupes\_cites\_table()} & interne & sexes, axe, valeurs de l'axe & groupe cité dans les refus du constructeur~: «~H~», «~H, année 1950~» ou «~F, génération 1950~»~; aide de message, seule définition du format (issues~\#270 et~\#272) \\
 \catalogue{fonctions-donnees}{lignes\_citees\_table()} & interne & lignes reçues, sexes, axe, valeurs de l'axe, âges & lignes citées avec leur groupe et leur âge («~2 (H, année 1950, âge 1)~»), séparées par des virgules, au plus \code{NB\_LIGNES\_CITEES} choisies par l'appelant~; aide de message (issue~\#270) \\
-\catalogue{fonctions-donnees}{table\_reference()} & exportée & table, nom, statut, source, paramètres, forme d'origine & objet \code{table\_reference} contrôlé, lignes dans l'ordre canonique (sexe, axe temporel, âge), noms de lignes automatiques~; au plus un axe temporel, \code{annee} ou \code{generation}, refus \code{table\_annee\_et\_generation} des deux (issue~\#272)~; table transcrite en $l_x$ convertie en $q_x = (l_x - l_{x+1})/l_x$ par groupe (sexe, axe), dernier âge de chaque groupe sans ligne, premier $l_x$ nul qui clôt le groupe, refus des $l_x$ non décroissants par paires d'âges (issues~\#146 et~\#272)~; nom réservé aux tables embarquées pour les statuts \code{importee} et \code{synthetique} (issue~\#263)~; nom, source, paramètres (noms et valeurs caractère, à toute profondeur) et classe de la table sans encodage \code{bytes}, refusés sous \code{table\_nom\_manquant}, \code{table\_source\_manquante}, \code{table\_parametres\_}\allowbreak\code{manquants} et \code{table\_mal\_formee} (section~\ref{sec:table-reference}~; issues~\#158 et~\#256)~; liste des colonnes de la longueur de ses noms, jugée avant toute lecture de colonne par \code{colonnes\_lues()}, sinon \code{table\_mal\_formee} (issue~\#355) \\
+\catalogue{fonctions-donnees}{table\_reference()} & exportée & table, nom, statut, source, paramètres, forme d'origine & objet \code{table\_reference} contrôlé, lignes dans l'ordre canonique (sexe, axe temporel, âge), noms de lignes automatiques~; au plus un axe temporel, \code{annee} ou \code{generation}, refus \code{table\_annee\_et\_generation} des deux (issue~\#272)~; table transcrite en $l_x$ convertie en $q_x = (l_x - l_{x+1})/l_x$ par groupe (sexe, axe), dernier âge de chaque groupe sans ligne, premier $l_x$ nul qui clôt le groupe, refus des $l_x$ non décroissants par paires d'âges (issues~\#146 et~\#272)~; nom réservé aux tables embarquées pour les statuts \code{importee} et \code{synthetique} (issue~\#263)~; nom, source, paramètres (noms et valeurs caractère, à toute profondeur) et classe de la table sans encodage \code{bytes}, refusés sous \code{table\_nom\_manquant}, \code{table\_source\_manquante}, \code{table\_parametres\_}\allowbreak\code{manquants} et \code{table\_mal\_formee} (section~\ref{sec:table-reference}~; issues~\#158 et~\#256)~; longueur des paramètres lue sans dispatch (\code{longueur\_lue()}) et classe des paramètres sans élément d'encodage \code{bytes}, sinon \code{table\_parametres\_}\allowbreak\code{manquants}, \code{details\$classe} la classe reçue (issue~\#392)~; liste des colonnes de la longueur de ses noms, jugée avant toute lecture de colonne par \code{colonnes\_lues()}, sinon \code{table\_mal\_formee} (issue~\#355)~; nombre de lignes du refus \code{table\_vide} lu sans dispatch (\code{.row\_names\_info()}~; section~\ref{sec:rapport-fige}, «~Lecture sans dispatch~»~; issue~\#367)~; nombre de lignes de chaque colonne comparé à celui des noms de lignes (\code{decomptes\_colonnes()} sous \code{par\_methode = FALSE}, liste classée sans \code{dim} non comptée), sinon \code{table\_mal\_formee}, \code{details} à cinq clés, avant \code{table\_colonne\_manquante} et \code{table\_vide} (issue~\#368) \\
 \catalogue{fonctions-donnees}{etat\_table\_reference()} & interne & objet reçu comme table de référence & \code{NULL} si l'objet est celui que rendrait \code{table\_reference()} pour ses colonnes et ses métadonnées, sinon le premier écart, liste (\code{constat}, \code{lu}, \code{attendu}, \code{motif\_constructeur})~; ne refuse pas, l'appelant refuse~; dans l'ordre~: classe exacte lue par \code{attr()}, noms de colonnes, pour une liste cohérence des colonnes et de leurs noms (\code{colonnes\_lues()}, avant toute lecture de colonne), reconstruction par \code{table\_reference()} sous \code{tryCatch()} (refus du constructeur cité par son motif~; erreur R, par exemple sur une colonne de classe \code{bytes}~: objet non reconstructible), \code{identical()} à la reconstruction~; seule lecture de cette règle, appelée par le contrôle de forme des tables reçues (points~(a) à~(c) du contrôle~1, section~\ref{sec:tables-reference-recues}) et par la loi effective du simulateur (section~\ref{sec:loi-vraie}, «~Table reçue~»~; issues~\#253 et~\#365) \\
 \catalogue{fonctions-donnees}{DECLARATIONS\_TABLES\_EMBARQUEES} & constante & --- & déclaration fermée des tables embarquées, \code{data.frame} nu~: \code{nom}, \code{identifiant} (de fichier), \code{sexe} (modalité déclarée), \code{format} (entier, 1 ou 2, déclaré et non déduit~; issue~\#272), une ligne par table dans l'ordre du catalogue (section~\ref{sec:table-reference}, «~Tables embarquées~») \\
 \catalogue{fonctions-donnees}{DOSSIER\_TABLES\_EMBARQUEES} & constante & --- & \code{inst/extdata/tables}, dossier des tables embarquées relatif à la racine des sources \\
@@ -18643,8 +18857,8 @@ l'entrée, comme la préparation des données (décision M499, (a)), puis
 contrôle chaque extraction par \code{controler\_lignes\_extraites()},
 sous l'étape \code{importance\_exclusions}, avant de la passer à
 \code{evaluer\_motifs()} ou à \code{construire\_observations()}~: mêmes
-contrôles~(0) à~(3), bonne forme du facteur extrait~(3~a) comprise (issue~\#357), mêmes constats et mêmes huit champs de
-\code{details} que sous l'étape \code{donnees}, refus
+contrôles~(0) à~(3), bonne forme du facteur extrait~(3~a) comprise (issue~\#357), mêmes constats et mêmes neuf champs de
+\code{details}, dont \code{cause} (issue~\#369), que sous l'étape \code{donnees}, refus
 \code{donnees\_mal\_formees} sous le module
 \code{importance\_exclusions}, message propre à l'étape par son seul sujet
 (section~\ref{sec:controles-donnees}, «~Extraction des lignes conservées
@@ -21656,7 +21870,14 @@ distincts, «~number of items to replace is not a multiple of replacement
 length~» et «~longer object length is not a multiple of shorter object
 length~»~; elle n'en lève plus aucun depuis, \emph{constat} de
 mesure), et faisait citer par le rejeu un nombre de lignes
-et de colonnes faux. Une garde mécanique,
+et de colonnes faux. Depuis l'issue~\#372, une lecture faussée du
+nombre de lignes dans \code{preparer\_donnees()} n'y produirait plus ni
+résultat faux ni erreur R, mais l'erreur de programmation d'une garde
+qui confronte les numéros des lignes conservées et exclues au nombre de
+lignes lu sur une colonne de rôle (section~\ref{sec:controles-donnees},
+«~Extraction des lignes conservées et son contrôle~»~; \emph{constat}
+des tests, sur la copie de la fonction qui relit \code{nrow()}, sous les
+trois recettes). Une garde mécanique,
 \code{tests/unitaires/test\_lignes\_sans\_dispatch.R}, relève sur
 l'arbre syntaxique de \code{R/*.R} (commentaires et chaînes exclus) les
 appels de \code{nrow()} et de \code{ncol()} dont l'argument est
@@ -21668,7 +21889,9 @@ démontrée pour toute méthode~: classe de test dont la méthode
 la fonction visée, un test par fonction et par recette où elle est
 appelée, résultat et fiche \code{identical()} à ceux de la même
 classe sans mensonge, et contrôle, par site, qu'une copie de la fonction qui relit
-\code{nrow()} produit l'effet d'avant~; méthode qui ment partout sauf
+\code{nrow()} produit l'effet d'avant (pour \code{preparer\_donnees()},
+depuis l'issue~\#372, l'erreur de programmation de la garde de cette
+issue)~; méthode qui ment partout sauf
 dans le contrôle, sur le jeu en lignes des tests du module
 \code{donnees}~: empreinte des données, étapes et fiche identiques à
 celles du \code{data.frame} nu, hors la classe des lignes conservées,
@@ -21677,7 +21900,37 @@ qui précède l'issue, \code{c0b719c}, où la même entrée arrête la
 construction sur une erreur R). La garde ne voit que \code{nrow()} et
 \code{ncol()} appliqués à l'argument nommé \code{donnees}~:
 \code{dim()}, \code{NROW()} ou une lecture sous un autre nom lui
-échappent et relèvent de la relecture. L'écriture de la fiche
+échappent et relèvent de la relecture. Deux fonctions exportées du
+module \code{donnees}, qui reçoivent une table et non l'entrée de la
+construction, lisent de même leur nombre de lignes par
+\code{.row\_names\_info(, 2L)} (issue~\#367)~: \code{empiler\_stocks()},
+pour le nombre de lignes de \code{inventaires} et celui de
+\code{evenements}, qui placent les lignes de chaque table dans la table
+empilée (section~\ref{sec:controles-donnees}, «~Empilement des deux
+tables~»), et \code{table\_reference()}, pour le refus \code{table\_vide}
+(section~\ref{sec:table-reference}). Avant l'issue, elles lisaient
+\code{nrow()}. Sous une méthode \code{dim()} qui compte une ligne de
+trop, posée sur l'une de deux tables de trois lignes,
+\code{empiler\_stocks()} rendait sept lignes au lieu de six, sans
+refus~: une quatrième ligne d'inventaire, aux colonnes de données toutes
+manquantes, la méthode étant posée sur \code{inventaires}~; une septième
+ligne qui répète la première ligne d'événement, avec deux avertissements
+de R («~number of items to replace is not a multiple of replacement
+length~»), la méthode étant posée sur \code{evenements}. Sous une méthode
+\code{dim()} qui rend zéro ligne, \code{table\_reference()} refusait sous
+\code{table\_vide} une table de six lignes (\emph{constat} de mesure sur
+le code qui précède l'issue, \code{18b4604}, R~4.3.3). Depuis, la table
+empilée est \code{identical()} à celle des mêmes tables sans classe
+propre, sans avertissement, et la table de référence est admise~; une
+table vraiment vide, aux colonnes de longueur nulle, reste refusée sous
+\code{table\_vide} (\emph{constat} de mesure sur l'état de la branche,
+mêmes tables). Une seconde garde du même fichier de tests relève, dans le
+corps de ces deux fonctions, tout appel de \code{nrow()} et de
+\code{ncol()}, quel que soit l'argument, et n'en admet aucun.
+\textbf{Statut}~: \emph{lecture} du code et \emph{constat} des tests,
+R~4.3.3, non propriété démontrée pour toute méthode~; \code{dim()},
+\code{NROW()} ou une lecture dans une fonction appelée échappent aussi à
+cette garde. L'écriture de la fiche
 (\code{ecrire\_fiche()}) en suit la règle pour le corps, écrit par
 \code{texte\_objet()}~; le rappel de \code{version\_fiche} et de la
 représentation dans son en-tête lit la longueur par \code{length()}, que
@@ -22906,8 +23159,12 @@ test en sous-processus,
 table de décès puis de rachat), une sous-classe ou un \code{data.frame}
 simple, des lignes permutées, une colonne ajoutée, un attribut retiré ou
 porté à une valeur que le constructeur refuse (par exemple un nom ou une
-valeur caractère d'encodage \code{bytes} dans les paramètres, motif
-\code{table\_parametres\_manquants} cité~; issue~\#256~; un niveau de
+valeur caractère d'encodage \code{bytes} dans les paramètres, ou une
+classe d'encodage \code{bytes} des paramètres eux-mêmes, motif
+\code{table\_parametres\_manquants} cité~; issues~\#256 et~\#392, la
+seconde ayant remplacé un refus sans motif du constructeur,
+\code{details\$motif\_constructeur} à \code{NA}, \emph{constat} de
+mesure sur \code{24bbd41}, R~4.3.3~; un niveau de
 facteur ou des \code{dimnames} d'un paramètre, que le constructeur ne lit
 pas, passent ce contrôle, le simulateur n'écrivant aucune fiche), un $q_x$ porté
 hors de $[0, 1]$ (motif \code{table\_qx\_hors\_bornes} cité).
