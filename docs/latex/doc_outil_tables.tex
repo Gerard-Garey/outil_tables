@@ -44,7 +44,7 @@
 % Date fixe, mise a jour a la main a chaque modification du document
 % (docs/latex/CONVENTIONS.md, section 1) : jamais \today, qui ferait
 % dependre le PDF du jour de compilation.
-\newcommand{\datedoc}{26/11/2026}
+\newcommand{\datedoc}{27/11/2026}
 \newcommand{\versiondoc}{0.1}
 \newcommand{\statutdoc}{Projet}
 % Titre court utilise dans le pied de page (fancyhdr).
@@ -955,8 +955,9 @@ contrôle du rapport figé, le rejeu outillé, le constructeur des tables de
 référence et le simulateur les emploient, et refusent sous un motif nommé,
 à toute position du nom ou de l'élément \code{bytes} dans la classe (pour
 le simulateur, une classe \code{bytes} de la loi vraie ou de la table d'une
-de ses lois seulement~; un nom de colonne \code{bytes} de cette table reste
-hors de cette règle, ci-dessous)~:
+de ses lois seulement~; un nom de colonne \code{bytes} de cette table, ou
+une colonne de classe \code{bytes}, relève du contrôle de la table reçue,
+ci-dessous)~:
 \code{donnees\_mal\_formees} pour des données de classe \code{bytes},
 \code{details\$classe} portant la classe reçue (issue~\#150)~;
 \code{type\_incompatible} pour une colonne de rôle de classe \code{bytes},
@@ -1030,16 +1031,19 @@ qui précède l'issue, \code{etats\_evenements\_exclus()} appelée
 directement, sous les locales C et C.UTF-8). Les fonctions exportées
 n'atteignent pas ces lectures~: \code{construire\_table()} et le rejeu
 refusent ce nom avant la première étape, au calcul des empreintes
-(\code{chaine\_codage\_bytes}, module \code{rapport}). Reste hors de
-cette règle un cas que la
-fonction exportée \code{simuler\_portefeuille()} atteint~: une table d'une
-loi de la loi vraie dont un nom de colonne (\code{age}, \code{sexe} ou
-\code{qx}) est d'encodage \code{bytes} fait lever l'erreur R à la lecture
-\code{tab\$sexe} de \code{loi\_effective()} (module \code{simulation})
-au lieu d'un refus nommé (\emph{constat} de la revue finale de l'audit,
-remesuré sous les locales C et C.UTF-8 pour chacune des trois colonnes~;
-défaut antérieur, hors du champ de l'issue~\#150, qui porte sur les
-classes~; issue proposée au mainteneur).
+(\code{chaine\_codage\_bytes}, module \code{rapport}). La
+fonction exportée \code{simuler\_portefeuille()} atteignait un cas resté
+hors de cette règle~: une table d'une loi de la loi vraie dont un nom de
+colonne d'encodage \code{bytes} remplace \code{age}, \code{sexe} ou
+\code{qx} (un nom ASCII n'est jamais marqué \code{bytes} par R) faisait
+lever l'erreur R à la lecture \code{tab\$sexe} de \code{loi\_effective()}
+(module \code{simulation}) au lieu d'un refus nommé (\emph{constat} de la
+revue finale de l'audit de l'issue~\#150, sous les locales C et C.UTF-8
+pour chacune des trois colonnes). Depuis l'issue~\#253, ces noms ne sont
+pas les colonnes du constructeur et la table est refusée sous
+\code{loi\_invalide} avant toute lecture de colonne, par le contrôle de la
+table reçue (section~\ref{sec:loi-vraie}, «~Table reçue~»~; \emph{constat}
+sous les locales C et C.UTF-8, pour chacune des trois colonnes).
 
 \subsection{Avertissements métier}
 \label{sec:avertissements}
@@ -1654,7 +1658,9 @@ usage, est l'objet de l'issue~\#25. Le \textbf{texte produit par le moteur}
 (messages d'avertissement, mentions, hypothèses et statuts de l'étape
 \code{brut}, unité d'exposition, hypothèse de censure, en-tête du texte du
 plan et de la fiche, gabarits des messages de refus, ces derniers par
-\code{formuler()}, section~\ref{sec:refus}) est en outre marqué UTF-8 par
+\code{formuler()}, section~\ref{sec:refus}~; nom des tables synthétiques
+de Gompertz-Makeham et logistique et source des trois tables synthétiques,
+section~\ref{sec:loi-vraie}~; issue~\#156) est en outre marqué UTF-8 par
 \code{texte\_moteur()},
 quelle que soit la locale d'installation ou d'exécution~: sans ce marquage,
 un package installé ou exécuté sous la locale C laissait des chaînes non
@@ -1683,7 +1689,15 @@ l'installation, les plans de référence R1 à R17 sur leur entrée de référen
 écrit, relit et réécrit leur fiche et leur plan, écrit leur rapport figé et,
 pour R1, le bilan du rejeu outillé, complété des cellules des bilans de
 fiches et de données à nom, classe des données ou fichier de provenance
-non ASCII (lignes~1, 6, 10 et~12~; issues~\#142 et~\#296), et cinq
+non ASCII (lignes~1, 6, 10 et~12~; issues~\#142 et~\#296)~; sur
+l'entrée de R1, il exécute en outre trois constructions qui lisent
+chacune une table synthétique (\code{table\_gompertz\_makeham()},
+\code{table\_logistique()} et \code{table\_constante()}~; positionnement
+par SMR sur la clé \code{tv}, sans segmentation~; issue~\#156), en
+écrit, relit et réécrit la fiche et le plan, en écrit le rapport figé, et
+exige que la source de la table lue soit marquée UTF-8 dans la fiche, ainsi
+que le nom, sans chiffre, des deux premières (le nom de la table constante
+est celui de l'appelant)~; il écrit de plus cinq
 messages (deux refus du rejeu
 outillé et deux refus \code{objet\_modifie} du rapport figé, dont trois
 citent des valeurs à caractères de contrôle ou non ASCII, et la citation
@@ -1716,7 +1730,8 @@ obtenus sous les deux locales (tableau~\ref{tab:scripts-controle})~; le
 moindre écart le fait sortir avec un code non nul. Il est une étape bloquante
 du job «~Tests (R 4.3.3)~», distincte des trois batteries. \textbf{Statut}~:
 l'identité des textes est un \emph{constat} sur la machine qui exécute le
-contrôle (la plateforme de référence en CI) et sur ces dix-sept plans, non une
+contrôle (la plateforme de référence en CI), sur ces dix-sept plans et ces
+trois constructions, non une
 propriété démontrée~; il ne couvre ni une locale latin-1 (contrôle
 suivant), ni Windows (issue~\#49), ni des données de l'utilisateur à chaînes
 non ASCII.
@@ -3709,7 +3724,7 @@ Windows. La batterie unitaire garde en outre un échantillon de l'écriture
 recoupée par \code{ecriture\_doubles.R} et les témoins T1 à T3 de
 \code{ecriture\_doubles\_texte.R}, que la CI exécute en entier
 (section~\ref{sec:verifications-rapport}). Pour
-\code{locale\_c.R}, dont l'exécution complète (deux installations, dix-sept plans)
+\code{locale\_c.R}, dont l'exécution complète (deux installations, dix-sept plans et trois constructions synthétiques)
 est une étape de la CI, la batterie ne rejoue que le chemin d'échec bon
 marché~: une racine sans package sort en échec et nomme l'installation
 sous \code{LC\_ALL=C}. Elle charge en outre le script sans le lancer
@@ -4224,7 +4239,10 @@ et~\#296), des bilans à segment de chemin cité entre «~…~» (lignes~8, 11,
 12 et~15~; issue~\#298) et à empreinte du code ou du résultat de forme
 non MD5 (lignes~9, 13 et~15~; issue~\#295), des cellules de la forme F307
 (lignes~9, 13, 14 et~15~; issue~\#307) et messages de refus (marqués UTF-8, sur une ligne~;
-issue~\#94)~; messages de refus par module (neuf modules, dont
+issue~\#94)~; sur l'entrée de R1, trois constructions qui lisent une table
+synthétique (Gompertz-Makeham, logistique, constante), fiche et plan écrits,
+relus et réécrits, rapport figé écrit, source de la table marquée UTF-8, nom
+marqué UTF-8 et sans chiffre pour les deux premières (issue~\#156)~; messages de refus par module (neuf modules, dont
 \code{positionnement}, \code{validation} et \code{homogeneite}, chacun
 contrôlé sur son module et son motif attendus),
 de la lecture du texte du
@@ -4233,12 +4251,12 @@ plan et de deux refus \code{type\_incompatible} sur un rôle date
 «~<xx>~»~; issue~\#127)~; marque UTF-8 de \code{details\$type\_attendu}
 de ces deux refus et des chaînes non ASCII de \code{TYPES\_ADMIS}, de
 \code{LIBELLES\_MOTIFS} et de \code{catalogue\_roles()\$type\_admis},
-avec témoin (issue~\#151)~; puis ces textes (trois par plan, le bilan, les messages
-de R1 et les messages par module~; leur nombre est écrit par la sortie du contrôle), comparés
+avec témoin (issue~\#151)~; puis ces textes (trois par plan et par construction synthétique, le bilan, les messages
+de R1 et les messages par module, soit $3 \times (17 + 3) + 3 = 63$, nombre exigé par le script et écrit par sa sortie), comparés
 octet à octet entre C et UTF-8, sans écart admis (section~\ref{sec:harnais})~; étape bloquante «~Locale C
 (installation et exécution)~» du job «~Tests (R 4.3.3)~», hors liste des
 batteries & ADR 0007, point 11 et annotation du 05/11/2026, (f)~; M54~;
-issues~\#66, \#127, \#142, \#151, \#295, \#296, \#298 et~\#307 \\
+issues~\#66, \#127, \#142, \#151, \#156, \#295, \#296, \#298 et~\#307 \\
 \code{messages\_refus.R} & règle de rédaction des messages de refus
 (section~\ref{sec:refus})~: fichiers de \code{R/} lus par \code{parse()},
 sans charger \code{tablexp}~; gabarit de \code{formuler()} constant, aux
@@ -5111,13 +5129,28 @@ dans cet ordre, au premier défaut (tableau~\ref{tab:refus-tables-reference})~:
     \code{sexe}, \code{qx}, puis l'axe temporel, \code{annee} ou
     \code{generation}, s'il est présent~; une table de génération passe donc
     ce contrôle, puis est refusée par l'étape qui la lit,
-    section~\ref{sec:table-reference}, «~Axe temporel~»)~; (b)~être
+    section~\ref{sec:table-reference}, «~Axe temporel~»), puis, s'il est
+    une liste, autant de colonnes que de noms (\code{colonnes\_lues()},
+    avant toute lecture de colonne~; issue~\#365), faute de quoi il est
+    refusé comme objet modifié, \code{details\$lu} «~data.frame nu non
+    reconstructible~»~; (b)~être
     reconstruit sans refus par \code{table\_reference()} à partir du
     \code{data.frame} nu de ses colonnes et de ses métadonnées~; (c)~être
     \code{identical()} à cette reconstruction (classe, attributs, ordre
     canonique des lignes, valeurs contrôlées)~; (d)~avoir un élément de fiche
     (\code{element\_table\_fiche()}) qui s'écrit dans le texte de la fiche,
-    sous sa clé, et se relit \code{identical()}. La lettre de l'ADR
+    sous sa clé, et se relit \code{identical()}. Les points~(a) à~(c) sont
+    jugés par un assistant du module \code{donnees},
+    \code{etat\_table\_reference()}, seule lecture de cette règle, que la
+    loi effective du simulateur lit aussi (issue~\#253~;
+    section~\ref{sec:loi-vraie}, «~Table reçue~»). Pour une liste plus
+    courte que ses noms (objet de l'issue~\#365), la garde de cohérence ne
+    change pas le refus de \code{construire\_table()}~: sans elle, la
+    reconstruction~(b) levait une erreur R, convertie en ce même refus
+    (\emph{constat} de mesure sur le code qui précède l'issue, R~4.3.3)~;
+    elle exclut toute lecture de colonne d'une telle liste, lecture qui
+    arrêtait R dans le simulateur (section~\ref{sec:loi-vraie}, «~Table
+    reçue~»). La lettre de l'ADR
     n'exigeait que la classe~: la reconstruction garantit qu'une table
     retouchée après le constructeur (lignes permutées, valeur de $q_x$ portée
     hors de $[0, 1]$, attribut ajouté, ou modifié vers une valeur que le
@@ -5134,22 +5167,28 @@ dans cet ordre, au premier défaut (tableau~\ref{tab:refus-tables-reference})~:
     sauf si son nom est celui d'une table du catalogue et son élément de
     fiche celui de cette table, empreinte de table et métadonnées
     comprises). Un attribut \code{nom} ou
-    \code{source} d'encodage \code{bytes} porté sur une table après le
-    constructeur est refusé à la reconstruction~(b), le constructeur le
+    \code{source} d'encodage \code{bytes}, ou un attribut
+    \code{parametres} dont un nom ou une valeur caractère, à toute
+    profondeur, porte cet encodage, posé sur une table après le
+    constructeur, est refusé à la reconstruction~(b), le constructeur le
     refusant (section~\ref{sec:table-reference}, «~Encodage \code{bytes}
     des métadonnées et de la table~»)~: raison «~refusé par
     table\_reference() (motif [motif])~», \code{details\$motif\_constructeur}
-    \code{table\_nom\_manquant} ou \code{table\_source\_manquante},
-    \code{details\$chemin} à \code{NA} (issue~\#158~; l'attribut était
+    \code{table\_nom\_manquant}, \code{table\_source\_manquante} ou
+    \code{table\_parametres\_manquants},
+    \code{details\$chemin} à \code{NA} (issues~\#158 et~\#256~; l'attribut était
     auparavant refusé à l'écriture d'essai~(d), sous
-    \code{chaine\_codage\_bytes}).
-    Un nom ou une valeur d'encodage \code{bytes} dans \code{parametres},
-    que le constructeur ne contrôle pas, est refusé à l'écriture
+    \code{chaine\_codage\_bytes}, avec, pour un paramètre,
+    \code{details\$chemin} \code{[clé]/parametres/[nom]} pour une valeur ou
+    \code{[clé]/parametres/@noms} pour un nom).
+    Un paramètre que le constructeur ne lit pas (fonction, niveau de
+    facteur, \code{dimnames}, classe ou autre attribut d'un paramètre,
+    d'encodage \code{bytes} ou non) est refusé à l'écriture
     d'essai~(d)~: raison «~métadonnée sans écriture exacte dans la fiche
-    (refus chaine\_codage\_bytes, [chemin])~», \code{details\$lu} le motif
+    (refus serialisation\_impossible, [chemin])~», \code{details\$lu} le motif
     de l'écrivain, \code{details\$chemin}
-    \code{[clé]/parametres/[nom]} pour une valeur ou
-    \code{[clé]/parametres/@noms} pour un nom.
+    \code{[clé]/parametres/[nom]} (\code{a/parametres/f} pour une
+    fonction rangée sous le nom \code{f} d'une table de clé \code{a}).
     Un refus du lecteur \code{lire\_texte()} à la relecture~(d) garde de
     même son motif et son chemin (issue~\#165)~: raison «~métadonnée sans
     écriture exacte dans la fiche (refus [motif], [chemin])~»,
@@ -7103,7 +7142,7 @@ locales.\par}
 \catalogue{fonctions-construire-table}{controler\_parametres\_recette()} & interne & plan, recette validée, catalogue des paramètres (injectable pour les tests) & \code{NULL} invisible, ou, étape par étape dans l'ordre du plan, refus \code{parametre\_manquant} (paramètre de la recette retenue absent) puis \code{parametre\_inattendu} (paramètre d'une autre recette présent)~; appelée par \code{controler\_plan\_roles()} après le contrôle de présence de la grille \\
 \catalogue{fonctions-construire-table}{controler\_parametres\_condition()} & interne & nom de l'étape, ses paramètres, son catalogue & \code{NULL} invisible, ou, gouvernant par gouvernant dans l'ordre du catalogue, refus \code{parametre\_manquant} (requis sous la valeur du gouvernant, absent) puis \code{parametre\_inattendu} (requis sous une autre valeur, présent), module \code{construire\_table}~; gouvernant absent ou non contrôlé~: erreur de programmation~; appelée par \code{valider\_plan()} pour chaque étape, après ses gouvernants et avant ses valeurs (section~\ref{sec:plan}) \\
 \catalogue{fonctions-construire-table}{ordres\_canoniques()} & interne & --- & vecteurs d'ordre des champs ensembles du plan, passés à \code{canoniser\_plan()}~: \code{etapes/}\allowbreak\code{coherence\_regularite/}\allowbreak\code{ordres} marqué \code{TRI\_NUMERIQUE} (tri croissant)~; \code{segmentation} (\code{ROLES\_SEGMENTATION}), \code{etapes/}\allowbreak\code{donnees/}\allowbreak\code{exclusions} (\code{c(MOTIFS\_LIGNES,} \code{MOTIFS\_TETE)}), \code{etapes/}\allowbreak\code{brut/}\allowbreak\code{estimateurs} (\code{ESTIMATEURS\_BRUT})~; fonction et non constante, construite à l'appel (section~\ref{sec:fiche}) \\
-\catalogue{fonctions-construire-table}{controler\_forme\_tables()} & interne & argument des tables de référence & \code{NULL} sans table (\code{NULL} ou liste vide), sinon les objets et leurs éléments de fiche, par clé triée par octets~; contrôle~1 de la section~\ref{sec:tables-reference-recues} (forme, classe, reconstruction, identité, écriture et relecture de l'élément), refus \code{tables\_reference\_}\allowbreak\code{mal\_formees}~; partagé par la construction et le rejeu \\
+\catalogue{fonctions-construire-table}{controler\_forme\_tables()} & interne & argument des tables de référence & \code{NULL} sans table (\code{NULL} ou liste vide), sinon les objets et leurs éléments de fiche, par clé triée par octets~; contrôle~1 de la section~\ref{sec:tables-reference-recues} (forme, classe, reconstruction, identité, écriture et relecture de l'élément~; classe, colonnes, cohérence de la liste des colonnes, reconstruction et identité jugées par l'assistant d'état du module \code{donnees}, issues~\#253 et~\#365), refus \code{tables\_reference\_}\allowbreak\code{mal\_formees}~; partagé par la construction et le rejeu \\
 \catalogue{fonctions-construire-table}{cles\_citees()} & interne & plan, chemins des paramètres qui citent une clé & \code{data.frame} (\code{cle}, \code{parametre}) des clés citées par les étapes présentes au plan, dans l'ordre des chemins, une ligne par élément d'un vecteur de clés (vide~: aucune)~; une clé citée deux fois y figure deux fois~; chemins parcourus par \code{lire\_chemin()} (issue~\#301) \\
 \catalogue{fonctions-construire-table}{ecarts\_catalogue()} & interne & élément de fiche d'une table de référence, table du catalogue de même nom & champs en écart, comparés par \code{identical()} à l'élément formé par \code{element\_table\_fiche()}, dans l'ordre de \code{CHAMPS\_TABLE\_FICHE} (vide sans écart), et leurs valeurs brutes de l'élément et du catalogue, sans citation~; assistant commun du refus \code{table\_embarquee\_}\allowbreak\code{discordante} et du témoin «~catalogue~» du rejeu (issue~\#267) \\
 \catalogue{fonctions-construire-table}{controler\_tables\_reference()} & interne & tables reçues, plan~; chemins des paramètres et catalogue (par défaut, les deux constantes de ce rôle) & valeur de \code{fiche\$tables\_reference}~; les quatre contrôles des tables reçues, dans l'ordre (section~\ref{sec:tables-reference-recues}), appelé une fois par \code{construire\_table()} \\
@@ -7489,7 +7528,10 @@ contrôle~(1~bis) d'une extraction de lignes emploie aussi (ci-dessous,
 l'empilement des stocks successifs (\code{empiler\_stocks()},
 ci-dessous) et le constructeur des tables de référence
 (\code{table\_reference()}, section~\ref{sec:table-reference}),
-chacun sous son propre motif (issue~\#355)~: le nombre de
+chacun sous son propre motif (issue~\#355), ainsi que l'état d'une table
+reçue (\code{etat\_table\_reference()}, qui ne refuse pas~: refus de son
+appelant, contrôle des tables reçues ou loi effective du simulateur,
+section~\ref{sec:tables-reference-recues}~; issue~\#365)~: le nombre de
 colonnes sur la liste elle-même, \code{length(unclass(donnees))}, le
 nombre de noms par \code{noms\_colonnes\_lus()} (attribut \code{names}
 lu par \code{attr()}~; un attribut absent vaut autant de noms vides que
@@ -8783,7 +8825,9 @@ forme\_origine)}, exportée pour l'import de tables par l'application~:
     noms compris, ni \code{NA} ni vide (\code{chaine\_unique()},
     section~\ref{sec:fonctions-outils}~; une chaîne nommée est refusée sous le
     motif du champ~; issue~\#48)~---, le nom et la source étant en outre
-    d'un encodage autre que \code{bytes} (ci-dessous), et \code{parametres}~: une liste non vide est \textbf{requise}
+    d'un encodage autre que \code{bytes} (ci-dessous), et \code{parametres}~: une liste non vide, dont aucun
+    nom ni aucune valeur caractère, à toute profondeur, n'est d'encodage
+    \code{bytes} (ci-dessous), est \textbf{requise}
     pour une table synthétique, qui n'a d'autre provenance que sa loi, et
     \textbf{interdite} pour une table embarquée ou importée, qu'elle ferait
     passer pour dérivée d'une loi.
@@ -8794,11 +8838,15 @@ forme\_origine)}, exportée pour l'import de tables par l'application~:
 \textbf{Statut des paramètres d'une table synthétique} (issue~\#163,
 option~(a), décision M279). Les \code{parametres} sont \textbf{déclarés par
 l'appelant, non vérifiés par le moteur}~: \code{table\_reference()} en exige
-une liste non vide sans en contrôler ni la forme ni la cohérence avec les
-$q_x$ (une liste \code{loi = "gompertz\_makeham"} avec $c = 1$ est admise,
+une liste non vide sans en contrôler ni la forme (hormis l'encodage
+\code{bytes} de ses noms et de ses valeurs caractère, ci-dessous,
+«~Encodage \code{bytes} des métadonnées et de la table~»~; issue~\#256)
+ni la cohérence avec les $q_x$ (une liste \code{loi = "gompertz\_makeham"} avec $c = 1$ est admise,
 alors que \code{table\_gompertz\_makeham()} refuse $c = 1$), et le contrôle de
-reconstruction de \code{construire\_table()} admet un attribut modifié après le
-constructeur. Il en va de même d'une table rendue par une loi du package
+reconstruction de \code{construire\_table()}, comme celui du simulateur
+(section~\ref{sec:loi-vraie}, «~Table reçue~»~; issue~\#253), admet un attribut modifié après le
+constructeur, pourvu que celui-ci l'admette (un nom ou une valeur caractère
+d'encodage \code{bytes} y est refusé à la reconstruction). Il en va de même d'une table rendue par une loi du package
 (\code{table\_gompertz\_makeham()}, \code{table\_logistique()},
 \code{table\_constante()}), que le moteur ne distingue pas d'une table
 déclarée par l'appelant. La table entre en valeurs~: l'empreinte de table
@@ -8807,6 +8855,9 @@ métadonnées, et aucune étape ne lit les paramètres~; ils permettent au tiers
 de recalculer la table et de mesurer l'écart (ADR 0015, point~2.3) pour
 autant qu'ils aient été déclarés exactement. Le rapport figé le dit par la
 mention \code{tables\_reference\_parametres} (section~\ref{sec:rapport-fige}).
+Le nom d'une table de Gompertz-Makeham ou logistique ne porte pas ses
+paramètres~: ils ne se lisent que dans ce champ (section~\ref{sec:loi-vraie},
+«~Nom et source~»~; issue~\#156).
 \code{tests/unitaires/test\_invariance\_parametres\_table.R} vérifie
 l'affirmation (issue~\#257)~: sous un plan par étape qui lit une table
 (\code{positionnement}, \code{validation}, \code{importance\_exclusions}, qui
@@ -8820,8 +8871,10 @@ la fiche entière~; une lecture des paramètres injectée dans chacune des quatr
 dans l'arbre syntaxique de \code{R/} relève les lectures de l'attribut, hors
 écritures (\code{attr()} au nom exact, partiel ou non littéral,
 \code{attributes()} suivi de \code{\$}, \code{[[ ]]} ou \code{[ ]})~: il n'y en a
-que deux, l'une à la reconstruction du contrôle de forme des tables reçues
-(\code{controler\_forme\_tables()}, section~\ref{sec:tables-reference-recues}),
+que deux, l'une à la reconstruction de l'état d'une table reçue
+(\code{etat\_table\_reference()}, module \code{donnees}, que lisent le
+contrôle de forme des tables reçues, section~\ref{sec:tables-reference-recues},
+et la loi effective du simulateur~; issue~\#253),
 l'autre à la formation de l'élément de fiche (\code{element\_table\_fiche()}),
 aucune dans une étape. Une lecture indirecte (\code{do.call()},
 \code{getElement()}, attributs rangés dans une variable) échappe à cette
@@ -8938,11 +8991,14 @@ version ne changent (ADR 0019, point~1.6).
     erreur R sur une classe d'encodage \code{bytes}), ou \code{NA} sans
     axe~; un objet qui porterait les deux colonnes, que le constructeur
     refuse, est rendu comme une table à \code{annee}, jamais comme une table
-    sans axe. Le lisent~: \code{empreinte\_table()}, le contrôle de forme
-    des tables reçues (\code{controler\_forme\_tables()}), les contrôles
-    d'entrée du positionnement, de la validation et de la cohérence et
-    régularité, et la loi effective du simulateur
-    (\code{loi\_effective()})~; ajouter un axe touchera la constante et le
+    sans axe. Le lisent~: le constructeur \code{table\_reference()},
+    \code{empreinte\_table()}, l'état d'une table reçue
+    (\code{etat\_table\_reference()}, que lisent le contrôle de forme des
+    tables reçues et la loi effective du simulateur~; issue~\#253), les
+    contrôles d'entrée du positionnement, de la validation et de la
+    cohérence et régularité, et la loi effective du simulateur
+    (\code{loi\_effective()}), qui refuse une table à axe avant d'en juger
+    l'état~; ajouter un axe touchera la constante et le
     constructeur, admettre une table de génération dans une étape touchera
     cette étape seule (ADR 0019, point~2.4).
   \item \textbf{Aucune étape de cette version ne lit une table de
@@ -8969,7 +9025,7 @@ version ne changent (ADR 0019, point~1.6).
 \medskip
 \noindent
 \textbf{Encodage \code{bytes} des métadonnées et de la table}
-(issue~\#158, règle de l'issue~\#128). Une chaîne d'encodage
+(issues~\#158 et~\#256, règle de l'issue~\#128). Une chaîne d'encodage
 \code{bytes} ne se convertit pas en UTF-8 sans deviner. Le nom et la
 source passent \code{chaine\_unique()}, qui admet une chaîne
 \code{bytes} (type \code{character}, aucun attribut), et
@@ -9026,11 +9082,32 @@ ment, arrêtait R par une erreur de segmentation (lecture de
 à ses noms (\emph{constat} de mesure sur le code qui précède
 l'issue, R~4.3.3), ou \code{table\_vide} pour une liste sans ligne
 (\emph{constat} de mesure de la revue finale sur le code qui précède
-l'issue, R~4.3.3). Les noms et les valeurs de
-\code{parametres} ne sont pas contrôlés par le constructeur~: une chaîne
-\code{bytes} y est refusée par l'écriture d'essai du contrôle des tables
-reçues (section~\ref{sec:tables-reference-recues}, «~Contrôle des tables reçues~», point~1~(d)),
-avant tout calcul.
+l'issue, R~4.3.3). Les \code{parametres} d'une table synthétique
+s'écrivent eux aussi dans la fiche~; un nom ou une valeur d'encodage
+\code{bytes} y était refusé par l'écriture d'essai du contrôle des tables
+reçues (section~\ref{sec:tables-reference-recues}, «~Contrôle des tables reçues~», point~1~(d),
+\code{chaine\_codage\_bytes}), avant toute étape. Depuis l'issue~\#256,
+le constructeur le refuse dès l'entrée, par la même règle que le nom et
+la source, sous \code{table\_parametres\_manquants}, sans lire les octets
+ni citer les paramètres (\code{details} vide)~: «~Table synthétique «~[nom]~»~: ses
+paramètres portent un nom ou une valeur d'encodage «~bytes~» (à toute
+profondeur), non convertible en UTF-8 sans deviner~: ils ne sont pas
+lus. Passer des paramètres (liste non vide) sans encodage bytes.~». Ce
+contrôle suit, dans l'étape «~paramètres~» de l'ordre ci-dessus, ceux de
+la présence des paramètres (\code{table\_parametres\_manquants} pour une
+table synthétique sans liste non vide, \code{table\_parametres\_inattendus}
+pour une table embarquée ou importée qui en porte). Il lit, à toute
+profondeur de la liste, les noms (\code{noms\_bytes()}) et les valeurs des
+vecteurs caractère, et rien d'autre~: les niveaux d'un facteur, les
+\code{dimnames}, la classe et les autres attributs d'un paramètre ne sont
+pas lus par le constructeur et relèvent de l'écrivain de la fiche, qui les
+refuse à l'écriture d'essai~(d) sous \code{serialisation\_impossible},
+qu'ils soient d'encodage \code{bytes} ou non. Le parcours se fait par
+niveaux de la liste, sans appel récursif ni dispatch sur la classe~: une
+liste de profondeur $10^5$ ne lève pas d'erreur R au constructeur
+(\emph{constat} de mesure, R~4.3.3), sa profondeur, au-delà de
+\code{PROFONDEUR\_MAX\_TEXTE}, étant refusée à l'écriture d'essai~(d), sous
+\code{serialisation\_impossible}.
 
 \medskip
 \noindent
@@ -10758,7 +10835,7 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{classes\_colonnes\_citees()} & interne & positions citées, classes des colonnes & classes distinctes des colonnes citées (au plus \code{NB\_LIGNES\_CITEES}), jointes par «~,~»~: conseil du refus d'une extraction fausse sous une entrée de classe exactement \code{data.frame} (issue~\#319) \\
 \catalogue{fonctions-donnees}{colonnes\_classe\_citees()} & interne & noms de colonnes, leurs classes & «~«~nom~» (classe c)~», joints par «~,~»~: colonnes de rôle citées par le contrôle~(3) de l'extraction sous une entrée de classe exactement \code{data.frame} (issue~\#319) \\
 \catalogue{fonctions-donnees}{noms\_colonnes\_lus()} & interne & liste & noms des colonnes, lus sans dispatch (\code{attr()}), chaînes vides à défaut~; seule lecture des noms de colonnes de la fonction \code{decomptes\_colonnes()}, de la fonction suivante et du contrôle d'une extraction de lignes (issues~\#319, \#322 et~\#344) \\
-\catalogue{fonctions-donnees}{colonnes\_lues()} & interne & liste & cohérence de la liste des colonnes et de ses noms, lue sans dispatch, seule lecture de cette règle~: nombre de colonnes (\code{length(unclass())}), nombre de noms (fonction précédente~; attribut absent~: accord), et leur égalité~; rend une liste à trois éléments, les deux nombres en \code{integer} et l'accord~; appelée par le contrôle des décomptes de lignes, par le contrôle d'une extraction de lignes, par \code{decomptes\_colonnes()}, par \code{empiler\_stocks()} et par \code{table\_reference()} (section~\ref{sec:controles-donnees}, «~Liste des colonnes et noms de colonnes de longueurs différentes~»~; issues~\#344 et~\#355) \\
+\catalogue{fonctions-donnees}{colonnes\_lues()} & interne & liste & cohérence de la liste des colonnes et de ses noms, lue sans dispatch, seule lecture de cette règle~: nombre de colonnes (\code{length(unclass())}), nombre de noms (fonction précédente~; attribut absent~: accord), et leur égalité~; rend une liste à trois éléments, les deux nombres en \code{integer} et l'accord~; appelée par le contrôle des décomptes de lignes, par le contrôle d'une extraction de lignes, par \code{decomptes\_colonnes()}, par \code{empiler\_stocks()}, par \code{table\_reference()} et par \code{etat\_table\_reference()} (section~\ref{sec:controles-donnees}, «~Liste des colonnes et noms de colonnes de longueurs différentes~»~; issues~\#344, \#355 et~\#365) \\
 \catalogue{fonctions-donnees}{constat\_colonnes\_lues()} & interne & rendu de la fonction précédente & constat d'une liste incohérente, «~liste de N colonne(s) pour M nom(s) de colonne~», formé une fois et cité tel quel par le refus du contrôle des décomptes de lignes, par celui du contrôle~(1~bis) d'une extraction de lignes, où il remplace tout le constat des noms, et par les refus \code{empilement\_}\allowbreak\code{table\_invalide} et \code{table\_mal\_formee} d'une liste incohérente (issues~\#344, \#345 et~\#355) \\
 \catalogue{fonctions-donnees}{premiere\_ecart\_colonnes()} & interne & noms des colonnes extraites et de l'entrée, décomptes des colonnes extraites, nombre de lignes attendu, indicateur des éléments \code{NULL} & première position écartée du contrôle~(1~bis) de l'extraction~: plus petite des positions où le nom diffère, où le décompte de la colonne extraite n'est pas celui attendu ou est illisible, et où une colonne manque ou excède~; indique si une autre position écartée la suit, l'élément extrait à la première étant \code{NULL} (extraction décalée) ou non~; \code{NULL} sans écart (issue~\#319) \\
 \catalogue{fonctions-donnees}{colonnes\_ecart\_citees()} & interne & noms des colonnes extraites et de l'entrée, première position écartée (\code{NULL} par défaut) & morceaux du constat du contrôle~(1~bis)~: nombre de colonnes s'il diffère, colonnes absentes et en trop (au plus \code{NB\_LIGNES\_CITEES} de chaque sorte, puis leur nombre restant), colonnes sans nom comptées, à défaut d'écart de noms «~mêmes noms de colonnes, dans un autre ordre ou répétés~»~; puis la colonne de l'entrée à la première position écartée, avec sa position et sa classe, et la mention du décalage ou des autres écarts~; appelée sur une extraction dont la liste des colonnes a la longueur de ses noms seulement, une liste incohérente recevant le constat de \code{constat\_colonnes\_lues()} (section~\ref{sec:controles-donnees}~; issues~\#319 et~\#345) \\
@@ -10801,10 +10878,11 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{FORMES\_ORIGINE} & constante & --- & \code{qx}, \code{lx} \\
 \catalogue{fonctions-donnees}{controler\_nom\_reserve()} & interne & nom, statut, noms réservés (par défaut, les noms de la déclaration des tables embarquées) & refus \code{table\_nom\_reserve} (module \code{donnees}) d'une table de statut \code{importee} ou \code{synthetique} qui porte, à l'identique, le nom d'une table déclarée~; appelé par le constructeur après le contrôle du statut (section~\ref{sec:table-reference}, «~Nom réservé~»~; issue~\#263) \\
 \catalogue{fonctions-donnees}{AXES\_TEMPORELS\_TABLE} & constante & --- & \code{annee}, \code{generation}~: axes temporels d'une table de référence, au plus un par table (section~\ref{sec:table-reference}, «~Axe temporel~»~; ADR 0019, point~2.1) \\
-\catalogue{fonctions-donnees}{axe\_temporel\_table()} & interne & table & prédicat unique de l'axe d'une table d'après ses noms de colonnes (lus par \code{attr()})~: \code{annee}, \code{generation} ou \code{NA}~; un objet aux deux colonnes est rendu comme une table à \code{annee}~; lu par l'empreinte de table, le contrôle de forme des tables reçues, les contrôles d'entrée des étapes qui lisent une table et la loi effective du simulateur (issue~\#272) \\
+\catalogue{fonctions-donnees}{axe\_temporel\_table()} & interne & table & prédicat unique de l'axe d'une table d'après ses noms de colonnes (lus par \code{attr()})~: \code{annee}, \code{generation} ou \code{NA}~; un objet aux deux colonnes est rendu comme une table à \code{annee}~; lu par le constructeur, l'empreinte de table, l'état d'une table reçue (issue~\#253), les contrôles d'entrée des étapes qui lisent une table et la loi effective du simulateur (issue~\#272) \\
 \catalogue{fonctions-donnees}{groupes\_cites\_table()} & interne & sexes, axe, valeurs de l'axe & groupe cité dans les refus du constructeur~: «~H~», «~H, année 1950~» ou «~F, génération 1950~»~; aide de message, seule définition du format (issues~\#270 et~\#272) \\
 \catalogue{fonctions-donnees}{lignes\_citees\_table()} & interne & lignes reçues, sexes, axe, valeurs de l'axe, âges & lignes citées avec leur groupe et leur âge («~2 (H, année 1950, âge 1)~»), séparées par des virgules, au plus \code{NB\_LIGNES\_CITEES} choisies par l'appelant~; aide de message (issue~\#270) \\
-\catalogue{fonctions-donnees}{table\_reference()} & exportée & table, nom, statut, source, paramètres, forme d'origine & objet \code{table\_reference} contrôlé, lignes dans l'ordre canonique (sexe, axe temporel, âge), noms de lignes automatiques~; au plus un axe temporel, \code{annee} ou \code{generation}, refus \code{table\_annee\_et\_generation} des deux (issue~\#272)~; table transcrite en $l_x$ convertie en $q_x = (l_x - l_{x+1})/l_x$ par groupe (sexe, axe), dernier âge de chaque groupe sans ligne, premier $l_x$ nul qui clôt le groupe, refus des $l_x$ non décroissants par paires d'âges (issues~\#146 et~\#272)~; nom réservé aux tables embarquées pour les statuts \code{importee} et \code{synthetique} (issue~\#263)~; nom, source et classe de la table sans encodage \code{bytes}, refusés sous \code{table\_nom\_manquant}, \code{table\_source\_manquante} et \code{table\_mal\_formee} (section~\ref{sec:table-reference}~; issue~\#158)~; liste des colonnes de la longueur de ses noms, jugée avant toute lecture de colonne par \code{colonnes\_lues()}, sinon \code{table\_mal\_formee} (issue~\#355) \\
+\catalogue{fonctions-donnees}{table\_reference()} & exportée & table, nom, statut, source, paramètres, forme d'origine & objet \code{table\_reference} contrôlé, lignes dans l'ordre canonique (sexe, axe temporel, âge), noms de lignes automatiques~; au plus un axe temporel, \code{annee} ou \code{generation}, refus \code{table\_annee\_et\_generation} des deux (issue~\#272)~; table transcrite en $l_x$ convertie en $q_x = (l_x - l_{x+1})/l_x$ par groupe (sexe, axe), dernier âge de chaque groupe sans ligne, premier $l_x$ nul qui clôt le groupe, refus des $l_x$ non décroissants par paires d'âges (issues~\#146 et~\#272)~; nom réservé aux tables embarquées pour les statuts \code{importee} et \code{synthetique} (issue~\#263)~; nom, source, paramètres (noms et valeurs caractère, à toute profondeur) et classe de la table sans encodage \code{bytes}, refusés sous \code{table\_nom\_manquant}, \code{table\_source\_manquante}, \code{table\_parametres\_}\allowbreak\code{manquants} et \code{table\_mal\_formee} (section~\ref{sec:table-reference}~; issues~\#158 et~\#256)~; liste des colonnes de la longueur de ses noms, jugée avant toute lecture de colonne par \code{colonnes\_lues()}, sinon \code{table\_mal\_formee} (issue~\#355) \\
+\catalogue{fonctions-donnees}{etat\_table\_reference()} & interne & objet reçu comme table de référence & \code{NULL} si l'objet est celui que rendrait \code{table\_reference()} pour ses colonnes et ses métadonnées, sinon le premier écart, liste (\code{constat}, \code{lu}, \code{attendu}, \code{motif\_constructeur})~; ne refuse pas, l'appelant refuse~; dans l'ordre~: classe exacte lue par \code{attr()}, noms de colonnes, pour une liste cohérence des colonnes et de leurs noms (\code{colonnes\_lues()}, avant toute lecture de colonne), reconstruction par \code{table\_reference()} sous \code{tryCatch()} (refus du constructeur cité par son motif~; erreur R, par exemple sur une colonne de classe \code{bytes}~: objet non reconstructible), \code{identical()} à la reconstruction~; seule lecture de cette règle, appelée par le contrôle de forme des tables reçues (points~(a) à~(c) du contrôle~1, section~\ref{sec:tables-reference-recues}) et par la loi effective du simulateur (section~\ref{sec:loi-vraie}, «~Table reçue~»~; issues~\#253 et~\#365) \\
 \catalogue{fonctions-donnees}{DECLARATIONS\_TABLES\_EMBARQUEES} & constante & --- & déclaration fermée des tables embarquées, \code{data.frame} nu~: \code{nom}, \code{identifiant} (de fichier), \code{sexe} (modalité déclarée), \code{format} (entier, 1 ou 2, déclaré et non déduit~; issue~\#272), une ligne par table dans l'ordre du catalogue (section~\ref{sec:table-reference}, «~Tables embarquées~») \\
 \catalogue{fonctions-donnees}{DOSSIER\_TABLES\_EMBARQUEES} & constante & --- & \code{inst/extdata/tables}, dossier des tables embarquées relatif à la racine des sources \\
 \catalogue{fonctions-donnees}{fichier\_table\_embarquee()} & interne & identifiant & chemin \code{<dossier>/}\allowbreak\code{<identifiant>.csv} du fichier de table \\
@@ -22766,9 +22844,9 @@ porte, à toute position, un élément de cet encodage est refusée
 (\code{loi\_invalide}) par un message propre, qui cite la classe sous le
 repère de la règle unique (section~\ref{sec:refus}) et demande l'objet
 rendu par \code{table\_reference()}, sans modification~: ce contrôle,
-fait par \code{classe\_bytes()}, précède celui de la classe
-\code{table\_reference}, dont \code{inherits()} lèverait une erreur R
-(\code{loi\_effective()}~; issue~\#150). Pour un sexe $s$, la loi effective est
+fait par \code{classe\_bytes()}, précède tout autre contrôle de la table,
+une lecture de la classe par \code{inherits()} levant une erreur R sur une
+telle classe (\code{loi\_effective()}~; issue~\#150). Pour un sexe $s$, la loi effective est
 \[
   q^{s}_x = \min\bigl(f_s\, q_x,\ 1\bigr),
 \]
@@ -22781,6 +22859,91 @@ ADR 0019, point~2.3). Seuls les sexes
 effectivement tirés (proportion d'hommes non nulle pour \code{H}, différente
 de 1 pour \code{F}) sont construits et contrôlés~; ils sont consignés dans
 \code{sexes\_controles}.
+
+\medskip
+\noindent
+\textbf{Table reçue} (issues~\#253 et~\#365). La table de chaque loi est ensuite
+jugée, avant le contrôle des facteurs et avant toute lecture de colonne,
+par la règle du contrôle des tables reçues de \code{construire\_table()}
+(section~\ref{sec:tables-reference-recues}, contrôle~1, points~(a)
+à~(c)), lue par le même assistant du module \code{donnees},
+\code{etat\_table\_reference()}~: l'objet doit être celui que
+\code{table\_reference()} rendrait pour ses colonnes et ses
+métadonnées, c'est-à-dire avoir exactement la classe
+\code{c("table\_reference", "data.frame")}, lue par \code{attr()}, et
+les colonnes \code{age}, \code{sexe}, \code{qx}, puis au plus un axe
+temporel~; s'il est une liste, avoir autant de colonnes que de noms~;
+être reconstruit par \code{table\_reference()}, à partir du
+\code{data.frame} nu de ses colonnes et de ses métadonnées, sans refus ni
+erreur R~; être \code{identical()} à cette reconstruction. Au premier
+écart, le refus \code{loi\_invalide} porte le message «~Loi «~[cause]~»~:
+la table n'est pas l'objet rendu par table\_reference() ([constat]).
+Passer l'objet rendu par table\_reference(), sans modification (ADR 0015,
+point 1.3).~»,
+où le constat est «~objet de classe [classes] au lieu de
+table\_reference~», «~objet modifié après table\_reference()~» ou
+«~refusé par table\_reference() (motif [motif])~», et des \code{details}
+\code{cause}, \code{constat}, \code{lu}, \code{attendu} et
+\code{motif\_constructeur}. L'ordre des contrôles de la table est donc~:
+classe \code{bytes}, axe temporel, état de la table~; puis viennent les
+facteurs. Sont ainsi refusés sans erreur R une colonne de classe
+\code{bytes} (une colonne \code{sexe} de classe \code{c(<bytes>,
+"factor")} faisait lever l'erreur R «~translating strings with "bytes"
+encoding is not allowed~» à la sélection des lignes d'un sexe, constat
+de l'issue~\#253), un nom de colonne \code{bytes}
+(section~\ref{sec:refus}), une liste plus courte que ses noms (objet de
+l'issue~\#365~: liste d'une colonne munie des noms \code{age},
+\code{sexe}, \code{qx}, que rend l'extraction \code{[.data.frame} sous
+une classe dont la méthode \code{length()} rend~1, puis reclassée
+\code{table\_reference}~; constat «~objet modifié après
+table\_reference()~», \code{details\$lu} «~data.frame nu non
+reconstructible~», \code{details\$motif\_constructeur} à \code{NA}~;
+elle arrêtait R par une erreur de segmentation, code de sortie~139, à la
+lecture \code{tab\$sexe} de \code{loi\_effective()}, \emph{constat} de
+mesure en sous-processus sur le code qui précède l'issue, R~4.3.3~;
+test en sous-processus,
+\code{tests/unitaires/test\_simulation\_table\_incoherente.R}, pour une
+table de décès puis de rachat), une sous-classe ou un \code{data.frame}
+simple, des lignes permutées, une colonne ajoutée, un attribut retiré ou
+porté à une valeur que le constructeur refuse (par exemple un nom ou une
+valeur caractère d'encodage \code{bytes} dans les paramètres, motif
+\code{table\_parametres\_manquants} cité~; issue~\#256~; un niveau de
+facteur ou des \code{dimnames} d'un paramètre, que le constructeur ne lit
+pas, passent ce contrôle, le simulateur n'écrivant aucune fiche), un $q_x$ porté
+hors de $[0, 1]$ (motif \code{table\_qx\_hors\_bornes} cité).
+\textbf{Le changement restreint les entrées admises}~: avant
+l'issue~\#253, dont le seul contrôle de la table était sa classe
+\code{table\_reference} (\code{inherits()}), ces tables étaient
+acceptées, refusées sous un autre message, faisaient lever une erreur R
+ou arrêtaient R (liste plus courte que ses noms, ci-dessus)
+(contre-épreuve des tests de l'issue sur l'état antérieur). En revanche, une modification qui laisse
+l'objet identique à sa reconstruction passe~: un $q_x$ modifié dans
+$[0, 1]$, un nom ou des paramètres changés vers une valeur que le
+constructeur admet~; c'est alors la table réellement reçue qui est
+simulée, et c'est elle que consigne l'attribut \code{simulation} (loi
+vraie, section~\ref{sec:portefeuille-simule})~: la loi vraie d'un jeu
+simulé est cette table, en valeurs, non la loi que décrivent ses
+paramètres, déclarés et non vérifiés (section~\ref{sec:table-reference},
+«~Statut des paramètres d'une table synthétique~»~; un $q_x$ modifié
+laisse des paramètres qui ne reproduisent plus la table). Le contrôle
+garantit la forme et les valeurs contrôlées par le constructeur, non la
+provenance de la table. Une table valide est lue
+telle quelle, sans correction~; son état est jugé sur la table entière,
+quels que soient les sexes tirés.
+
+\emph{Fondement.} La lettre de l'ADR 0015, point~1.3, ne régit que
+l'entrée de \code{construire\_table()}~; le message du refus la cite
+comme source de la règle de reconstruction. La règle est appliquée au
+simulateur par la décision M610 du mainteneur (plan de la quarantième
+branche) et par l'ADR 0007, point~7.1, selon lequel le simulateur ne lit
+une table de référence que sous la classe \code{table\_reference}. La
+classe seule ne garantit pas que l'objet a été rendu par le
+constructeur~: la reconstruction étend au simulateur la garantie qu'elle
+donne à la construction (section~\ref{sec:tables-reference-recues})~:
+une table retouchée n'entre pas sous l'identité d'une table contrôlée, et
+une colonne qui ferait lever une erreur R à la lecture est refusée, sous
+un motif nommé, avant toute lecture par le simulateur (la reconstruction,
+qui la lit sous \code{tryCatch()}, convertit l'erreur en refus).
 
 \medskip
 Trois tables synthétiques, de statut \code{synthetique} et porteuses de leurs
@@ -22812,8 +22975,9 @@ paramètres (attribut \code{parametres}), sont construites par le module~:
     paramètres $a \ge 0$, $b > 0$, $c > 0$ sont des réels finis déclarés,
     sans valeur par défaut, et $e^{c}$ doit être fini en double précision
     ($c \le \ln(\text{plus grand double}) \approx 709{,}78$~: au-delà,
-    $q_x$ vaudrait 1 à tort)~; les âges sont des entiers $\ge 0$ déclarés~;
-    sinon, refus \code{loi\_invalide}. Le risque cumulé est
+    $q_x$ vaudrait 1 à tort)~; sinon, refus \code{loi\_invalide}~; les
+    âges déclarés suivent la règle commune aux trois tables
+    (ci-dessous, «~Âges déclarés~»). Le risque cumulé est
     $H(x) = a\,x + \ln(1 + b\,e^{cx})/c$, et la probabilité annuelle est
     l'intégrale exacte de $\mu$ sur $[x, x+1)$ (résultat exact, calcul
     direct)~:
@@ -22872,6 +23036,95 @@ paramètres (attribut \code{parametres}), sont construites par le module~:
     rachat par ancienneté (axe secondaire) est hors du périmètre de la
     branche.
 \end{itemize}
+
+\noindent
+\textbf{Nom et source} (issue~\#156). Le nom des deux premières tables est
+une constante sans nombre, «~Gompertz-Makeham synthétique~» ou
+«~Logistique synthétique~»~; celui de la table constante est le texte
+déclaré par l'appelant (argument \code{nom}), laissé tel quel. La source
+des trois tables est un texte du moteur qui énonce la loi et sa
+spécification. Le nom constant et la source sont marqués UTF-8 par
+\code{texte\_moteur()} (section~\ref{sec:harnais}, «~Locale de
+l'installation~»). Les paramètres ne figurent que dans l'attribut
+\code{parametres} (section~\ref{sec:table-reference}), que la fiche
+écrit sous \code{tables\_reference/}\textit{clé}\code{/parametres}, les
+paramètres numériques de la loi en doubles au format \code{\%.17g} (la
+famille, \code{loi}, en chaîne~; l'étendue des âges, \code{ages}, en
+entiers), et que le rapport figé restitue avec la
+mention \code{tables\_reference\_parametres}
+(section~\ref{sec:rapport-fige}). Deux raisons. D'une part, un nom formé
+par \code{format()} dépendait des options de session \code{OutDec} et
+\code{digits} (le paramètre $c = 1{,}1$ s'écrivait «~1.1~» ou «~1,1~»)~;
+or le nom entre dans \code{fiche\$tables\_reference}, donc dans
+l'empreinte du résultat (ADR 0015, point~3.1)~: la même table aurait donné
+deux empreintes du résultat selon le réglage de la session. D'autre part,
+le nom et la source, formés de littéraux non ASCII non marqués, n'étaient
+pas marqués UTF-8 quand le package était installé et exécuté sous la
+locale C~: une construction qui lisait l'une de ces tables y était
+refusée (\code{chaine\_codage\_indetermine}, sur le nom ou la source de la
+table). \emph{Constat de mesure} (R~4.3.3, package installé)~: le nom et
+la source sont identiques octet à octet sous \code{OutDec = ","} et
+\code{digits = 3} et sous les options par défaut
+(\code{tests/unitaires/test\_simulation.R})~; la fiche, le plan et le
+rapport figé d'une construction qui lit chacune des trois tables sont
+identiques octet à octet sous la locale C et sous une locale UTF-8
+(\code{tests/controles/locale\_c.R}, section~\ref{sec:harnais}). Les
+valeurs, les paramètres et l'empreinte de table sont inchangés~; le nom
+étant dans la fiche, l'empreinte du résultat d'une construction qui lit
+une table de Gompertz-Makeham ou logistique a changé à cette
+modification~; aucune construction des plans de référence R1 à R17 ne
+lit de table synthétique, et aucune référence de non-régression n'a
+changé. Conséquence~: le nom ne distingue plus deux lois synthétiques de
+même famille. Le message du refus \code{empreinte\_table\_discordante}
+(section~\ref{sec:rejeu}), qui cite le nom et le statut de la table,
+renvoie, pour une table synthétique, à
+\code{fiche/tables\_reference/}\textit{clé}\code{/parametres}~: avec la
+clé, que le message cite, ce renvoi désigne la loi déclarée (pour les
+trois tables du package, famille, paramètres et étendue des âges, qui
+suffisent à la recalculer~; pour une table synthétique déclarée par
+l'appelant, des paramètres déclarés et non vérifiés,
+section~\ref{sec:table-reference}, «~Statut des paramètres d'une table
+synthétique~»)~; seule l'empreinte de table identifie les valeurs.
+
+\noindent
+\textbf{Âges déclarés} (issue~\#234). Les trois constructeurs contrôlent
+leurs âges par une même règle, que porte la fonction
+\code{defaut\_ages\_synthetiques()}~: le vecteur
+\code{ages} doit être numérique, non vide, fait d'entiers de 0 à
+\code{.Machine\$integer.max} ($2^{31} - 1 = 2\,147\,483\,647$, plus grand
+entier du moteur), si bien que la conversion en entier qui suit est
+exacte, sans valeur manquante ni avertissement. Sinon, refus
+\code{loi\_invalide} (module \code{simulation}~; \code{details\$ages}~:
+le vecteur reçu), de message «~\textit{Loi}~: les âges sont des entiers
+de 0 à 2147483647~; \textit{défaut}.~», où \textit{Loi} vaut
+«~Gompertz-Makeham~», «~Logistique~» ou «~Table constante~» et où
+\textit{défaut} décrit le premier âge fautif dans l'ordre du vecteur, avec
+sa position $j$ et sa valeur $v$ écrite au format \code{\%.17g}
+(dix-sept chiffres significatifs, qui désignent le double reçu sans
+ambiguïté~: 0{,}1 est cité «~0.10000000000000001~»)~: «~âge «~NA~»
+manquant (position $j$)~», puis, dans cet ordre de priorité, «~âge
+«~$v$~» non fini~» (\code{NaN}, \code{Inf}, \code{-Inf}), «~non
+entier~», «~négatif~» et «~supérieur au plus grand entier du moteur~»,
+chacun suivi de la position~; un vecteur vide donne «~aucun âge reçu~», un
+vecteur non numérique «~âges de classe $k$ reçus, un vecteur numérique est
+attendu~» ($k$~: sa classe). Avant l'issue, un âge infini ou supérieur à
+l'entier maximal (\code{Inf}, \code{3e9}) franchissait ce contrôle,
+levait l'avertissement de R «~NAs introduced by coercion to integer
+range~», puis était refusé sous le motif générique
+\code{table\_colonne\_mal\_typee} de \code{table\_reference()}, dont le
+message parle de valeur manquante (\emph{constat} de mesure de
+l'issue~\#234)~; les tables construites sur des âges valides sont
+inchangées. La borne supérieure est une limite de représentation,
+\textbf{non un plafond actuariel}~: le constructeur d'une table
+synthétique ne fixe pas d'âge limite et ne refuse pas un âge sans sens
+démographique (choix de conception, sans source)~; l'âge limite d'une
+table relève de la fermeture (section~\ref{sec:fermeture}). Le garde-fou est en aval~: le simulateur refuse
+une loi qui ne couvre pas les âges atteignables (\code{table\_trop\_courte})
+ou y atteint $q_x = 1$ (\code{qx\_egal\_a\_un}~;
+section~\ref{sec:portefeuille-simule}), ce qui arrive pour
+Gompertz-Makeham aux grands âges~: sous la loi des tests ci-dessus, $q_x$
+vaut 1 en double précision dès 149~ans (approximation numérique, valeur
+calculée).
 
 \subsubsection*{Hypothèse de répartition dans l'année}
 
@@ -23966,8 +24219,8 @@ et 155~refus, identiques, attributs compris, avant et après).
     l'exception énumère les refus établis, et l'absence d'autre refus
     causé par l'exclusion sous les trois conditions est une
     \textbf{hypothèse non démontrée}. Le texte de la forme agrégats énonce
-    la même exception, les cellules tenant lieu de lignes (forme
-    «~agrégats~», ci-dessous), sans condition sur les étapes du plan.
+    la même exception, les cellules tenant lieu de lignes, sous la même
+    condition d'étape (issue~\#381~; forme «~agrégats~», ci-dessous).
 \end{itemize}
 
 \noindent
@@ -24133,9 +24386,15 @@ exclusion déclarée, le module \code{donnees} refuse
 (\code{ligne\_invalide}) en nommant les motifs attendus~; avec toutes les
 exclusions des motifs attendus déclarées, les lignes exclues sont celles de
 l'attribut, motif par motif, sauf si ces exclusions ne conservent aucune
-cellule (refus \code{aucune\_ligne\_conservee}) ou aucune cellule
-d'exposition strictement positive ni aucun événement (refus
-\code{periode\_sans\_exposition}). Toute cellule exclue manque à la table
+cellule (refus \code{aucune\_ligne\_conservee}, levé par le module
+\code{donnees} quelles que soient la recette et les étapes du plan) ou
+aucune cellule d'exposition strictement positive ni aucun événement (refus
+\code{periode\_sans\_exposition} si le plan comporte l'étape
+\code{exposition}, seule à lever ce refus~; un plan réduit à l'étape
+\code{donnees} n'en lève aucun~: constat, R~4.3.3, sur le jeu du test de
+l'issue~\#381). Comme pour les lignes individuelles, l'absence d'autre
+refus causé par les exclusions sous ces conditions est une
+\textbf{hypothèse non démontrée}. Toute cellule exclue manque à la table
 (pour \code{cellule\_dupliquee}, l'original et la copie)~: le relevé
 \code{ages\_manquants} peut alors apparaître.
 
@@ -25139,7 +25398,14 @@ absent, inattendu, hors liste ou \code{NA}, et pour
 \code{"tete"} sous le rachat, avec ou sans défauts~; leurs messages~;
 \code{defauts\_ineligibles} après la projection (deux appels de
 \code{sous\_graine()}, état du générateur de l'appelant inchangé)~; la
-disjonction, sous un taux de~1 pour tous les types. \emph{Recoupement
+disjonction, sous un taux de~1 pour tous les types. Le texte de validité
+est égal (\code{identical()}) au texte spécifié, recopié dans le test~;
+sur un jeu par année à part (issue~\#381), dont toutes les cellules
+d'exposition strictement positive ou à événement sont altérées puis
+exclues, le refus
+\code{periode\_sans\_exposition} de l'étape \code{exposition} sous le
+plan complet et l'absence de refus sous un plan réduit à l'étape
+\code{donnees}. \emph{Recoupement
 contre le moteur} (A5~; \emph{approximation numérique}, tolérance relative
 $10^{-10}$, l'écart maximal mesuré figurant dans l'intitulé du test,
 affiché en cas d'échec ou sous l'option \code{harnais.verbeux}, un
@@ -25267,10 +25533,11 @@ identique, attribut compris, dans un autre processus R.
 \catalogue{fonctions-simulation}{COMBINAISONS\_DEFAUTS} & constante & --- & combinaisons de types admises sur une même ligne (liste fermée) \\
 \catalogue{fonctions-simulation}{ORDRE\_TIRAGES\_DEFAUTS} & constante & --- & ordre des tirages des défauts, consigné dans l'attribut \code{defauts} \\
 \catalogue{fonctions-simulation}{DEFAUTS\_FORMES} & constante & --- & règles des défauts par forme, lues par le nom de forme (\code{lignes} pour \code{forme = NULL}, \code{agregats}, \code{stocks\_successifs})~: catalogue, combinaisons, domaine de \code{cible}, unités à cible requise, types exclusifs (stocks successifs~: \code{inventaire\_perdu}~; champ absent pour les autres formes), ordre des tirages et texte de validité consignés~; l'entrée \code{lignes} reprend à l'identique les trois constantes précédentes (tableaux~\ref{tab:catalogue-defauts}, \ref{tab:catalogue-defauts-agregats} et~\ref{tab:catalogue-defauts-stocks}) \\
-\catalogue{fonctions-simulation}{table\_gompertz\_makeham()} & interne & $A$, $B$, $c$, âges & table synthétique de Gompertz-Makeham \\
-\catalogue{fonctions-simulation}{table\_logistique()} & interne & $a$, $b$, $c$, âges & table synthétique logistique (Kannisto si $a = 0$)~; refus \code{loi\_invalide} \\
-\catalogue{fonctions-simulation}{table\_constante()} & interne & $q$, âges, nom & table synthétique à $q_x$ constant \\
-\catalogue{fonctions-simulation}{loi\_effective()} & interne & loi d'une transition, cause, sexes & $q^{s}_x$ et $\mu_x$ par sexe~; refus \code{loi\_invalide}, dont la forme exacte des facteurs, une table de classe d'encodage \code{bytes}, jugée avant \code{inherits()} (issue~\#150), et une table à axe temporel, \code{annee} ou \code{generation} (issue~\#272) \\
+\catalogue{fonctions-simulation}{defaut\_ages\_synthetiques()} & interne & âges & \code{""} si les âges forment un vecteur numérique non vide d'entiers de 0 à \code{.Machine\$integer.max}, sinon le texte du défaut du premier âge fautif (manquant, non fini, non entier, négatif, supérieur au plus grand entier du moteur), valeur citée au format \code{\%.17g} et position, ou du vecteur vide ou non numérique~; règle unique des âges des trois tables synthétiques, aide de message (section~\ref{sec:loi-vraie}, «~Âges déclarés~»~; issue~\#234) \\
+\catalogue{fonctions-simulation}{table\_gompertz\_makeham()} & interne & $A$, $B$, $c$, âges & table synthétique de Gompertz-Makeham, de nom constant «~Gompertz-Makeham synthétique~», paramètres dans l'attribut \code{parametres}, nom et source marqués UTF-8 (issue~\#156)~; refus \code{loi\_invalide} (paramètres, puis âges par l'aide ci-dessus) \\
+\catalogue{fonctions-simulation}{table\_logistique()} & interne & $a$, $b$, $c$, âges & table synthétique logistique (Kannisto si $a = 0$), de nom constant «~Logistique synthétique~», paramètres dans l'attribut \code{parametres}, nom et source marqués UTF-8 (issue~\#156)~; refus \code{loi\_invalide} (paramètres, puis âges par l'aide ci-dessus) \\
+\catalogue{fonctions-simulation}{table\_constante()} & interne & $q$, âges, nom & table synthétique à $q_x$ constant, de nom déclaré par l'appelant, source marquée UTF-8 (issue~\#156)~; refus \code{loi\_invalide} ($q$, puis âges par l'aide ci-dessus) \\
+\catalogue{fonctions-simulation}{loi\_effective()} & interne & loi d'une transition, cause, sexes & $q^{s}_x$ et $\mu_x$ par sexe~; refus \code{loi\_invalide}, dans l'ordre~: une loi qui n'est pas la liste (\code{table}, \code{facteurs}), une table de classe d'encodage \code{bytes} (issue~\#150), une table à axe temporel, \code{annee} ou \code{generation} (issue~\#272), une table qui n'est pas l'objet que rendrait le constructeur, jugée par l'assistant d'état du module \code{donnees} avant toute lecture de colonne, cohérence de la liste des colonnes et de leurs noms comprise (issues~\#253 et~\#365), puis la forme exacte des facteurs \\
 \catalogue{fonctions-simulation}{jours\_civils()} & interne & année, mois, jour & jours depuis 1970-01-01 (arithmétique entière) \\
 \catalogue{fonctions-simulation}{jour\_anniversaire()} & interne & composantes de naissance, âge & jour de l'anniversaire (29~février~: 1\textsuperscript{er}~mars des années non bissextiles) \\
 \catalogue{fonctions-simulation}{composantes\_distinctes()} & interne & jours & composantes de date, calculées sur les valeurs distinctes \\

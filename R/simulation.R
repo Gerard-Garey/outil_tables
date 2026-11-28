@@ -238,8 +238,9 @@ DEFAUTS_FORMES <- list(
                      "exclusions des motifs attendus déclarées : lignes exclues = lignes de l'attribut, motif par",
                      "motif. Exception : si ces exclusions ne conservent aucune cellule, refus",
                      "aucune_ligne_conservee ; si aucune cellule conservée n'a d'exposition strictement positive",
-                     "ni d'événement, refus periode_sans_exposition. Toute cellule exclue manque à la table",
-                     "(cellule_dupliquee : l'original et la copie) : relevé ages_manquants possible.")),
+                     "ni d'événement, refus periode_sans_exposition si le plan comporte l'étape exposition. Toute",
+                     "cellule exclue manque à la table (cellule_dupliquee : l'original et la copie) : relevé",
+                     "ages_manquants possible.")),
   # Stocks successifs (#191 ; spécification d'actuary-approfondi de #191,
   # § 1 à § 3 ; avis de forme d'architect, partie #191 ; décision du
   # mainteneur du 11/11/2026 : inventaire perdu, toutes les dates de la grille
@@ -312,27 +313,65 @@ DEFAUTS_FORMES <- list(
 
 # --- tables synthétiques ------------------------------------------------------
 
+# Prédicat unique des âges des tables synthétiques (#234 ; aide de message au
+# sens de tests/controles/messages_refus.R, comme ecart_noms()) : "" si `ages`
+# est un vecteur numérique non vide d'entiers de 0 à .Machine$integer.max
+# (as.integer() est alors exact, sans coercition ni NA) ; sinon, le texte du
+# défaut du premier âge fautif (valeur citée, position), que le constructeur
+# insère dans son refus. Ordre des défauts d'un âge : manquant (NA), non fini (NaN, Inf, -Inf),
+# non entier, négatif, supérieur au plus grand entier du moteur.
+defaut_ages_synthetiques <- function(ages) {
+  if (!is.numeric(ages))
+    return(formuler("âges de classe %s reçus, un vecteur numérique est attendu",
+                    paste(citer(class(ages)), collapse = "/")))
+  if (!length(ages)) return(formuler("aucun âge reçu"))
+  # Chemin court des âges valides (un seul passage) ; NA et NaN donnent NA,
+  # que isTRUE() écarte vers le diagnostic ci-dessous.
+  if (isTRUE(all(ages >= 0 & ages <= .Machine$integer.max & ages == trunc(ages)))) return("")
+  # Les défauts s'excluent dans l'ordre : trunc(Inf) vaut Inf, un âge infini
+  # n'est donc pas décelé par le test d'entier, d'où le test de finitude d'abord.
+  manquant <- is.na(ages) & !is.nan(ages)
+  non_fini <- !manquant & !is.finite(ages)
+  non_entier <- !manquant & !non_fini & ages != trunc(ages)
+  negatif <- !manquant & !non_fini & ages < 0
+  grand <- !manquant & !non_fini & ages > .Machine$integer.max
+  fautif <- manquant | non_fini | non_entier | negatif | grand
+  if (!any(fautif)) return("")
+  j <- which(fautif)[1L]
+  v <- citer(sprintf("%.17g", as.double(ages[j])))
+  if (manquant[j]) formuler("âge « NA » manquant (position %d)", j)
+  else if (non_fini[j]) formuler("âge « %s » non fini (position %d)", v, j)
+  else if (non_entier[j]) formuler("âge « %s » non entier (position %d)", v, j)
+  else if (negatif[j]) formuler("âge « %s » négatif (position %d)", v, j)
+  else formuler("âge « %s » supérieur au plus grand entier du moteur (position %d)", v, j)
+}
+
 # Table de Gompertz-Makeham, mu(x) = A + B c^x, sans distinction de sexe :
 # q_x = 1 - exp(-A - B c^x (c - 1) / ln c), intégrale exacte de mu sur
-# [x, x+1) (A.2). Paramètres déclarés, sans valeur par défaut.
+# [x, x+1) (A.2). Paramètres déclarés, sans valeur par défaut. Le `nom` est une
+# constante sans nombre et la `source` un texte du moteur, tous deux marqués
+# UTF-8 par texte_moteur() : les paramètres sont dans `parametres`, pas dans le
+# nom, que format() aurait fait dépendre de OutDec et de digits (#156) ; non
+# marqués, nom et source seraient refusés à l'écriture de la fiche sous la
+# locale C (chaine_codage_indetermine).
 table_gompertz_makeham <- function(A, B, c, ages) {
   reel <- function(v) is.numeric(v) && length(v) == 1L && is.finite(v)
   if (!reel(A) || !reel(B) || !reel(c) || A < 0 || B < 0 || c <= 1)
     refuser("simulation", "loi_invalide",
             formuler("Gompertz-Makeham : A >= 0, B >= 0 et c > 1, réels finis, à déclarer."),
             list(A = A, B = B, c = c))
-  if (!is.numeric(ages) || !length(ages) || anyNA(ages) || any(ages != trunc(ages)) ||
-      any(ages < 0))
+  defaut <- defaut_ages_synthetiques(ages)
+  if (nzchar(defaut))
     refuser("simulation", "loi_invalide",
-            formuler("Gompertz-Makeham : les âges sont des entiers >= 0."), list(ages = ages))
+            formuler("Gompertz-Makeham : les âges sont des entiers de 0 à %d ; %s.", .Machine$integer.max, defaut),
+            list(ages = ages))
   ages <- as.integer(ages)
   qx <- 1 - exp(-A - B * c^ages * (c - 1) / log(c))
   table_reference(data.frame(age = ages, sexe = "ensemble", qx = qx, stringsAsFactors = FALSE),
-                  nom = sprintf("Gompertz-Makeham synthétique (A = %s, B = %s, c = %s)",
-                                format(A), format(B), format(c)),
+                  nom = texte_moteur("Gompertz-Makeham synthétique"),
                   statut = "synthetique",
-                  source = paste("Table synthétique : mu(x) = A + B c^x ;",
-                                 "q_x = 1 - exp(-A - B c^x (c - 1) / ln c) (spécification d'actuary, A.2, #10)"),
+                  source = texte_moteur(paste("Table synthétique : mu(x) = A + B c^x ;",
+                                              "q_x = 1 - exp(-A - B c^x (c - 1) / ln c) (spécification d'actuary, A.2, #10)")),
                   parametres = list(loi = "gompertz_makeham", A = A, B = B, c = c,
                                     ages = range(ages)))
 }
@@ -348,17 +387,19 @@ table_gompertz_makeham <- function(A, B, c, ages) {
 # sans former b e^(cx) (plateau q -> 1 - exp(-(a + 1))) ni diviser par c un
 # logarithme annulé par dépassement inférieur (c ou b infimes : q faux,
 # voire nul, sinon). exp(c) fini exigé : au-delà, q vaudrait 1 à tort.
-# Paramètres déclarés, sans valeur par défaut.
+# Paramètres déclarés, sans valeur par défaut. `nom` et `source` : comme
+# table_gompertz_makeham() (#156).
 table_logistique <- function(a, b, c, ages) {
   reel <- function(v) is.numeric(v) && length(v) == 1L && is.finite(v)
   if (!reel(a) || !reel(b) || !reel(c) || a < 0 || b <= 0 || c <= 0 || !is.finite(expm1(c)))
     refuser("simulation", "loi_invalide",
             formuler("Logistique : a >= 0, b > 0 et c > 0, réels finis, exp(c) fini, à déclarer."),
             list(a = a, b = b, c = c))
-  if (!is.numeric(ages) || !length(ages) || anyNA(ages) || any(ages != trunc(ages)) ||
-      any(ages < 0))
+  defaut <- defaut_ages_synthetiques(ages)
+  if (nzchar(defaut))
     refuser("simulation", "loi_invalide",
-            formuler("Logistique : les âges sont des entiers >= 0."), list(ages = ages))
+            formuler("Logistique : les âges sont des entiers de 0 à %d ; %s.", .Machine$integer.max, defaut),
+            list(ages = ages))
   ages <- as.integer(ages)
   v <- stats::plogis(log(b) + c * ages)
   z <- expm1(c) * v
@@ -366,30 +407,32 @@ table_logistique <- function(a, b, c, ages) {
   r[z == 0] <- 1
   qx <- -expm1(-(a + v * (expm1(c) / c) * r))
   table_reference(data.frame(age = ages, sexe = "ensemble", qx = qx, stringsAsFactors = FALSE),
-                  nom = sprintf("Logistique synthétique (a = %s, b = %s, c = %s)",
-                                format(a), format(b), format(c)),
+                  nom = texte_moteur("Logistique synthétique"),
                   statut = "synthetique",
-                  source = paste("Table synthétique : mu(x) = a + b e^(cx) / (1 + b e^(cx)) (Lignes directrices",
-                                 "mortalité, Institut des actuaires, 2006, p. 25/40 ; a = 0 : modèle de Kannisto) ;",
-                                 "q_x = 1 - exp(-a - log1p(expm1(c) plogis(ln b + c x)) / c) (spécification",
-                                 "d'actuary, #211)"),
+                  source = texte_moteur(paste("Table synthétique : mu(x) = a + b e^(cx) / (1 + b e^(cx)) (Lignes directrices",
+                                              "mortalité, Institut des actuaires, 2006, p. 25/40 ; a = 0 : modèle de Kannisto) ;",
+                                              "q_x = 1 - exp(-a - log1p(expm1(c) plogis(ln b + c x)) / c) (spécification",
+                                              "d'actuary, #211)")),
                   parametres = list(loi = "logistique", a = a, b = b, c = c, ages = range(ages)))
 }
 
 # Table à q_x constant sur les âges `ages`, sans distinction de sexe (loi de
-# rachat de la branche, A.2 ; q = 0 pour une transition absente).
+# rachat de la branche, A.2 ; q = 0 pour une transition absente). `nom` : texte
+# de l'appelant, laissé tel quel ; `source` : texte du moteur, marqué UTF-8
+# (#156, comme table_gompertz_makeham()).
 table_constante <- function(q, ages, nom) {
   if (!is.numeric(q) || length(q) != 1L || !is.finite(q) || q < 0 || q > 1)
     refuser("simulation", "loi_invalide", formuler("Table constante : q réel fini dans [0, 1]."), list(q = q))
-  if (!is.numeric(ages) || !length(ages) || anyNA(ages) || any(ages != trunc(ages)) ||
-      any(ages < 0))
-    refuser("simulation", "loi_invalide", formuler("Table constante : les âges sont des entiers >= 0."),
+  defaut <- defaut_ages_synthetiques(ages)
+  if (nzchar(defaut))
+    refuser("simulation", "loi_invalide",
+            formuler("Table constante : les âges sont des entiers de 0 à %d ; %s.", .Machine$integer.max, defaut),
             list(ages = ages))
   ages <- as.integer(ages)
   table_reference(data.frame(age = ages, sexe = "ensemble", qx = rep(as.numeric(q), length(ages)),
                              stringsAsFactors = FALSE),
                   nom = nom, statut = "synthetique",
-                  source = "Table synthétique à q_x constant (spécification d'actuary, A.2, #10)",
+                  source = texte_moteur("Table synthétique à q_x constant (spécification d'actuary, A.2, #10)"),
                   parametres = list(loi = "constante", q = q, ages = range(ages)))
 }
 
@@ -406,19 +449,17 @@ loi_effective <- function(loi_t, cause, sexes) {
     refuser("simulation", "loi_invalide",
             formuler("Loi « %s » : liste (table, facteurs) attendue.", cause), list(cause = cause))
   tab <- loi_t$table; f <- loi_t$facteurs
-  # Classe d'encodage « bytes » lue par classe_bytes() avant inherits(), qui
-  # lève une erreur R sur elle (#150) ; refus propre à ce cas.
+  # Classe d'encodage « bytes » lue par classe_bytes() en premier (#150) : refus
+  # propre à ce cas (inherits() levait une erreur R sur elle), message conservé.
   if (classe_bytes(tab))
     refuser("simulation", "loi_invalide",
             formuler("Loi « %s » : la table porte une classe d'encodage « bytes » (classe %s), non convertible en UTF-8 sans deviner ; passer l'objet rendu par table_reference(), sans modification.",
                      cause, paste(citer(class(tab)), collapse = "/")),
             list(cause = cause))
-  if (!inherits(tab, "table_reference"))
-    refuser("simulation", "loi_invalide",
-            formuler("Loi « %s » : la table doit être de classe table_reference (ADR 0007, point 7).", cause),
-            list(cause = cause))
   # Axe temporel lu par le prédicat unique (axe_temporel_table(), module
-  # donnees ; ADR 0019, point 2) : aucune table à axe n'est simulée.
+  # donnees ; ADR 0019, point 2) : aucune table à axe n'est simulée. Lu avant
+  # l'état de la table : il ne lit que les noms de colonnes, et un objet forgé
+  # à axe garde son refus propre.
   axe <- axe_temporel_table(tab)
   if (identical(axe, "annee"))
     refuser("simulation", "loi_invalide",
@@ -429,6 +470,21 @@ loi_effective <- function(loi_t, cause, sexes) {
             formuler("Loi « %s » : table de génération (colonne generation) non prise en charge par le simulateur minimal.",
                      cause),
             list(cause = cause))
+  # Table reçue : un objet identique à sa reconstruction par table_reference()
+  # (etat_table_reference(), module donnees ; ADR 0015, point 1.3, comme
+  # construire_table(), #253) : classe exacte, colonnes, liste des colonnes
+  # cohérente avec ses noms (#365), reconstruction sans refus ni erreur R
+  # (colonne de classe « bytes »), identité avec elle. Un objet que
+  # table_reference() ne rendrait pas à l'identique, pour ses colonnes et ses
+  # métadonnées, est refusé, jamais lu ; une modification qui laisse l'objet
+  # identique à sa reconstruction (par exemple un q_x modifié dans [0, 1]) passe.
+  # Aucune lecture de colonne (tab$sexe) ne précède ce contrôle.
+  etat <- etat_table_reference(tab)
+  if (!is.null(etat))
+    refuser("simulation", "loi_invalide",
+            formuler(paste("Loi « %s » : la table n'est pas l'objet rendu par table_reference() (%s). Passer l'objet rendu par",
+                           "table_reference(), sans modification (ADR 0015, point 1.3)."), cause, etat$constat),
+            c(list(cause = cause), etat))
   # Facteurs : forme exacte (#58, forme_exacte()) : double ou integer, seul
   # attribut names (ni classe, ni dim), de noms exactement H et F, sans tri :
   # setequal() ne dépend pas de la locale et ne lève pas pour un nom non ASCII

@@ -2706,7 +2706,8 @@ lignes_citees_table <- function(k, sexes, axe, valeurs, ages) {
 #                  source : arrêté, URL, fichier de provenance) ;
 #   statut       : synthetique, embarquee ou importee ;
 #   parametres   : liste non vide des paramètres pour une table synthétique,
-#                  NULL sinon ;
+#                  dont aucun nom ni aucune valeur chaîne, à toute profondeur,
+#                  n'est d'encodage « bytes » (#256) ; NULL sinon ;
 #   forme_origine: qx ou lx (forme de la transcription) ; une colonne lx
 #                  exige « lx », une colonne qx est admise sous l'une ou
 #                  l'autre.
@@ -2715,8 +2716,9 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
     refuser("donnees", "table_nom_manquant", formuler("La table de référence doit avoir un nom (chaîne non vide, sans attribut)."))
   # Chaîne d'encodage « bytes » (#158 ; règle de #128) : chaine_unique() l'admet
   # (type character, aucun attribut), et le nom ou la source serait écrit dans
-  # la fiche, où octets_chaines() la refuse (chaine_codage_bytes) après tous les
-  # calculs ; refus ici, sous le motif de l'argument, sans lire les octets.
+  # la fiche, où octets_chaines() la refuse (chaine_codage_bytes), à l'étape (d) de
+  # controler_forme_tables(), avant toute étape ; refus ici, sous le motif de
+  # l'argument, sans lire les octets.
   # statut et forme_origine, valeurs d'un ensemble fermé, sont déjà refusés par
   # %in% (mesuré). Le nom et la source bytes ne se citent pas (refus sans
   # details) ; details$statut et details$classe portent, eux, la valeur reçue
@@ -2746,6 +2748,36 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
   if (statut != "synthetique" && !is.null(parametres))
     refuser("donnees", "table_parametres_inattendus",
             formuler("Table « %s » de statut « %s » : aucun paramètre de loi attendu.", nom_cite, citer(statut)))
+  # Nom ou valeur « bytes » de `parametres` (#256 ; règle de #128, comme le nom
+  # et la source, #158) : les paramètres s'écrivent dans la fiche, où
+  # octets_chaines() les refuserait (chaine_codage_bytes), à l'étape (d) de
+  # controler_forme_tables(), avant toute étape ; refus ici, sous le motif de
+  # l'argument, sans rien citer. Le prédicat lit, à toute profondeur, les noms
+  # (noms_bytes()) et les valeurs des vecteurs caractère, rien d'autre : les
+  # niveaux d'un facteur, les dimnames, la classe et les autres attributs ne sont
+  # pas lus ici et relèvent de l'écrivain de la fiche (étape (d), motif
+  # serialisation_impossible).
+  # Parcours par niveaux, sans pile d'appels (une liste très profonde ne lève
+  # pas d'erreur R : sa profondeur est refusée plus tard, à l'écriture de la
+  # fiche) ni copie répétée d'une pile (coût linéaire), et sans dispatch :
+  # noms_bytes() lit les noms par attr(), .subset2() les éléments,
+  # longueur_lue() la longueur ; Encoding() ne traduit rien (R/outils.R).
+  parametres_bytes <- function(p) {
+    niveau <- list(p)
+    while (length(niveau)) {
+      if (any(vapply(niveau, function(v) length(noms_bytes(v)) > 0L || (is.character(v) && any(Encoding(v) == "bytes")), NA)))
+        return(TRUE)
+      listes <- niveau[vapply(niveau, is.list, NA)]
+      niveau <- unlist(lapply(listes, function(v) lapply(seq_len(longueur_lue(v)), function(i) .subset2(v, i))),
+                       recursive = FALSE)
+    }
+    FALSE
+  }
+  if (parametres_bytes(parametres))
+    refuser("donnees", "table_parametres_manquants",
+            formuler(paste("Table synthétique « %s » : ses paramètres portent un nom ou une valeur d'encodage « bytes » (à toute",
+                           "profondeur), non convertible en UTF-8 sans deviner : ils ne sont pas lus. Passer des paramètres",
+                           "(liste non vide) sans encodage bytes."), nom_cite))
   if (!chaine_unique(forme_origine) || !(forme_origine %in% FORMES_ORIGINE))
     refuser("donnees", "table_forme_inconnue",
             formuler("Table « %s » : forme d'origine (chaîne sans attribut) à prendre dans %s.", nom_cite, liste_guillemets(FORMES_ORIGINE)))
@@ -3041,6 +3073,59 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
   }
   structure(t, class = c("table_reference", "data.frame"), nom = nom, statut = statut,
             source = source, forme_origine = forme_origine, parametres = parametres)
+}
+
+# État d'un objet reçu comme table de référence (ADR 0015, point 1.3 ; #253,
+# #365), seule lecture de cette règle, lue par controler_forme_tables() (module
+# construire_table, étapes (a) à (c)) et par loi_effective() (module
+# simulation) : l'objet est identique à sa reconstruction par table_reference()
+# sur ses colonnes et ses métadonnées (contrôles (1) à (5) ci-dessous ; une
+# modification qui laisse l'objet identique à sa reconstruction, par exemple un
+# q_x modifié dans [0, 1], n'est pas détectée). Rend NULL s'il l'est, sinon le
+# premier écart, list(constat, lu, attendu, motif_constructeur) : `constat` est
+# le texte de l'écart (inséré dans le message du refus de l'appelant, qui
+# refuse : cette fonction ne refuse pas), `lu` et `attendu` les valeurs
+# comparées, `motif_constructeur` le motif du
+# refus de table_reference() à la reconstruction, NA sinon. Ordre des
+# contrôles : (1) classe exacte table_reference/data.frame, lue par attr() (une
+# classe « bytes » ne lève pas) ; (2) noms des colonnes (attr() : age, sexe, qx,
+# puis au plus un axe temporel, celui que rend axe_temporel_table()) ; (3) si
+# l'objet est une liste : cohérence de ses colonnes avec ses noms (colonnes_lues(),
+# F344), avant toute lecture de colonne (#365 : sous une liste plus courte que
+# ses noms, x$sexe arrête R) ; un objet qui n'est pas une liste (vecteur
+# atomique classé table_reference) va à (4), sans lecture par `$` ; (4) reconstruction par table_reference() sur le
+# data.frame nu des colonnes et les métadonnées lues dans les attributs (un
+# attribut absent est passé NULL, que le constructeur refuse ; une erreur R du
+# data.frame nu, par exemple sur une colonne de classe « bytes », vaut objet
+# non reconstructible, #253) ; (5) identical() à la reconstruction (ordre
+# canonique, valeurs contrôlées, attributs).
+etat_table_reference <- function(x) {
+  constat <- function(texte, lu, attendu, motif = NA_character_)
+    list(constat = texte, lu = lu, attendu = attendu, motif_constructeur = motif)
+  modifie <- formuler("objet modifié après table_reference()")
+  classe_attendue <- c("table_reference", "data.frame")
+  if (!identical(attr(x, "class", exact = TRUE), classe_attendue))
+    return(constat(formuler("objet de classe %s au lieu de table_reference", paste(citer(class(x)), collapse = "/")),
+                   class(x), classe_attendue))
+  colonnes <- attr(x, "names", exact = TRUE)
+  axe <- axe_temporel_table(x)
+  if (!identical(colonnes, c("age", "sexe", "qx", if (!is.na(axe)) axe)))
+    return(constat(modifie, colonnes, "age, sexe, qx [, annee ou generation] (colonnes de table_reference())"))
+  if (is.list(x) && !colonnes_lues(x)$coherente)
+    return(constat(modifie, "data.frame nu non reconstructible", "colonnes de table_reference()"))
+  r <- tryCatch({
+    nu <- data.frame(lapply(stats::setNames(colonnes, colonnes), function(n) .subset2(x, n)),
+                     stringsAsFactors = FALSE)
+    table_reference(nu, attr(x, "nom", exact = TRUE), attr(x, "statut", exact = TRUE),
+                    attr(x, "source", exact = TRUE), attr(x, "parametres", exact = TRUE),
+                    attr(x, "forme_origine", exact = TRUE))
+  }, refus_tablexp = function(e) e, error = function(e) NULL)
+  if (is.null(r)) return(constat(modifie, "data.frame nu non reconstructible", "colonnes de table_reference()"))
+  if (inherits(r, "refus_tablexp"))
+    return(constat(formuler("refusé par table_reference() (motif %s)", citer(r$motif)), r$motif, "aucun refus",
+                   motif = r$motif))
+  if (!identical(x, r)) return(constat(modifie, texte_moteur("objet reçu"), "objet reconstruit par table_reference()"))
+  NULL
 }
 
 # --- tables embarquées (ADR 0018 ; ADR 0015, point 6) -----------------------------

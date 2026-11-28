@@ -71,6 +71,86 @@ verifier("table constante : q constant, statut synthetique, parametres (loi, q, 
 verifier("Gompertz-Makeham : c <= 1 refusé (loi_invalide)", leve_refus(table_gm(GM_A, GM_B, 1, 0:120), "loi_invalide"))
 verifier("table constante : q > 1 refusé (loi_invalide)", leve_refus(table_constante(1.5, 0:10, "x"), "loi_invalide"))
 
+# Âges des trois tables synthétiques (#234) : refus nommé à l'entrée, par le prédicat
+# unique defaut_ages_synthetiques(), citant la valeur fautive, sans aucun
+# avertissement de coercition (avant : Inf et 3e9 donnaient un avertissement
+# « NAs introduced by coercion to integer range », puis le refus générique
+# table_colonne_mal_typee).
+table_logistique <- tablexp:::table_logistique
+CONSTRUCTEURS_AGES <- list(
+  "Gompertz-Makeham" = function(ages) table_gm(GM_A, GM_B, GM_C, ages),
+  "logistique" = function(ages) table_logistique(2e-4, 2.5e-5, log(1.1), ages),
+  "constante" = function(ages) table_constante(0.05, ages, "x"))
+AGES_REFUSES <- list(  # âges reçus, texte cité attendu (NULL : défaut sans valeur)
+  "Inf" = list(c(0, Inf), "Inf"), "-Inf" = list(-Inf, "-Inf"), "NaN" = list(NaN, "NaN"),
+  "3e9" = list(c(0, 3e9), "3000000000"), "2147483648" = list(2147483648, "2147483648"),
+  "2.5" = list(2.5, "2.5"), "2 + 4 eps" = list(2 + 4 * .Machine$double.eps, "2.0000000000000009"),
+  "4503599627370495.5" = list(4503599627370495.5, "4503599627370495.5"), "-1" = list(-1, "-1"), "NA" = list(c(0, NA), "NA"),
+  "vide" = list(numeric(0), NULL), "texte" = list("0", NULL))
+avertissements_et_refus <- function(expr) {
+  w <- 0L
+  r <- withCallingHandlers(tryCatch({ force(expr); NULL }, refus_tablexp = function(c) c),
+                           warning = function(x) { w <<- w + 1L; invokeRestart("muffleWarning") })
+  list(avertissements = w, refus = r)
+}
+for (ctr in names(CONSTRUCTEURS_AGES)) for (cas in names(AGES_REFUSES)) {
+  verifier(sprintf("table %s : âges %s refusés (loi_invalide), valeur citée, aucun avertissement (#234)", ctr, cas), {
+    m <- avertissements_et_refus(CONSTRUCTEURS_AGES[[ctr]](AGES_REFUSES[[cas]][[1L]]))
+    cite <- AGES_REFUSES[[cas]][[2L]]
+    m$avertissements == 0L && inherits(m$refus, "refus_tablexp") && identical(m$refus$motif, "loi_invalide") &&
+      grepl("entiers de 0 à 2147483647", conditionMessage(m$refus), fixed = TRUE) &&
+      (is.null(cite) || grepl(paste0("« ", cite, " »"), conditionMessage(m$refus), fixed = TRUE))
+  })
+}
+verifier("table synthétique : âges valides inchangés (double entier = entier ; plus grand entier admis, sans avertissement)", {
+  m <- avertissements_et_refus(table_constante(0.05, .Machine$integer.max, "x"))
+  m$avertissements == 0L && is.null(m$refus) &&
+    identical(table_gm(GM_A, GM_B, GM_C, c(0, 1, 2)), table_gm(GM_A, GM_B, GM_C, 0:2)) &&
+    identical(table_logistique(2e-4, 2.5e-5, log(1.1), c(0, 1, 2)), table_logistique(2e-4, 2.5e-5, log(1.1), 0:2)) &&
+    identical(table_constante(0.05, c(0, 1, 2), "x")$age, 0:2)
+})
+
+# nom et source des tables synthétiques (#156 ; M500) : le `nom` est une constante
+# sans nombre (avant : formé par format() des paramètres, donc dépendant de
+# OutDec et de digits : « (A = 2e-04, B = 2,5e-05, c = 1,1) » sous OutDec = ","
+# et digits = 3) ; nom et source sont des textes du moteur marqués UTF-8 par
+# texte_moteur() (avant : non marqués, refusés à l'écriture de la fiche sous la
+# locale C, contrôle tests/controles/locale_c.R). Les paramètres restent dans
+# `parametres` ; l'empreinte de la table (valeurs seules) est celle de l'état
+# antérieur, mesurée sur 20f62b4 (A = 2e-4, B = 2.5e-5, c = 1.1 ; a = 2e-4,
+# b = 2.5e-5, c = log(1.1) ; q = 0.01 ; âges 0:120).
+synthetiques <- function() list(
+  gm = table_gm(GM_A, GM_B, GM_C, 0:120),
+  logistique = table_logistique(2e-4, 2.5e-5, log(1.1), 0:120),
+  constante = table_constante(0.01, 0:120, "constante"))
+SYNTHETIQUES_DEFAUT <- synthetiques()
+SYNTHETIQUES_OUTDEC <- local({
+  op <- options(OutDec = ",", digits = 3)
+  on.exit(options(op))
+  synthetiques()
+})
+u8 <- function(debut, fin) c(charToRaw(debut), as.raw(c(0xc3, 0xa9)), charToRaw(fin))  # « é » en octets UTF-8
+NOMS_SYNTHETIQUES <- list(gm = u8("Gompertz-Makeham synth", "tique"), logistique = u8("Logistique synth", "tique"))
+EMPREINTES_SYNTHETIQUES <- c(gm = "cfb5c8c7398a795d21beb5dbf030d7fd", logistique = "ae1112824b47a1f35e0d925cdf6cedc4",
+                             constante = "417e18bf2dde5e771b1cc770a2b789ad")
+for (k in c("gm", "logistique"))
+  verifier(sprintf("table synthétique %s (#156) : nom constant sans chiffre, octets UTF-8 attendus, marqué UTF-8, identique sous OutDec = \",\" et digits = 3", k),
+           identical(charToRaw(attr(SYNTHETIQUES_DEFAUT[[k]], "nom")), NOMS_SYNTHETIQUES[[k]]) &&
+             identical(charToRaw(attr(SYNTHETIQUES_OUTDEC[[k]], "nom")), NOMS_SYNTHETIQUES[[k]]) &&
+             !grepl("[0-9]", attr(SYNTHETIQUES_DEFAUT[[k]], "nom")) &&
+             identical(Encoding(attr(SYNTHETIQUES_DEFAUT[[k]], "nom")), "UTF-8") &&
+             identical(Encoding(attr(SYNTHETIQUES_OUTDEC[[k]], "nom")), "UTF-8"))
+for (k in names(SYNTHETIQUES_DEFAUT))
+  verifier(sprintf("table synthétique %s (#156) : source marquée UTF-8 ; source, parametres, valeurs et empreinte identiques sous OutDec = \",\" et digits = 3, empreinte de l'état antérieur", k),
+           {
+             d <- SYNTHETIQUES_DEFAUT[[k]]; o <- SYNTHETIQUES_OUTDEC[[k]]
+             identical(Encoding(attr(d, "source")), "UTF-8") && validUTF8(attr(d, "source")) &&
+               identical(charToRaw(attr(d, "source")), charToRaw(attr(o, "source"))) &&
+               identical(attr(d, "parametres"), attr(o, "parametres")) && identical(d$qx, o$qx) &&
+               identical(tablexp:::empreinte_table(d), tablexp:::empreinte_table(o)) &&
+               identical(tablexp:::empreinte_table(d), EMPREINTES_SYNTHETIQUES[[k]])
+           })
+
 # --- loi vraie effective -----------------------------------------------------------
 
 le <- loi_effective(list(table = GM, facteurs = c(H = 1, F = 0.6)), "deces", c("H", "F"))
@@ -288,10 +368,94 @@ local({
   verifier("table de classe c(<bytes>, ...) sur la transition rachat : refus loi_invalide, transition citée",
            verdict(attrape(simuler(loi(rachat = structure(RACHAT, class = c(b, class(RACHAT)))), PF, PER, GRAINE)),
                    "Loi « rachat » : la table porte une classe d'encodage « bytes »"))
-  # Témoin : une classe sans encodage bytes en tête n'est pas refusée pour cela.
-  verifier("table de classe c(\"autre\", \"table_reference\", \"data.frame\") (sans encodage bytes) : acceptée",
-           is.null(attrape(simuler(loi(deces = structure(GM, class = c("autre", class(GM)))),
-                                   modifyList(PF, list(n = 100)), PER, GRAINE))))
+  # Témoin : une classe sans encodage bytes en tête n'est pas refusée pour cela
+  # (classe d'encodage) : elle l'est depuis #253 comme objet autre que celui de
+  # table_reference() (classe exacte), sous le message de l'état de la table.
+  x <- attrape(simuler(loi(deces = structure(GM, class = c("autre", class(GM)))), modifyList(PF, list(n = 100)), PER, GRAINE))
+  verifier("table de classe c(\"autre\", \"table_reference\", \"data.frame\") (sans encodage bytes) : refus loi_invalide (classe exacte, #253), message de l'état de la table, pas celui de la classe bytes",
+           identical(verdict(x, "Loi « deces » : la table n'est pas l'objet rendu par table_reference() (objet de classe autre/table_reference/data.frame au lieu de table_reference)."), TRUE) &&
+             !grepl("bytes", conditionMessage(x), fixed = TRUE))
+})
+# Table reçue revalidée comme l'est celle de construire_table() (#253, ADR 0015,
+# point 1.3 ; etat_table_reference(), module donnees) : l'objet est exactement
+# celui que rend table_reference(), sinon refus loi_invalide nommé avant toute
+# lecture de colonne, au lieu d'une erreur R. Contre-épreuve : le cas de la
+# colonne `sexe` de classe c(<bytes>, "factor") lève sur l'état antérieur
+# l'erreur R « translating strings with "bytes" encoding is not allowed »
+# (mesuré à f2d532c) ; les autres cas y étaient acceptés ou refusés sous un autre
+# message. Messages écrits à la main.
+local({
+  b <- "\xe9"; Encoding(b) <- "bytes"
+  attrape <- function(expr) tryCatch({ force(expr); NULL }, refus_tablexp = function(r) r, error = function(e) e)
+  # Colonne `sexe` remplacée sans dispatch (`$<-.data.frame` lèverait sur la
+  # classe bytes), classe de l'objet conservée.
+  sexe_bytes <- function(t) {
+    f <- factor(t$sexe); class(f) <- c(b, "factor")
+    cl <- attr(t, "class"); u <- unclass(t); u[["sexe"]] <- f; attr(u, "class") <- cl; u
+  }
+  ligne_utf8 <- function(m) !grepl("[\n\v\f]", m) && validUTF8(m) && identical(Encoding(m), "UTF-8")
+  gabarit <- function(cause, constat)
+    paste0("Loi « ", cause, " » : la table n'est pas l'objet rendu par table_reference() (", constat,
+           "). Passer l'objet rendu par table_reference(), sans modification (ADR 0015, point 1.3).")
+  MODIFIE <- "objet modifié après table_reference()"
+  verdict <- function(x, cause, constat, details) {
+    if (is.null(x)) return("aucun refus levé")
+    if (!inherits(x, "refus_tablexp")) return(sprintf("condition %s : %s", class(x)[1L], conditionMessage(x)))
+    if (!identical(x$module, "simulation") || !identical(x$motif, "loi_invalide")) return(sprintf("refus %s/%s", x$module, x$motif))
+    if (!identical(conditionMessage(x), gabarit(cause, constat))) return(paste("message :", conditionMessage(x)))
+    if (!ligne_utf8(conditionMessage(x))) return("message sur plusieurs lignes ou non marqué UTF-8")
+    if (!identical(x$details, c(list(cause = cause, constat = constat), details))) return(paste("details :", paste(deparse(x$details), collapse = " ")))
+    TRUE
+  }
+  T_SEXE <- sexe_bytes(GM)
+  verifier("#253 colonne sexe de classe c(<bytes>, \"factor\"), classe de l'objet table_reference/data.frame : refus loi_invalide (pas une erreur R), message et details exacts, une ligne UTF-8",
+           identical(attr(T_SEXE, "class"), c("table_reference", "data.frame")) &&
+             identical(verdict(attrape(simuler(loi(deces = T_SEXE), PF, PER, GRAINE)), "deces", MODIFIE,
+                               list(lu = "data.frame nu non reconstructible", attendu = "colonnes de table_reference()",
+                                    motif_constructeur = NA_character_)), TRUE))
+  verifier("#253 idem sur la transition rachat : cause citée",
+           identical(verdict(attrape(simuler(loi(rachat = sexe_bytes(RACHAT)), PF, PER, GRAINE)), "rachat", MODIFIE,
+                             list(lu = "data.frame nu non reconstructible", attendu = "colonnes de table_reference()",
+                                  motif_constructeur = NA_character_)), TRUE))
+  # Paramètres bytes posés après coup (#256) : la reconstruction hérite du refus
+  # du constructeur, dont le motif est cité.
+  for (cas in list(list("nom de paramètre", structure(list(1), names = b)), list("valeur de paramètre", list(p = b))))
+    verifier(sprintf("#253 table reçue dont %s est d'encodage bytes (posé après coup) : refus loi_invalide, motif table_parametres_manquants cité (#256)", cas[[1L]]),
+             identical(verdict(attrape(simuler(loi(deces = structure(GM, parametres = cas[[2L]])), PF, PER, GRAINE)),
+                               "deces", "refusé par table_reference() (motif table_parametres_manquants)",
+                               list(lu = "table_parametres_manquants", attendu = "aucun refus",
+                                    motif_constructeur = "table_parametres_manquants")), TRUE))
+  # Vecteur atomique classé table_reference aux noms exacts : pas une liste, la garde de cohérence
+  # des colonnes ne s'applique pas (colonnes_lues() : précondition liste) ; la reconstruction le
+  # refuse, motif du constructeur cité, sans erreur R.
+  ATOME <- structure(c(1, 2, 3), names = c("age", "sexe", "qx"), class = c("table_reference", "data.frame"))
+  verifier("#253 vecteur atomique classé table_reference (noms age, sexe, qx) : refus loi_invalide, motif table_nom_manquant cité, pas une erreur R",
+           identical(verdict(attrape(simuler(loi(deces = ATOME), PF, PER, GRAINE)),
+                             "deces", "refusé par table_reference() (motif table_nom_manquant)",
+                             list(lu = "table_nom_manquant", attendu = "aucun refus",
+                                  motif_constructeur = "table_nom_manquant")), TRUE))
+  verifier("#253 lignes permutées (GM[121:1, ]) : refus loi_invalide, objet reçu comme lu",
+           identical(verdict(attrape(loi_effective(list(table = GM[121:1, ], facteurs = c(H = 1, F = 1)), "deces", c("H", "F"))),
+                             "deces", MODIFIE, list(lu = "objet reçu", attendu = "objet reconstruit par table_reference()",
+                                                    motif_constructeur = NA_character_)), TRUE))
+  verifier("#253 colonne en trop : refus loi_invalide, colonnes lues dans details$lu",
+           identical(verdict(attrape(loi_effective(list(table = structure(cbind(GM, z = 1), class = class(GM)), facteurs = c(H = 1, F = 1)),
+                                                    "deces", c("H", "F"))), "deces", MODIFIE,
+                             list(lu = c("age", "sexe", "qx", "z"),
+                                  attendu = "age, sexe, qx [, annee ou generation] (colonnes de table_reference())",
+                                  motif_constructeur = NA_character_)), TRUE))
+  verifier("#253 data.frame simple : refus loi_invalide, classe citée",
+           identical(verdict(attrape(loi_effective(list(table = as.data.frame(GM), facteurs = c(H = 1, F = 1)), "deces", c("H", "F"))),
+                             "deces", "objet de classe data.frame au lieu de table_reference",
+                             list(lu = "data.frame", attendu = c("table_reference", "data.frame"),
+                                  motif_constructeur = NA_character_)), TRUE))
+  # Tables valides : objet inchangé et accepté tel quel (aucune copie, aucune correction).
+  # Embarquées lues sans refus (TF 00-02 est refusée à la lecture, hors de ce test) :
+  # table de génération comprise (colonne generation).
+  verifier("#253 tables valides (Gompertz-Makeham, constante, embarquées dont une table de génération) : etat_table_reference() rend NULL",
+           is.null(tablexp:::etat_table_reference(GM)) && is.null(tablexp:::etat_table_reference(RACHAT)) &&
+             all(vapply(c("TD 88-90", "TV 88-90", "TH 00-02", "TGF05", "Table unique 2024"),
+                        function(n) is.null(tablexp:::etat_table_reference(table_embarquee(n))), NA)))
 })
 verifier("portefeuille : champ manquant (origine) refusé, sans défaut implicite",
          leve_refus(simuler(loi(), PF[setdiff(names(PF), "origine")], PER, GRAINE), "portefeuille_invalide"))

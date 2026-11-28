@@ -58,7 +58,7 @@ verifier("T1 forme (valeur calculée à la main) : classe, statut, sexe, âges, 
            identical(unique(LT$sexe), "ensemble") && identical(LT$age, 0:130) &&
            identical(attr(LT, "parametres"),
                      list(loi = "logistique", a = LT_A, b = LT_B, c = LT_C, ages = c(0L, 130L))) &&
-           identical(attr(LT, "nom"), "Logistique synthétique (a = 2e-04, b = 2.5e-05, c = 0.09531018)"))
+           identical(attr(LT, "nom"), "Logistique synthétique"))
 
 # --- T2 : valeurs à 12 décimales -----------------------------------------------------------
 

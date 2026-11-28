@@ -41,8 +41,14 @@
 #       date (libellé « entières » de TYPES_ADMIS) : marqués UTF-8, sans
 #       octet « <xx> » (#127) ; TYPES_ADMIS, LIBELLES_MOTIFS,
 #       catalogue_roles()$type_admis et details$type_attendu marqués UTF-8
-#       (#151) ;
-#    3. les textes (fiche, plan et rapport figé de R1 à R17, bilan du rejeu et
+#       (#151) ; puis, sur l'entrée de R1, une construction (positionnement par
+#       SMR, sans segmentation) qui lit chacune des trois tables synthétiques
+#       (Gompertz-Makeham, logistique, constante ; #156, M500), dont le nom
+#       et la source doivent être marqués UTF-8 (sinon refus
+#       chaine_codage_indetermine à l'écriture de la fiche) : fiche, plan
+#       et rapport figé, comme pour R1 à R17 ;
+#    3. les textes (fiche, plan et rapport figé de R1 à R17 et des trois constructions
+#       synthétiques, bilan du rejeu et
 #       messages de refus de R1, messages de refus par module) écrits sous C
 #       et sous UTF-8 sont comparés
 #       octet à octet. Aucune
@@ -64,6 +70,7 @@
 
 LOCALES_UTF8 <- c("C.UTF-8", "C.utf8", "en_US.UTF-8")  # comme tests/harnais.R
 LOCALE_INVENTEE <- "xx_XX.UTF-8"  # comme tests/harnais.R (critère de #109)
+IDENTIFIANTS_SYNTHETIQUES <- c("S_gm", "S_logistique", "S_constante")  # #156 : tables synthétiques lues par une construction
 IDENTIFIANTS <- paste0("R", 1:17)  # R13 : #169, recette agrégats ; R14 : #180, recette stocks successifs ; R15 à R17 : #223, #225, #144, lissage
 
 # Orchestration commune (installer, executer, avec_environnement, duree,
@@ -433,6 +440,45 @@ travailleur <- function(args) {
     if (inherits(r, "error")) d(sprintf("erreur [%s] : %s", paste(class(r)[1L], collapse = "/"), conditionMessage(r)))
     cat(sprintf("  %s : %s\n", id, if (length(defauts) && any(startsWith(defauts, paste0(id, " :")))) "ECHEC" else "ok"))
   }
+  # Tables synthétiques lues par une construction (#156 ; M500) : le nom et la
+  # source des trois constructeurs sont des textes du moteur marqués UTF-8
+  # (texte_moteur()) ; non marqués, la construction est refusée sous la locale C
+  # (chaine_codage_indetermine, clé tv/nom ou tv/source). Même entrée que R1,
+  # positionnement par SMR sur la table synthétique (clé « tv », sexe
+  # « ensemble », sans segmentation) ; fiche, plan et rapport figé écrits, relus
+  # (aller-retour identical()), octets comparés ensuite entre les deux
+  # installations.
+  jeu_s <- entrees[["reference"]]
+  plan_s <- plan_reference(segmentation = character(0),
+                           positionnement = list(methode = "smr", table_reference = "tv", plage_ages = c(20, 90), niveau = 0.95))
+  tables_s <- list(
+    S_gm = tablexp:::table_gompertz_makeham(2e-4, 2.5e-5, 1.1, 0:120),
+    S_logistique = tablexp:::table_logistique(2e-4, 2.5e-5, log(1.1), 0:120),
+    S_constante = tablexp:::table_constante(0.01, 0:120, "rachat constant"))
+  for (id in IDENTIFIANTS_SYNTHETIQUES) {
+    d <- function(m) defauts <<- c(defauts, sprintf("%s : %s", id, octets_bruts(m)))
+    r <- tryCatch({
+      x <- construire_table(jeu_s$donnees, jeu_s$roles, plan_s, tables_reference = list(tv = tables_s[[id]]))
+      f <- x$fiche
+      tf <- ecrire_fiche(f); tp <- ecrire_plan(f$plan); tr <- ecrire_rapport(x)
+      if (!is.raw(tf) || !is.raw(tp) || !is.raw(tr)) stop("texte non écrit en octets (raw)")
+      writeBin(tf, file.path(sortie, paste0(id, ".fiche.txt")))
+      writeBin(tp, file.path(sortie, paste0(id, ".plan.txt")))
+      writeBin(tr, file.path(sortie, paste0(id, ".rapport.txt")))
+      if (!identical(lire_fiche(tf), f)) d("fiche : lire_fiche(ecrire_fiche(f)) n'est pas identical() à f")
+      if (!identical(lire_plan(tp), f$plan)) d("plan : lire_plan(ecrire_plan(p)) n'est pas identical() au plan")
+      if (!identical(ecrire_fiche(lire_fiche(tf)), tf)) d("fiche : réécriture de la fiche relue différente du texte écrit")
+      if (!identical(ecrire_plan(lire_plan(tp)), tp)) d("plan : réécriture du plan relu différente du texte écrit")
+      t_ <- f$tables_reference$tv
+      if (!identical(t_$statut, "synthetique")) d("fiche : table lue sans le statut synthetique")
+      if (!identical(Encoding(t_$source), "UTF-8")) d("fiche : source de la table non marquée UTF-8")
+      if (id != "S_constante" && !identical(Encoding(t_$nom), "UTF-8")) d("fiche : nom de la table non marqué UTF-8")
+      if (id != "S_constante" && grepl("[0-9]", t_$nom)) d(sprintf("fiche : nom de la table à chiffre : %s", t_$nom))
+      NULL
+    }, error = function(e) e)
+    if (inherits(r, "error")) d(sprintf("erreur [%s] : %s", paste(class(r)[1L], collapse = "/"), conditionMessage(r)))
+    cat(sprintf("  %s : %s\n", id, if (length(defauts) && any(startsWith(defauts, paste0(id, " :")))) "ECHEC" else "ok"))
+  }
   # Messages de refus par module (#127, critère 2 ; ADR 0007, annotation du
   # 05/11/2026, (c) et (f)) : un refus par module qui cite une valeur reçue
   # non ASCII (« âge ») de codage natif non marqué, latin-1 et UTF-8, le refus
@@ -597,7 +643,7 @@ principal <- function(args = commandArgs(trailingOnly = TRUE)) {
   if (length(defauts)) echec()
   # Comparaison octet à octet : textes écrits sous C contre sous UTF-8.
   n_comparees <- 0L
-  for (id in IDENTIFIANTS) for (nature in c("fiche", "plan", "rapport")) {
+  for (id in c(IDENTIFIANTS, IDENTIFIANTS_SYNTHETIQUES)) for (nature in c("fiche", "plan", "rapport")) {
     nom <- sprintf("%s.%s.txt", id, nature)
     f <- file.path(vapply(cas, `[[`, "", "sortie"), nom)
     if (!all(file.exists(f))) { defauts <- c(defauts, sprintf("%s : texte absent (%s)", nom, paste(basename(dirname(f))[!file.exists(f)], collapse = ", "))); next }
@@ -631,10 +677,10 @@ principal <- function(args = commandArgs(trailingOnly = TRUE)) {
       defauts <- c(defauts, sprintf("modules.refus.txt : messages de refus par module sous C différents de ceux sous %s (%s)",
                                     utf8, ecart_octets(a, b)))
   }
-  if (n_comparees != 3L * length(IDENTIFIANTS) + 3L && !length(defauts)) defauts <- "nombre de textes comparés inattendu"
+  if (n_comparees != 3L * (length(IDENTIFIANTS) + length(IDENTIFIANTS_SYNTHETIQUES)) + 3L && !length(defauts)) defauts <- "nombre de textes comparés inattendu"
   if (length(defauts)) echec()
   cat(sprintf("  OK : %d textes (fiche, plan et rapport figé de %s, bilan du rejeu et messages de refus de R1, messages de refus par module) identiques octet à octet sous C et sous %s ; aller-retour identical() ; durée totale %s.\n",
-              n_comparees, paste(IDENTIFIANTS, collapse = ", "), utf8, duree(t_debut)))
+              n_comparees, paste(c(IDENTIFIANTS, IDENTIFIANTS_SYNTHETIQUES), collapse = ", "), utf8, duree(t_debut)))
   invisible(TRUE)
 }
 

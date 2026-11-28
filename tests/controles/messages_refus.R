@@ -130,10 +130,11 @@ RELAIS <- list(
 # locale, qui rend un texte formé (règle 4, contrôlée dans son fichier) ; son
 # appel est admis en tout fichier.
 AIDES <- data.frame(
-  fichier = c("donnees.R", "donnees.R", "donnees.R", "simulation.R", "construire_table.R", "rapport.R", "rapport.R",
+  fichier = c("donnees.R", "donnees.R", "donnees.R", "simulation.R", "simulation.R", "construire_table.R", "rapport.R", "rapport.R",
               "positionnement.R", "lissage.R", "donnees.R", "donnees.R", "donnees.R", "donnees.R", "donnees.R", "donnees.R",
               "donnees.R"),
-  nom = c("message_aucune_recette", "groupes_cites_table", "lignes_citees_table", "ecart_noms", "decrire_forme",
+  nom = c("message_aucune_recette", "groupes_cites_table", "lignes_citees_table", "ecart_noms",
+          "defaut_ages_synthetiques", "decrire_forme",
           "decrire_valeur", "valeur_message", "segments_cites", "segments_cites", "bandes_citees",
           "complement_citees", "colonnes_decompte_citees", "classes_colonnes_citees", "colonnes_classe_citees",
           "colonnes_ecart_citees", "constat_colonnes_lues"),
@@ -157,6 +158,8 @@ EXCEPTIONS <- exception_lignes(
   c("construire_table.R", "rejouer_fiche", "ALGORITHME_EMPREINTE", "constante du moteur"),
   c("construire_table.R", "rejouer_fiche", "ENTETE_CANONIQUE", "constante du moteur"),
   c("construire_table.R", "rejouer_fiche", "empreinte", "empreinte recalculée par le moteur (hexadécimal)"),
+  c("construire_table.R", "controler_forme_tables", "etat$constat",
+    "texte de l'écart formé par formuler() dans etat_table_reference() (donnees.R ; classes citées par citer()), #253"),
   c("donnees.R", "controler_roles", "vapply(hors, function(h) paste(utils::head(h, NB_LIGNES_CITEES), collapse = \", \"), character(1L))", "numéros de ligne (which())"),
   c("donnees.R", "controler_transition_periode", "paste(TRANSITIONS$depart, \"->\", TRANSITIONS$arrivee, collapse = \", \")", "catalogue des transitions"),
   c("donnees.R", "controler_transition_periode", "paste(names(hors_p)[hors_p], collapse = \" et \")", "noms des bornes (debut, fin), texte du moteur"),
@@ -178,6 +181,8 @@ EXCEPTIONS <- exception_lignes(
   c("rapport.R", "decrire_valeur", "typeof(v)", "type R (typeof()), ASCII"),
   c("rapport.R", "controler_rapport", "typeof(x)", "type R (typeof()), ASCII"),
   c("rapport.R", "controler_rapport", "a", "empreinte recalculée par le moteur (hexadécimal)"),
+  c("simulation.R", "loi_effective", "etat$constat",
+    "texte de l'écart formé par formuler() dans etat_table_reference() (donnees.R ; classes citées par citer()), #253"),
   c("simulation.R", "loi_effective", "cause", "cause du catalogue (names(CAUSES_SIMULEES))"),
   c("simulation.R", "loi_effective", "s", "sexe du catalogue (MODALITES_SEXE)"),
   c("simulation.R", "controler_couverture", "cause", "cause du catalogue (names(CAUSES_SIMULEES))"),
