@@ -973,6 +973,11 @@ issue~\#150), et pour une table de référence entière de classe
 \code{bytes}, \code{details\$classe} portant la classe reçue
 (\code{classe\_bytes()} avant \code{is.data.frame()}~;
 section~\ref{sec:table-reference}~; issue~\#158)~;
+\code{table\_parametres\_manquants} pour les paramètres d'une table
+synthétique de classe \code{bytes}, \code{details\$classe} portant la
+classe reçue (\code{classe\_bytes()}, longueur lue par
+\code{longueur\_lue()}~; section~\ref{sec:table-reference}~;
+issue~\#392)~;
 \code{empilement\_table\_invalide} pour une table de classe \code{bytes}
 reçue par \code{empiler\_stocks()}, \code{inventaires},
 \code{evenements} ou les deux, toutes les tables en défaut citées,
@@ -1001,7 +1006,7 @@ une classe \code{bytes} sur \code{plan/etapes}~:
 «~différente~» (section~\ref{sec:rejeu}). Une classe d'encodage
 \code{bytes} est citée sous le repère de la règle ci-dessus.
 \textbf{Statut et limites}~: pour les données, les colonnes de rôle, une
-table de référence et ses colonnes, les deux tables d'\code{empiler\_stocks()}
+table de référence, ses colonnes et ses paramètres, les deux tables d'\code{empiler\_stocks()}
 et la loi du simulateur, \emph{lecture}
 du code (\code{classe\_bytes()} y précède toute fonction qui dispatche~;
 pour la loi vraie elle-même, \code{forme\_exacte()}, qui n'admet aucune
@@ -1203,7 +1208,7 @@ d'encodage \code{bytes}, \code{FALSE} sinon~; l'appelant retire alors la
 classe par \code{unclass()} avant toute fonction qui dispatche
 (issue~\#128), ou refuse sous un motif nommé (données, colonne de rôle,
 table d'une loi du simulateur~; issue~\#150~; tables d'\code{empiler\_stocks()}~;
-issue~\#366) \\
+issue~\#366~; paramètres d'une table de référence~; issue~\#392) \\
 \catalogue{fonctions-outils}{lire\_champ()} & interne & \code{x} (liste),
 \code{nom} & premier élément de \code{x} de ce nom, \code{NULL} s'il est
 absent, comme \code{x[[nom]]}, mais trouvé par \code{match()} sur les noms
@@ -5182,7 +5187,8 @@ dans cet ordre, au premier défaut (tableau~\ref{tab:refus-tables-reference})~:
     comprises). Un attribut \code{nom} ou
     \code{source} d'encodage \code{bytes}, ou un attribut
     \code{parametres} dont un nom ou une valeur caractère, à toute
-    profondeur, porte cet encodage, posé sur une table après le
+    profondeur, ou la classe elle-même (issue~\#392) porte cet encodage,
+    posé sur une table après le
     constructeur, est refusé à la reconstruction~(b), le constructeur le
     refusant (section~\ref{sec:table-reference}, «~Encodage \code{bytes}
     des métadonnées et de la table~»)~: raison «~refusé par
@@ -5193,7 +5199,12 @@ dans cet ordre, au premier défaut (tableau~\ref{tab:refus-tables-reference})~:
     auparavant refusé à l'écriture d'essai~(d), sous
     \code{chaine\_codage\_bytes}, avec, pour un paramètre,
     \code{details\$chemin} \code{[clé]/parametres/[nom]} pour une valeur ou
-    \code{[clé]/parametres/@noms} pour un nom).
+    \code{[clé]/parametres/@noms} pour un nom~; une classe \code{bytes}
+    des paramètres faisait lever une erreur R à la reconstruction~(b),
+    convertie en refus sans motif du constructeur, \code{details\$lu}
+    «~data.frame nu non reconstructible~», \code{details\$motif\_constructeur}
+    à \code{NA}, \emph{constat} de mesure de \code{etat\_table\_reference()}
+    sur le code qui précède l'issue~\#392, \code{24bbd41}, R~4.3.3).
     Un paramètre que le constructeur ne lit pas (fonction, niveau de
     facteur, \code{dimnames}, classe ou autre attribut d'un paramètre,
     d'encodage \code{bytes} ou non) est refusé à l'écriture
@@ -9227,7 +9238,8 @@ lus. Passer des paramètres (liste non vide) sans encodage bytes.~». Ce
 contrôle suit, dans l'étape «~paramètres~» de l'ordre ci-dessus, ceux de
 la présence des paramètres (\code{table\_parametres\_manquants} pour une
 table synthétique sans liste non vide, \code{table\_parametres\_inattendus}
-pour une table embarquée ou importée qui en porte). Il lit, à toute
+pour une table embarquée ou importée qui en porte) et celui de leur
+classe (issue~\#392, ci-dessous). Il lit, à toute
 profondeur de la liste, les noms (\code{noms\_bytes()}) et les valeurs des
 vecteurs caractère, et rien d'autre~: les niveaux d'un facteur, les
 \code{dimnames}, la classe et les autres attributs d'un paramètre ne sont
@@ -9238,7 +9250,33 @@ niveaux de la liste, sans appel récursif ni dispatch sur la classe~: une
 liste de profondeur $10^5$ ne lève pas d'erreur R au constructeur
 (\emph{constat} de mesure, R~4.3.3), sa profondeur, au-delà de
 \code{PROFONDEUR\_MAX\_TEXTE}, étant refusée à l'écriture d'essai~(d), sous
-\code{serialisation\_impossible}.
+\code{serialisation\_impossible}. Depuis l'issue~\#392 (décision P1 sur
+l'avis d'\code{actuary}~: refus dès la construction), le contrôle de
+présence lit la longueur des paramètres sans dispatch, par
+\code{longueur\_lue()}, et non plus par \code{length()}, puis, entre
+\code{table\_parametres\_inattendus} et le contrôle de l'issue~\#256,
+des paramètres dont la classe porte, à toute position, un élément
+d'encodage \code{bytes} (\code{classe\_bytes()}) sont refusés sous
+\code{table\_parametres\_manquants}, au message~: «~Table synthétique
+«~[nom]~»~: ses paramètres portent une classe d'encodage «~bytes~»
+(classe [classe]), non convertible en UTF-8 sans deviner~: ils ne sont
+pas lus. Passer des paramètres (liste non vide) dont la classe ne porte
+aucune chaîne d'encodage bytes.~», [classe] les éléments de la classe
+séparés par «~/~», chaque élément \code{bytes} cité sous le repère de la
+règle unique des refus (section~\ref{sec:refus}), \code{details\$classe}
+la classe reçue. Une liste vide ou une valeur qui n'est pas une liste,
+même de classe \code{bytes}, reste refusée par le contrôle de présence
+(«~ses paramètres (liste non vide) sont requis~»)~; une classe sans
+élément \code{bytes} reste admise, sans être lue~; une classe
+\code{bytes} à l'intérieur de la liste n'est pas lue par le constructeur
+et relève de l'écrivain de la fiche (ci-dessus). Auparavant,
+\code{length()} levait sur une telle classe l'erreur R «~translating
+strings with "bytes" encoding is not allowed~», liste vide comprise, et
+une méthode \code{length()} de la classe des paramètres qui rendait~0
+faisait refuser une liste non vide comme vide, sous
+\code{table\_parametres\_manquants}~; depuis, cette liste est admise
+(\emph{constat} de mesure sur le code qui précède l'issue,
+\code{24bbd41}, et sur l'état de la branche, R~4.3.3).
 
 \medskip
 \noindent
@@ -11012,7 +11050,7 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{axe\_temporel\_table()} & interne & table & prédicat unique de l'axe d'une table d'après ses noms de colonnes (lus par \code{attr()})~: \code{annee}, \code{generation} ou \code{NA}~; un objet aux deux colonnes est rendu comme une table à \code{annee}~; lu par le constructeur, l'empreinte de table, l'état d'une table reçue (issue~\#253), les contrôles d'entrée des étapes qui lisent une table et la loi effective du simulateur (issue~\#272) \\
 \catalogue{fonctions-donnees}{groupes\_cites\_table()} & interne & sexes, axe, valeurs de l'axe & groupe cité dans les refus du constructeur~: «~H~», «~H, année 1950~» ou «~F, génération 1950~»~; aide de message, seule définition du format (issues~\#270 et~\#272) \\
 \catalogue{fonctions-donnees}{lignes\_citees\_table()} & interne & lignes reçues, sexes, axe, valeurs de l'axe, âges & lignes citées avec leur groupe et leur âge («~2 (H, année 1950, âge 1)~»), séparées par des virgules, au plus \code{NB\_LIGNES\_CITEES} choisies par l'appelant~; aide de message (issue~\#270) \\
-\catalogue{fonctions-donnees}{table\_reference()} & exportée & table, nom, statut, source, paramètres, forme d'origine & objet \code{table\_reference} contrôlé, lignes dans l'ordre canonique (sexe, axe temporel, âge), noms de lignes automatiques~; au plus un axe temporel, \code{annee} ou \code{generation}, refus \code{table\_annee\_et\_generation} des deux (issue~\#272)~; table transcrite en $l_x$ convertie en $q_x = (l_x - l_{x+1})/l_x$ par groupe (sexe, axe), dernier âge de chaque groupe sans ligne, premier $l_x$ nul qui clôt le groupe, refus des $l_x$ non décroissants par paires d'âges (issues~\#146 et~\#272)~; nom réservé aux tables embarquées pour les statuts \code{importee} et \code{synthetique} (issue~\#263)~; nom, source, paramètres (noms et valeurs caractère, à toute profondeur) et classe de la table sans encodage \code{bytes}, refusés sous \code{table\_nom\_manquant}, \code{table\_source\_manquante}, \code{table\_parametres\_}\allowbreak\code{manquants} et \code{table\_mal\_formee} (section~\ref{sec:table-reference}~; issues~\#158 et~\#256)~; liste des colonnes de la longueur de ses noms, jugée avant toute lecture de colonne par \code{colonnes\_lues()}, sinon \code{table\_mal\_formee} (issue~\#355)~; nombre de lignes du refus \code{table\_vide} lu sans dispatch (\code{.row\_names\_info()}~; section~\ref{sec:rapport-fige}, «~Lecture sans dispatch~»~; issue~\#367)~; nombre de lignes de chaque colonne comparé à celui des noms de lignes (\code{decomptes\_colonnes()} sous \code{par\_methode = FALSE}, liste classée sans \code{dim} non comptée), sinon \code{table\_mal\_formee}, \code{details} à cinq clés, avant \code{table\_colonne\_manquante} et \code{table\_vide} (issue~\#368) \\
+\catalogue{fonctions-donnees}{table\_reference()} & exportée & table, nom, statut, source, paramètres, forme d'origine & objet \code{table\_reference} contrôlé, lignes dans l'ordre canonique (sexe, axe temporel, âge), noms de lignes automatiques~; au plus un axe temporel, \code{annee} ou \code{generation}, refus \code{table\_annee\_et\_generation} des deux (issue~\#272)~; table transcrite en $l_x$ convertie en $q_x = (l_x - l_{x+1})/l_x$ par groupe (sexe, axe), dernier âge de chaque groupe sans ligne, premier $l_x$ nul qui clôt le groupe, refus des $l_x$ non décroissants par paires d'âges (issues~\#146 et~\#272)~; nom réservé aux tables embarquées pour les statuts \code{importee} et \code{synthetique} (issue~\#263)~; nom, source, paramètres (noms et valeurs caractère, à toute profondeur) et classe de la table sans encodage \code{bytes}, refusés sous \code{table\_nom\_manquant}, \code{table\_source\_manquante}, \code{table\_parametres\_}\allowbreak\code{manquants} et \code{table\_mal\_formee} (section~\ref{sec:table-reference}~; issues~\#158 et~\#256)~; longueur des paramètres lue sans dispatch (\code{longueur\_lue()}) et classe des paramètres sans élément d'encodage \code{bytes}, sinon \code{table\_parametres\_}\allowbreak\code{manquants}, \code{details\$classe} la classe reçue (issue~\#392)~; liste des colonnes de la longueur de ses noms, jugée avant toute lecture de colonne par \code{colonnes\_lues()}, sinon \code{table\_mal\_formee} (issue~\#355)~; nombre de lignes du refus \code{table\_vide} lu sans dispatch (\code{.row\_names\_info()}~; section~\ref{sec:rapport-fige}, «~Lecture sans dispatch~»~; issue~\#367)~; nombre de lignes de chaque colonne comparé à celui des noms de lignes (\code{decomptes\_colonnes()} sous \code{par\_methode = FALSE}, liste classée sans \code{dim} non comptée), sinon \code{table\_mal\_formee}, \code{details} à cinq clés, avant \code{table\_colonne\_manquante} et \code{table\_vide} (issue~\#368) \\
 \catalogue{fonctions-donnees}{etat\_table\_reference()} & interne & objet reçu comme table de référence & \code{NULL} si l'objet est celui que rendrait \code{table\_reference()} pour ses colonnes et ses métadonnées, sinon le premier écart, liste (\code{constat}, \code{lu}, \code{attendu}, \code{motif\_constructeur})~; ne refuse pas, l'appelant refuse~; dans l'ordre~: classe exacte lue par \code{attr()}, noms de colonnes, pour une liste cohérence des colonnes et de leurs noms (\code{colonnes\_lues()}, avant toute lecture de colonne), reconstruction par \code{table\_reference()} sous \code{tryCatch()} (refus du constructeur cité par son motif~; erreur R, par exemple sur une colonne de classe \code{bytes}~: objet non reconstructible), \code{identical()} à la reconstruction~; seule lecture de cette règle, appelée par le contrôle de forme des tables reçues (points~(a) à~(c) du contrôle~1, section~\ref{sec:tables-reference-recues}) et par la loi effective du simulateur (section~\ref{sec:loi-vraie}, «~Table reçue~»~; issues~\#253 et~\#365) \\
 \catalogue{fonctions-donnees}{DECLARATIONS\_TABLES\_EMBARQUEES} & constante & --- & déclaration fermée des tables embarquées, \code{data.frame} nu~: \code{nom}, \code{identifiant} (de fichier), \code{sexe} (modalité déclarée), \code{format} (entier, 1 ou 2, déclaré et non déduit~; issue~\#272), une ligne par table dans l'ordre du catalogue (section~\ref{sec:table-reference}, «~Tables embarquées~») \\
 \catalogue{fonctions-donnees}{DOSSIER\_TABLES\_EMBARQUEES} & constante & --- & \code{inst/extdata/tables}, dossier des tables embarquées relatif à la racine des sources \\
@@ -23067,8 +23105,12 @@ test en sous-processus,
 table de décès puis de rachat), une sous-classe ou un \code{data.frame}
 simple, des lignes permutées, une colonne ajoutée, un attribut retiré ou
 porté à une valeur que le constructeur refuse (par exemple un nom ou une
-valeur caractère d'encodage \code{bytes} dans les paramètres, motif
-\code{table\_parametres\_manquants} cité~; issue~\#256~; un niveau de
+valeur caractère d'encodage \code{bytes} dans les paramètres, ou une
+classe d'encodage \code{bytes} des paramètres eux-mêmes, motif
+\code{table\_parametres\_manquants} cité~; issues~\#256 et~\#392, la
+seconde ayant remplacé un refus sans motif du constructeur,
+\code{details\$motif\_constructeur} à \code{NA}, \emph{constat} de
+mesure sur \code{24bbd41}, R~4.3.3~; un niveau de
 facteur ou des \code{dimnames} d'un paramètre, que le constructeur ne lit
 pas, passent ce contrôle, le simulateur n'écrivant aucune fiche), un $q_x$ porté
 hors de $[0, 1]$ (motif \code{table\_qx\_hors\_bornes} cité).
