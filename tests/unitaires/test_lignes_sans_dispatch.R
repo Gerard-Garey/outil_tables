@@ -236,7 +236,7 @@ local({
   # d'innocuité).
   SITES_DONNEES <- list(
     list(nom = "evaluer_motifs", jeu = "lignes", effet = "erreur de R « NAs are not allowed in subscripted assignments »",
-         avant = function(f, J) f(k354(J$d), J$r, J$p$debut, J$p$fin, J$p$borne, J$seg),
+         avant = function(f, J) f(k354(J$d), J$r, J$p$debut, J$p$fin, J$p$borne, J$seg, J$p$transition$etat_de),
          controle = function(a, J) inherits(a$valeur, "error") && !inherits(a$valeur, "refus_tablexp") &&
            grepl("NAs are not allowed", conditionMessage(a$valeur), fixed = TRUE)),
     list(nom = "evaluer_motifs_agregats", jeu = "agregats", effet = "aucun",
