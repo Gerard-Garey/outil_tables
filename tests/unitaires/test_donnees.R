@@ -2849,6 +2849,79 @@ verifier("table_reference : paramètres sans repérage faux (NULL, fonction, ent
          inherits(tr(parametres = list(a = 1, b = list(NULL, TRUE, identity, 1L, NA_character_, c(u = "x"), list()))), "table_reference"))
 verifier("table_reference : paramètres : data.frame à nom de colonne bytes -> refus table_parametres_manquants sans erreur R",
          identical(refus(tr(parametres = list(d = structure(data.frame(a = 1), names = OCTETS))))$motif, "table_parametres_manquants"))
+# Classe d'encodage bytes de `parametres` lui-même (#392 ; décision P1 sur l'avis
+# d'actuary, étape (0') de B41) : refus table_parametres_manquants dès la
+# construction, texte et details écrits à la main. Avant #392 (mesuré à 24bbd41) :
+# erreur R « translating strings with "bytes" encoding is not allowed » (appel
+# length(parametres), avec dispatch). Une classe ASCII n'est pas marquée « bytes »
+# (Encoding() rend "unknown") : les cas emploient une classe non ASCII. Le refus
+# vient avant parametres_bytes() (#256) et après table_parametres_inattendus.
+local({
+  cl_b <- "cl\xe9"; Encoding(cl_b) <- "bytes"
+  cl_deux <- c("autre", cl_b)
+  appel <- function(p, ...) {
+    n <- 0L
+    r <- withCallingHandlers(tryCatch(tr(parametres = p, ...), refus_tablexp = function(c) c, error = function(c) c),
+                             warning = function(w) { n <<- n + 1L; invokeRestart("muffleWarning") })
+    list(r = r, n = n)
+  }
+  msg <- function(cl) paste0("Table synthétique « essai » : ses paramètres portent une classe d'encodage « bytes » (classe ", cl,
+                             "), non convertible en UTF-8 sans deviner : ils ne sont pas lus. Passer des paramètres ",
+                             "(liste non vide) dont la classe ne porte aucune chaîne d'encodage bytes.")
+  verifier("#392 une classe non ASCII est marquée bytes, une classe ASCII ne l'est pas (hypothèse du test)",
+           identical(Encoding(cl_b), "bytes") && !identical(Encoding(local({ a <- "cl"; Encoding(a) <- "bytes"; a })), "bytes"))
+  cas <- list(
+    list("liste de classe bytes", structure(list(A = 2e-4), class = cl_b), msg("<chaîne d'encodage bytes>"), cl_b),
+    list("liste de classe c(\"autre\", <bytes>)", structure(list(A = 2e-4), class = cl_deux), msg("autre/<chaîne d'encodage bytes>"), cl_deux))
+  for (k in cas)
+    verifier(sprintf("#392 refus (valeur écrite à la main) : paramètres, %s -> donnees/table_parametres_manquants, message et details exacts, une ligne UTF-8, aucune erreur R, 0 avertissement R", k[[1L]]), {
+      a <- appel(k[[2L]])
+      x <- a$r
+      if (!inherits(x, "refus_tablexp")) { if (inherits(x, "error")) paste("erreur R :", conditionMessage(x)) else "aucun refus levé" }
+      else if (!identical(x$module, "donnees") || !identical(x$motif, "table_parametres_manquants")) sprintf("%s / %s", x$module, x$motif)
+      else if (!identical(conditionMessage(x), k[[3L]])) paste("message :", conditionMessage(x))
+      else if (!ligne_utf8(x)) "message sur plusieurs lignes ou non marqué UTF-8"
+      else if (!identical(x$details, list(classe = k[[4L]]))) paste("details :", paste(deparse(x$details), collapse = " "))
+      else if (a$n != 0L) sprintf("%d avertissement(s) R", a$n)
+      else TRUE
+    })
+  verifier("#392 témoin : paramètres list(A = 1) (et classe ASCII supplémentaire) admis, aucun refus ni avertissement R, parametres identiques à l'entrée", {
+    ascii <- structure(list(A = 1), class = "k392")
+    a <- appel(list(A = 1)); b <- appel(ascii)
+    inherits(a$r, "table_reference") && identical(attr(a$r, "parametres"), list(A = 1)) && a$n == 0L &&
+      inherits(b$r, "table_reference") && identical(attr(b$r, "parametres"), ascii) && b$n == 0L
+  })
+  verifier("#392 liste vide de classe bytes : refus « liste non vide requis » du premier contrôle (longueur 0 lue sans dispatch), sans erreur R", {
+    a <- appel(structure(list(), class = cl_b))
+    x <- a$r
+    inherits(x, "refus_tablexp") && identical(x$motif, "table_parametres_manquants") &&
+      identical(conditionMessage(x), "Table synthétique « essai » : ses paramètres (liste non vide) sont requis.") && a$n == 0L
+  })
+  verifier("#392 parametres non liste de classe bytes : refus « liste non vide requis » inchangé, sans erreur R (is.list() court-circuite)", {
+    a <- appel(structure(1, class = cl_b))
+    x <- a$r
+    inherits(x, "refus_tablexp") && identical(x$motif, "table_parametres_manquants") &&
+      identical(conditionMessage(x), "Table synthétique « essai » : ses paramètres (liste non vide) sont requis.") && a$n == 0L
+  })
+  verifier("#392 classe bytes imbriquée (hors périmètre) : admise, comme avant, à l'écrivain de la fiche d'en décider (étape (d))", {
+    p <- list(A = structure(list(1), class = cl_b))
+    a <- appel(p)
+    inherits(a$r, "table_reference") && identical(attr(a$r, "parametres"), p) && a$n == 0L
+  })
+  verifier("#392 paramètres de classe bytes et statut importee -> table_parametres_inattendus d'abord ; et forme_origine inconnue -> paramètres refusés d'abord",
+           identical(appel(structure(list(A = 1), class = cl_b), statut = "importee")$r$motif, "table_parametres_inattendus") &&
+             identical(appel(structure(list(A = 1), class = cl_b), forme_origine = "zz")$r$details, list(classe = cl_b)))
+  # length() surchargé par une méthode de classe : la longueur est lue sans dispatch
+  # (longueur_lue()). Avant #392, la méthode (qui rend 0) faisait refuser une liste
+  # non vide comme vide ; elle n'est plus appelée.
+  verifier("#392 parametres dont length() est surchargé (méthode de classe rendant 0) : longueur lue sans dispatch, liste non vide admise", {
+    classe <- "classe_longueur_surchargee_392"
+    assign(paste0("length.", classe), function(x) 0L, envir = globalenv())
+    p <- structure(list(A = 1), class = classe)
+    a <- tryCatch(c(appel(p), list(dispatch = length(p))), finally = rm(list = paste0("length.", classe), envir = globalenv()))
+    identical(a$dispatch, 0L) && inherits(a$r, "table_reference") && a$n == 0L
+  })
+})
 # Sous LC_ALL=C (sous-processus, bibliothèque des batteries) : un nom qui n'est pas bytes
 # est cité exactement comme le ferait sprintf() sur le nom reçu (oracle : la formule
 # d'avant #111, octet pour octet, sans traduction ajoutée par le masquage (un nom latin1

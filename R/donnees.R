@@ -2750,8 +2750,9 @@ lignes_citees_table <- function(k, sexes, axe, valeurs, ages) {
 #                  source : arrêté, URL, fichier de provenance) ;
 #   statut       : synthetique, embarquee ou importee ;
 #   parametres   : liste non vide des paramètres pour une table synthétique,
-#                  dont aucun nom ni aucune valeur chaîne, à toute profondeur,
-#                  n'est d'encodage « bytes » (#256) ; NULL sinon ;
+#                  dont la classe ne porte aucune chaîne d'encodage « bytes »
+#                  (#392) et dont aucun nom ni aucune valeur chaîne, à toute
+#                  profondeur, n'est d'encodage « bytes » (#256) ; NULL sinon ;
 #   forme_origine: qx ou lx (forme de la transcription) ; une colonne lx
 #                  exige « lx », une colonne qx est admise sous l'une ou
 #                  l'autre.
@@ -2786,12 +2787,27 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
     refuser("donnees", "table_source_manquante",
             formuler(paste("Table « %s » : la source est une chaîne d'encodage « bytes », non convertible en UTF-8 sans deviner :",
                            "elle n'est pas lue. Passer une source (chaîne non vide, sans attribut) sans encodage bytes."), nom_cite))
-  if (statut == "synthetique" && (!is.list(parametres) || !length(parametres)))
+  # Longueur de `parametres` lue sans dispatch (#392) : length() dispatche et
+  # lève une erreur R sur une classe d'encodage « bytes » (« translating strings
+  # with "bytes" encoding is not allowed ») ; is.list() ne lit pas la classe.
+  if (statut == "synthetique" && (!is.list(parametres) || !longueur_lue(parametres)))
     refuser("donnees", "table_parametres_manquants",
             formuler("Table synthétique « %s » : ses paramètres (liste non vide) sont requis.", nom_cite))
   if (statut != "synthetique" && !is.null(parametres))
     refuser("donnees", "table_parametres_inattendus",
             formuler("Table « %s » de statut « %s » : aucun paramètre de loi attendu.", nom_cite, citer(statut)))
+  # Classe d'encodage « bytes » de `parametres` lui-même (#392 ; même règle que
+  # celle de x, #158, et de controler_roles(), #150) : refus ici, sous le motif de
+  # l'argument, avant parametres_bytes() ; la classe ne se cite pas (repère de
+  # neutraliser_citation()) et details$classe porte la valeur reçue. Une classe
+  # qui n'est pas « bytes » reste admise (non lue, #256).
+  if (classe_bytes(parametres))
+    refuser("donnees", "table_parametres_manquants",
+            formuler(paste("Table synthétique « %s » : ses paramètres portent une classe d'encodage « bytes » (classe %s), non",
+                           "convertible en UTF-8 sans deviner : ils ne sont pas lus. Passer des paramètres (liste non vide)",
+                           "dont la classe ne porte aucune chaîne d'encodage bytes."),
+                     nom_cite, paste(citer(class(parametres)), collapse = "/")),
+            list(classe = class(parametres)))
   # Nom ou valeur « bytes » de `parametres` (#256 ; règle de #128, comme le nom
   # et la source, #158) : les paramètres s'écrivent dans la fiche, où
   # octets_chaines() les refuserait (chaine_codage_bytes), à l'étape (d) de
@@ -2799,7 +2815,8 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
   # l'argument, sans rien citer. Le prédicat lit, à toute profondeur, les noms
   # (noms_bytes()) et les valeurs des vecteurs caractère, rien d'autre : les
   # niveaux d'un facteur, les dimnames, la classe et les autres attributs ne sont
-  # pas lus ici et relèvent de l'écrivain de la fiche (étape (d), motif
+  # pas lus ici : la classe de `parametres` lui-même est refusée avant (#392) ; les
+  # classes à l'intérieur relèvent de l'écrivain de la fiche (étape (d), motif
   # serialisation_impossible).
   # Parcours par niveaux, sans pile d'appels (une liste très profonde ne lève
   # pas d'erreur R : sa profondeur est refusée plus tard, à l'écriture de la

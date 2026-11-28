@@ -425,6 +425,16 @@ local({
                                "deces", "refusé par table_reference() (motif table_parametres_manquants)",
                                list(lu = "table_parametres_manquants", attendu = "aucun refus",
                                     motif_constructeur = "table_parametres_manquants")), TRUE))
+  # Classe d'encodage bytes de `parametres` posée après coup (#392) : la table ne se
+  # construit plus (table_reference() la refuse) ; reçue par le simulateur, la
+  # reconstruction hérite du refus, motif cité. Avant #392 (mesuré à 24bbd41),
+  # l'erreur R du constructeur était attrapée : refus loi_invalide sans motif du
+  # constructeur (motif_constructeur NA), « data.frame nu non reconstructible ».
+  verifier("#392 table reçue dont la classe de parametres est d'encodage bytes (posée après coup) : refus loi_invalide, motif table_parametres_manquants cité",
+           identical(verdict(attrape(simuler(loi(deces = structure(GM, parametres = structure(attr(GM, "parametres"), class = b))), PF, PER, GRAINE)),
+                             "deces", "refusé par table_reference() (motif table_parametres_manquants)",
+                             list(lu = "table_parametres_manquants", attendu = "aucun refus",
+                                  motif_constructeur = "table_parametres_manquants")), TRUE))
   # Vecteur atomique classé table_reference aux noms exacts : pas une liste, la garde de cohérence
   # des colonnes ne s'applique pas (colonnes_lues() : précondition liste) ; la reconstruction le
   # refuse, motif du constructeur cité, sans erreur R.
