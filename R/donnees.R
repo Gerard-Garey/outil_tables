@@ -1865,7 +1865,11 @@ observations_stocks <- function(lignes, numeros, roles, segmentation, p, donnees
 # Seules les colonnes atomiques sans dimension, hors raw, sont admises (une
 # colonne raw n'a pas de NA : la complétion écrirait 00). Refus (module
 # donnees), dans l'ordre :
-#   empilement_table_invalide        : `inventaires` ou `evenements` n'est pas
+#   empilement_table_invalide        : `inventaires` ou `evenements` a une classe
+#                                      portant une chaîne d'encodage « bytes »
+#                                      (#366 ; lue avant is.data.frame(), qui
+#                                      lèverait une erreur R ; toutes les tables
+#                                      en défaut citées), n'est pas
 #                                      un data.frame (le moteur ne lit pas de
 #                                      fichier), ou est un data.frame dont la
 #                                      liste des colonnes et les noms n'ont
@@ -1892,6 +1896,19 @@ observations_stocks <- function(lignes, numeros, roles, segmentation, p, donnees
 #                                      différents, toutes citées.
 empiler_stocks <- function(inventaires, evenements, colonne_type) {
   tables <- list(inventaires = inventaires, evenements = evenements)
+  # Classe d'encodage « bytes » (#366), lue avant is.data.frame() : inherits()
+  # lèverait « translating strings with "bytes" encoding is not allowed »
+  # (précédents : controler_roles(), #150 ; table_reference(), #158).
+  bytes <- names(tables)[vapply(tables, classe_bytes, NA)]
+  if (length(bytes))
+    refuser("donnees", "empilement_table_invalide",
+            formuler(paste("Empilement des stocks successifs : la classe de %s porte une chaîne d'encodage « bytes »",
+                           "(classe(s) reçue(s) : %s), non convertible en UTF-8 sans deviner : la table n'est pas lue.",
+                           "Passer, pour chaque table, un data.frame dont la classe ne porte aucune chaîne d'encodage bytes."),
+                     liste_guillemets(bytes),
+                     paste(vapply(tables[bytes], function(x) paste(citer(class(x)), collapse = "/"), character(1L)),
+                           collapse = " ; ")),
+            list(table = bytes, classe = lapply(tables[bytes], class)))
   # is.list() : un environnement classé « data.frame » n'a pas de colonnes à
   # lire (colonnes_lues() : précondition ; précédent de controler_roles()).
   non_df <- names(tables)[!vapply(tables, function(x) is.data.frame(x) && is.list(x), logical(1L))]

@@ -366,6 +366,82 @@ local({
   })
 })
 
+# --- classe d'encodage bytes (#366) ---------------------------------------------------
+#
+# Spécification d'actuary (avis de l'étape (0') de B41) : une table dont la classe
+# porte une chaîne d'encodage « bytes » est refusée en tête de fonction, avant
+# is.data.frame() (motif empilement_table_invalide, toutes les tables en défaut
+# citées). Avant #366 (mesuré à 41093de) : erreur R « translating strings with
+# "bytes" encoding is not allowed », appel inherits(x, "data.frame") dans
+# is.data.frame(), que la table soit passée en inventaires ou en evenements. Une
+# classe ASCII n'est pas marquée « bytes » (Encoding() rend "unknown") : le cas
+# emploie une classe non ASCII. Messages et details écrits à la main (texte de
+# l'avis) ; la classe est citée sous le repère de neutraliser_citation().
+local({
+  I3 <- data.frame(id = 1:3, sx = c("H", "F", "H"), stringsAsFactors = FALSE)
+  E3 <- data.frame(id = 2:4, sx = c("F", "H", "H"), c = c("deces", "rachat", "deces"), stringsAsFactors = FALSE)
+  classe_b <- c("k\xe9", "data.frame")
+  Encoding(classe_b) <- c("bytes", "unknown")
+  avec_classe <- function(x) { class(x) <- classe_b; x }
+  Ib <- avec_classe(I3)
+  Eb <- avec_classe(E3)
+  appel <- function(i, e, type = "t") {
+    f <- function() tryCatch(empiler_stocks(i, e, type), refus_tablexp = function(c) c, error = function(c) c)
+    r <- suppressWarnings(f())
+    n <- 0L
+    withCallingHandlers(f(), warning = function(w) { n <<- n + 1L; invokeRestart("muffleWarning") })
+    list(r = r, n = n)
+  }
+  msg <- function(t) paste0("Empilement des stocks successifs : la classe de ", t, " porte une chaîne d'encodage « bytes » ",
+                            "(classe(s) reçue(s) : <chaîne d'encodage bytes>/data.frame), non convertible en UTF-8 sans ",
+                            "deviner : la table n'est pas lue. Passer, pour chaque table, un data.frame dont la classe ne ",
+                            "porte aucune chaîne d'encodage bytes.")
+  msg2 <- paste0("Empilement des stocks successifs : la classe de « inventaires », « evenements » porte une chaîne ",
+                 "d'encodage « bytes » (classe(s) reçue(s) : <chaîne d'encodage bytes>/data.frame ; ",
+                 "<chaîne d'encodage bytes>/data.frame), non convertible en UTF-8 sans deviner : la table n'est pas lue. ",
+                 "Passer, pour chaque table, un data.frame dont la classe ne porte aucune chaîne d'encodage bytes.")
+  cas <- list(
+    list("inventaires de classe bytes", Ib, E3, msg("« inventaires »"),
+         list(table = "inventaires", classe = list(inventaires = classe_b))),
+    list("evenements de classe bytes", I3, Eb, msg("« evenements »"),
+         list(table = "evenements", classe = list(evenements = classe_b))),
+    list("les deux tables de classe bytes (toutes citées)", Ib, Eb, msg2,
+         list(table = c("inventaires", "evenements"), classe = list(inventaires = classe_b, evenements = classe_b))))
+  verifier("#366 une classe non ASCII est marquée bytes, une classe ASCII ne l'est pas (hypothèse du test, valeur écrite à la main)",
+           identical(Encoding(class(Ib)), c("bytes", "unknown")) && !tablexp:::classe_bytes(I3) && tablexp:::classe_bytes(Ib) &&
+             !tablexp:::classe_bytes(structure(I3, class = c("k", "data.frame"))))
+  for (c1 in cas)
+    verifier(sprintf("#366 refus (valeur écrite à la main) : %s -> donnees/empilement_table_invalide, message et details exacts, une ligne marquée UTF-8, aucune erreur R, 0 avertissement R", c1[[1L]]), {
+      a <- appel(c1[[2L]], c1[[3L]])
+      x <- a$r
+      if (!inherits(x, "refus_tablexp")) {
+        if (inherits(x, "error")) paste("erreur R :", conditionMessage(x)) else "aucun refus levé"
+      }
+      else if (!identical(x$module, "donnees") || !identical(x$motif, "empilement_table_invalide"))
+        sprintf("%s / %s", x$module, x$motif)
+      else if (!identical(conditionMessage(x), c1[[4L]])) paste("message :", conditionMessage(x))
+      else if (grepl("[\n\v\f]", conditionMessage(x)) || !validUTF8(conditionMessage(x)) ||
+               !identical(Encoding(conditionMessage(x)), "UTF-8")) "message sur plusieurs lignes ou non marqué UTF-8"
+      else if (!identical(x$details, c1[[5L]])) paste("details :", paste(deparse(x$details), collapse = " "))
+      else if (a$n != 0L) sprintf("%d avertissement(s) R", a$n)
+      else TRUE
+    })
+  verifier("#366 témoin : deux data.frame de classe sans chaîne bytes (dont une classe ASCII supplémentaire) rendent la table de six lignes écrite à la main, aucun refus ni avertissement R", {
+    a <- appel(I3, E3)
+    ascii <- I3
+    class(ascii) <- c("k", "data.frame")
+    b <- appel(ascii, E3)
+    attendu <- data.frame(id = c(1:3, 2:4), sx = c("H", "F", "H", "F", "H", "H"),
+                          c = c(NA, NA, NA, "deces", "rachat", "deces"),
+                          t = rep(c("inventaire", "evenement"), each = 3L), stringsAsFactors = FALSE)
+    identical(a$r, attendu) && a$n == 0L && identical(b$r, attendu) && b$n == 0L
+  })
+  verifier("#366 class() et citer() ne lèvent pas d'erreur sur une classe bytes (précédent #158) : repère rendu, valeur écrite à la main", {
+    r <- tryCatch(tablexp:::citer(class(Ib)), error = function(e) e)
+    identical(r, c("<chaîne d'encodage bytes>", "data.frame"))
+  })
+})
+
 # --- forme consommée par la recette `stocks_successifs` (identité exacte) ------------
 
 PER_E <- list(debut = D("2015-01-01"), fin = D("2017-12-31"))
