@@ -9225,7 +9225,12 @@ lignes de chaque colonne, compté comme au contrôle des données
 (section~\ref{sec:controles-donnees}, «~Décomptes de lignes
 discordants~»)~: \code{dim[1]} pour une colonne munie d'un attribut
 \code{dim} (une matrice au nombre de lignes différent reçoit donc ce
-refus, et non plus \code{table\_colonne\_inconnue}),
+refus, et non plus, selon son nom, \code{table\_colonne\_inconnue} ou
+\code{table\_colonne\_mal\_typee}, sauf refus antérieur, une matrice
+\code{qx} étant auparavant admise, complétée par des valeurs manquantes
+ou tronquée~: \emph{constat} de mesure sur le code qui précède
+l'issue, \code{992749c}, R~4.3.3, matrices d'une colonne de trois et
+de huit lignes dans une table de six lignes),
 \code{longueur\_lue()} sinon. Une colonne liste munie d'une classe autre
 que \code{bytes} et sans attribut \code{dim} (\code{POSIXlt}, colonne
 \code{data.frame}, \code{I()} d'une liste) n'est pas comptée~: son
