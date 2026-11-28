@@ -952,7 +952,8 @@ du vecteur sous-jacent, \code{length(unclass(x))}, sans dispatch
 dispatch~»). Les contrôles des
 données et des rôles, l'écrivain unique, l'écriture de la fiche, le
 contrôle du rapport figé, le rejeu outillé, le constructeur des tables de
-référence et le simulateur les emploient, et refusent sous un motif nommé,
+référence, l'empilement des stocks successifs (issue~\#366) et le
+simulateur les emploient, et refusent sous un motif nommé,
 à toute position du nom ou de l'élément \code{bytes} dans la classe (pour
 le simulateur, une classe \code{bytes} de la loi vraie ou de la table d'une
 de ses lois seulement~; un nom de colonne \code{bytes} de cette table, ou
@@ -971,7 +972,14 @@ même (\code{type\_conforme()}~; section~\ref{sec:table-reference}~;
 issue~\#150), et pour une table de référence entière de classe
 \code{bytes}, \code{details\$classe} portant la classe reçue
 (\code{classe\_bytes()} avant \code{is.data.frame()}~;
-section~\ref{sec:table-reference}~; issue~\#158)~; \code{loi\_invalide} pour une loi vraie, ou la table d'une
+section~\ref{sec:table-reference}~; issue~\#158)~;
+\code{empilement\_table\_invalide} pour une table de classe \code{bytes}
+reçue par \code{empiler\_stocks()}, \code{inventaires},
+\code{evenements} ou les deux, toutes les tables en défaut citées,
+\code{details\$classe} portant la classe reçue de chacune
+(\code{classe\_bytes()} avant \code{is.data.frame()}~;
+section~\ref{sec:controles-donnees}, «~Empilement des deux tables~»~;
+issue~\#366)~; \code{loi\_invalide} pour une loi vraie, ou la table d'une
 de ses lois, de classe \code{bytes} (section~\ref{sec:loi-vraie}~;
 issue~\#150)~; \code{type\_non\_canonique} ou
 \code{serialisation\_impossible} pour une valeur écrite de classe
@@ -993,12 +1001,16 @@ une classe \code{bytes} sur \code{plan/etapes}~:
 «~différente~» (section~\ref{sec:rejeu}). Une classe d'encodage
 \code{bytes} est citée sous le repère de la règle ci-dessus.
 \textbf{Statut et limites}~: pour les données, les colonnes de rôle, une
-table de référence et ses colonnes, et la loi du simulateur, \emph{lecture}
+table de référence et ses colonnes, les deux tables d'\code{empiler\_stocks()}
+et la loi du simulateur, \emph{lecture}
 du code (\code{classe\_bytes()} y précède toute fonction qui dispatche~;
 pour la loi vraie elle-même, \code{forme\_exacte()}, qui n'admet aucune
 classe, et noms des \code{details} lus par \code{attr()}) et
 \emph{constat} des tests, l'élément \code{bytes} placé en tête ou après
-une autre classe (en tête seulement pour la loi vraie elle-même)~; pour l'écriture de la fiche, le rapport figé
+une autre classe (en tête seulement pour la loi vraie elle-même, et pour
+les deux tables d'\code{empiler\_stocks()}, l'élément après
+\code{data.frame} relevant d'un \emph{constat} de mesure, R~4.3.3~;
+issue~\#366)~; pour l'écriture de la fiche, le rapport figé
 et le rejeu, \emph{constat} des tests et de mesures sous les locales C et
 C.UTF-8, aux niveaux~1 à~7 de la fiche, non une propriété démontrée pour
 toute profondeur~; pour le témoin de la fiche (règle~V3,
@@ -1190,7 +1202,8 @@ issue~\#128) \\
 d'encodage \code{bytes}, \code{FALSE} sinon~; l'appelant retire alors la
 classe par \code{unclass()} avant toute fonction qui dispatche
 (issue~\#128), ou refuse sous un motif nommé (données, colonne de rôle,
-table d'une loi du simulateur~; issue~\#150) \\
+table d'une loi du simulateur~; issue~\#150~; tables d'\code{empiler\_stocks()}~;
+issue~\#366) \\
 \catalogue{fonctions-outils}{lire\_champ()} & interne & \code{x} (liste),
 \code{nom} & premier élément de \code{x} de ce nom, \code{NULL} s'il est
 absent, comme \code{x[[nom]]}, mais trouvé par \code{match()} sur les noms
@@ -7898,7 +7911,29 @@ sont pas recopiés, et le résultat est un \code{data.frame} nu, à noms de
 lignes automatiques. Seules les colonnes atomiques sans dimension, hors
 \code{raw} (qui n'a pas de valeur manquante), sont admises. Six refus,
 module \code{donnees}, dans cet ordre~: \code{empilement\_table\_invalide}
-(l'une des tables n'est pas un \code{data.frame}, ou est une valeur de
+(depuis l'issue~\#366, et avant tout autre contrôle, la classe de l'une
+des tables porte, à toute position, un élément d'encodage \code{bytes}~:
+\code{classe\_bytes()} est lue pour chaque table avant
+\code{is.data.frame()}, dont \code{inherits()} lèverait l'erreur R, et
+toutes les tables en défaut sont citées, au message~: «~Empilement des
+stocks successifs~: la classe de [tables] porte une chaîne d'encodage
+«~bytes~» (classe(s) reçue(s)~: [classes]), non convertible en UTF-8
+sans deviner~: la table n'est pas lue. Passer, pour chaque table, un
+data.frame dont la classe ne porte aucune chaîne d'encodage bytes.~»,
+[tables] les noms des tables en défaut entre guillemets, séparés par des
+virgules, [classes] la classe de chacune, éléments séparés par «~/~» et
+tables par «~;~», l'élément \code{bytes} cité sous le repère de la règle
+unique des refus (section~\ref{sec:refus}), \code{details} à deux
+clés~: \code{table} (noms des tables en défaut) et \code{classe}
+(classe reçue de chacune)~; auparavant, l'élément \code{bytes} placé en
+tête de la classe arrêtait l'empilement sur l'erreur R «~translating
+strings with "bytes" encoding is not allowed~», que la table soit
+\code{inventaires}, \code{evenements} ou les deux, et, placé après
+\code{data.frame}, la table était empilée sans refus (six lignes pour
+deux tables de trois lignes), \emph{constat} de mesure sur le code qui
+précède l'issue, \code{41093de}, R~4.3.3~; une classe ASCII n'est
+jamais marquée \code{bytes} par R~; ou l'une des tables n'est pas un
+\code{data.frame}, ou est une valeur de
 classe \code{data.frame} qui n'est pas une liste, comme un environnement
 ainsi classé~: le moteur ne lit pas de fichier~; ou, depuis
 l'issue~\#355, l'une des tables est un \code{data.frame} dont la liste
@@ -10958,7 +10993,7 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{faits\_unites\_stocks()} & interne & unité de chaque ligne, lignes d'inventaire et d'événement, indice dans la grille, date et cause de sortie, nombre d'unités & par unité~: indices $f$ et $l$ du premier et du dernier inventaire, nombres de lignes d'inventaire et d'événement, plus petite et plus grande date de sortie, cause du premier événement \\
 \catalogue{fonctions-donnees}{evaluer\_motifs\_stocks()} & interne & données, rôles, valeurs validées \code{p} (dont la grille), segmentation & numéros des lignes porteuses de chaque motif (ligne, puis unité sur les unités exemptes de motif de ligne), lignes de propagation et nombre d'unités concernées (section~\ref{sec:controles-donnees})~; nombre de lignes des données lu sans dispatch (issue~\#354) \\
 \catalogue{fonctions-donnees}{observations\_stocks()} & interne & lignes retenues, leurs numéros, rôles, segmentation, valeurs validées \code{p}, données reçues & une observation par unité, rangée par identifiant, unité \code{tete} ou \code{contrat}, classes P0, E, ES, HF et fins S, C~; relevés par classe, par inventaire et par intervalle~; refus \code{inventaire\_sans\_ligne}~; erreur de programmation sur une unité incohérente (motifs non appliqués) \\
-\catalogue{fonctions-donnees}{empiler\_stocks()} & exportée & table des inventaires, table des événements, nom de la colonne du type de ligne & table empilée~: lignes d'inventaire puis d'événement dans l'ordre reçu, colonne du type déclarée par la table d'origine, colonnes absentes complétées par des valeurs manquantes, sans conversion~; six refus \code{empilement\_*}, dont \code{empilement\_}\allowbreak\code{table\_invalide} d'une table dont la liste des colonnes n'a pas la longueur de ses noms, jugée par \code{colonnes\_lues()} avant toute lecture de colonne (section~\ref{sec:controles-donnees}~; issue~\#355)~; nombres de lignes des deux tables lus sans dispatch (\code{.row\_names\_info()}~; section~\ref{sec:rapport-fige}, «~Lecture sans dispatch~»~; issue~\#367)~; puis, pour chaque table, nombre de lignes de chaque colonne comparé à celui des noms de lignes (\code{decomptes\_colonnes()} sous \code{par\_methode = FALSE}, liste classée sans \code{dim} non comptée), sinon \code{empilement\_}\allowbreak\code{table\_invalide}, \code{details} à six clés, avant \code{colonne\_type} (issue~\#368) \\
+\catalogue{fonctions-donnees}{empiler\_stocks()} & exportée & table des inventaires, table des événements, nom de la colonne du type de ligne & table empilée~: lignes d'inventaire puis d'événement dans l'ordre reçu, colonne du type déclarée par la table d'origine, colonnes absentes complétées par des valeurs manquantes, sans conversion~; six refus \code{empilement\_*}, dont \code{empilement\_}\allowbreak\code{table\_invalide}, en premier, d'une table dont la classe porte un élément d'encodage \code{bytes}, jugé par \code{classe\_bytes()} avant \code{is.data.frame()}, toutes les tables en défaut citées (issue~\#366), puis d'une table dont la liste des colonnes n'a pas la longueur de ses noms, jugée par \code{colonnes\_lues()} avant toute lecture de colonne (section~\ref{sec:controles-donnees}~; issue~\#355)~; nombres de lignes des deux tables lus sans dispatch (\code{.row\_names\_info()}~; section~\ref{sec:rapport-fige}, «~Lecture sans dispatch~»~; issue~\#367)~; puis, pour chaque table, nombre de lignes de chaque colonne comparé à celui des noms de lignes (\code{decomptes\_colonnes()} sous \code{par\_methode = FALSE}, liste classée sans \code{dim} non comptée), sinon \code{empilement\_}\allowbreak\code{table\_invalide}, \code{details} à six clés, avant \code{colonne\_type} (issue~\#368) \\
 \catalogue{fonctions-donnees}{fusionner\_intervalles()} & interne & têtes, entrées, fins & composantes fusionnées et relevés~; refus \code{dates\_hors\_plage} \\
 \catalogue{fonctions-donnees}{libelles\_facteur()} & interne & facteur, positions & libellés des éléments désignés, lus sans dispatch~: codes par \code{.subset()}, niveaux par l'attribut \code{levels}, noms des niveaux retirés~; égaux, pour un facteur sans classe propre, à sa conversion en chaînes, \code{NA} et niveaux inutilisés ou nommés compris~; contrôle~(3~b) d'une extraction de lignes, après le contrôle~(3~a) de bonne forme, un code hors des niveaux y étant lu \code{NA} (section~\ref{sec:controles-donnees}~; issues~\#322 et~\#357~; décision M558) \\
 \catalogue{fonctions-donnees}{SUJETS\_LIGNES\_EXTRAITES} & constante & --- & sujet du message de refus de la fonction suivante, une entrée par étape appelante (clé~: nom de l'étape, module du refus), deux clés~: \code{donnees} («~Les lignes conservées~», issue~\#322) et \code{importance\_exclusions} (lignes relues par cette étape, issue~\#320~; section~\ref{sec:importance-exclusions})~; texte du moteur \\
