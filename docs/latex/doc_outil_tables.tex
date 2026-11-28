@@ -44,7 +44,7 @@
 % Date fixe, mise a jour a la main a chaque modification du document
 % (docs/latex/CONVENTIONS.md, section 1) : jamais \today, qui ferait
 % dependre le PDF du jour de compilation.
-\newcommand{\datedoc}{27/11/2026}
+\newcommand{\datedoc}{28/11/2026}
 \newcommand{\versiondoc}{0.1}
 \newcommand{\statutdoc}{Projet}
 % Titre court utilise dans le pied de page (fancyhdr).
@@ -8224,6 +8224,37 @@ contrôlé~: \code{preparer\_donnees()} extrait par
 demandées, dans l'ordre attendu, les rôles et l'étape appelante. Les
 numéros sont formés par l'appelant, entiers positifs, sans \code{NA}, au
 plus le nombre de lignes de l'entrée~: l'outil ne les contrôle pas.
+À l'étape \code{donnees}, \code{preparer\_donnees()} les contrôle
+elle-même, avant l'appel de l'outil, qu'il y ait une exclusion ou non
+(issue~\#372)~: les numéros des lignes conservées et ceux des lignes
+exclues, réunis, sont des entiers, sans \code{NA}, de~1 au nombre de
+lignes reçues, en même nombre que ces lignes et sans doublon, si bien
+que chaque ligne reçue y figure une fois et une seule~; sinon, erreur de
+programmation du package (\code{stop()}, non un refus). Ce nombre de
+lignes est lu sans dispatch sur une colonne de rôle, la première des
+rôles déclarés (\code{longueur\_lue(lire\_champ())}), et non sur le
+nombre de lignes que la fonction a lu d'abord
+(\code{.row\_names\_info()}) et dont elle forme les numéros~: une
+lecture faussée de celui-ci fausserait la garde avec eux. Aucune entrée
+admise n'atteint cette garde~: le contrôle des décomptes de lignes à
+l'entrée (ci-dessus, «~Décomptes de lignes discordants~») a imposé
+l'accord des noms de lignes et du nombre de lignes de chaque colonne,
+et le contrôle des types, qu'une colonne de rôle soit un vecteur
+atomique sans attribut \code{dim}, dont \code{longueur\_lue()} donne
+donc le nombre de lignes~; elle protège la construction contre un
+défaut du code du moteur. \textbf{Statut}~: \emph{lecture} du code pour
+cette inaccessibilité, non propriété démontrée~; \emph{constat} des
+tests (\code{tests/unitaires/test\_lignes\_sans\_dispatch.R}) pour son
+effet, sous chacune des trois recettes~: garde silencieuse et numéros
+des lignes conservées attendus sans exclusion et sous l'exclusion de la
+première ligne (propagée, sous \code{stocks\_successifs}, aux autres
+lignes de son unité), sur un \code{data.frame} sans classe propre comme
+sur une sous-classe munie d'une méthode \code{dim()} exacte~; refus
+\code{aucune\_ligne\_conservee} inchangé quand toutes les lignes sont
+exclues~; erreur de la garde sur une copie de \code{preparer\_donnees()}
+dont les numéros comptent une ligne de trop (section~\ref{sec:rapport-fige},
+«~Lecture sans dispatch~») et sur une copie où, sans exclusion, le
+deuxième numéro conservé répète le premier, la deuxième ligne manquant.
 L'étape donne le module du refus et le sujet de son message, lu dans la
 constante \code{SUJETS\_LIGNES\_EXTRAITES}, qui en a une entrée par
 étape appelante, soit deux~: «~Les lignes conservées~» pour l'étape
@@ -11036,7 +11067,7 @@ maximale du domaine, de part et d'autre du nombre de têtes limite.
 \catalogue{fonctions-donnees}{libelles\_facteur()} & interne & facteur, positions & libellés des éléments désignés, lus sans dispatch~: codes par \code{.subset()}, niveaux par l'attribut \code{levels}, noms des niveaux retirés~; égaux, pour un facteur sans classe propre, à sa conversion en chaînes, \code{NA} et niveaux inutilisés ou nommés compris~; contrôle~(3~b) d'une extraction de lignes, après le contrôle~(3~a) de bonne forme, un code hors des niveaux y étant lu \code{NA} (section~\ref{sec:controles-donnees}~; issues~\#322 et~\#357~; décision M558) \\
 \catalogue{fonctions-donnees}{SUJETS\_LIGNES\_EXTRAITES} & constante & --- & sujet du message de refus de la fonction suivante, une entrée par étape appelante (clé~: nom de l'étape, module du refus), deux clés~: \code{donnees} («~Les lignes conservées~», issue~\#322) et \code{importance\_exclusions} (lignes relues par cette étape, issue~\#320~; section~\ref{sec:importance-exclusions})~; texte du moteur \\
 \catalogue{fonctions-donnees}{controler\_lignes\_extraites()} & interne & données, lignes extraites par l'appelant, numéros des lignes demandées, rôles, étape (\code{donnees} par défaut) & postcondition d'une extraction de lignes par la méthode \code{[} de la classe des données~: contrôles~(0) à~(3), sans dispatch, rien du résultat n'étant lu avant le contrôle~(0), le nombre de colonnes du contrôle~(1~bis) lu sur la liste (\code{length(unclass())}, par \code{colonnes\_lues()}~; issue~\#344) et comparé au nombre des noms et à celui de l'entrée avant toute lecture des colonnes, une liste incohérente recevant le seul constat de \code{constat\_colonnes\_lues()} (issue~\#345), le contrôle~(3) en deux temps, bonne forme de chaque facteur extrait par \code{facteur\_bien\_forme()}, toutes les colonnes en défaut citées, puis, à défaut d'écart, identité des colonnes de rôle (issue~\#357), refus \code{donnees\_mal\_formees} du module de l'étape, message citant la classe des colonnes en cause sous une entrée de classe exactement \code{data.frame}, \code{details} à huit champs~; étape hors des clés de la constante précédente~: erreur de programmation (\code{stop()}), avant tout contrôle~; numéros non contrôlés~; rend \code{TRUE}, invisible~; appelée sous les étapes \code{donnees} et \code{importance\_exclusions} (section~\ref{sec:controles-donnees}, «~Extraction des lignes conservées et son contrôle~»~; issues~\#319, \#322, \#320, \#345 et~\#357) \\
-\catalogue{fonctions-donnees}{preparer\_donnees()} & interne & données, rôles, valeurs validées \code{p}, segmentation, exclusions, recette validée & fonction d'étape \code{donnees}~: paramètres effectifs, résultat, diagnostics, avertissements~; nombre de lignes des données lu sans dispatch (\code{.row\_names\_info()}~; issue~\#354)~; évaluation des motifs, observations et relevés selon la recette (\code{evaluer\_motifs()} et \code{construire\_observations()} sous \code{lignes\_dates\_completes}, \code{evaluer\_motifs\_agregats()} et \code{observations\_agregats()} sous \code{agregats}, \code{evaluer\_motifs\_stocks()} et \code{observations\_stocks()} sous \code{stocks\_successifs}), squelette commun, qui exclut aussi les lignes de propagation (\code{NULL} hors stocks)~; colonnes de rôle lues par \code{lire\_champ()} (issue~\#140)~; sous une exclusion, lignes conservées extraites par la méthode \code{[} de la classe de l'entrée, puis contrôlées sans dispatch par la fonction précédente (forme, nombre de lignes, colonnes, décompte de chaque colonne, bonne forme de chaque facteur extrait, identité des colonnes de rôle), refus \code{donnees\_mal\_formees} sinon (section~\ref{sec:controles-donnees}~; issues~\#319, \#322 et~\#357)~; ne contrôle ni les paramètres ni les rôles, contrôlés par \code{construire\_table()} (issues~\#22 et~\#82) \\
+\catalogue{fonctions-donnees}{preparer\_donnees()} & interne & données, rôles, valeurs validées \code{p}, segmentation, exclusions, recette validée & fonction d'étape \code{donnees}~: paramètres effectifs, résultat, diagnostics, avertissements~; nombre de lignes des données lu sans dispatch (\code{.row\_names\_info()}~; issue~\#354)~; évaluation des motifs, observations et relevés selon la recette (\code{evaluer\_motifs()} et \code{construire\_observations()} sous \code{lignes\_dates\_completes}, \code{evaluer\_motifs\_agregats()} et \code{observations\_agregats()} sous \code{agregats}, \code{evaluer\_motifs\_stocks()} et \code{observations\_stocks()} sous \code{stocks\_successifs}), squelette commun, qui exclut aussi les lignes de propagation (\code{NULL} hors stocks)~; colonnes de rôle lues par \code{lire\_champ()} (issue~\#140)~; sous une exclusion, lignes conservées extraites par la méthode \code{[} de la classe de l'entrée, puis contrôlées sans dispatch par la fonction précédente (forme, nombre de lignes, colonnes, décompte de chaque colonne, bonne forme de chaque facteur extrait, identité des colonnes de rôle), refus \code{donnees\_mal\_formees} sinon (section~\ref{sec:controles-donnees}~; issues~\#319, \#322 et~\#357)~; avant ce contrôle, avec ou sans exclusion, numéros des lignes conservées et exclues confrontés aux lignes reçues, chacune une fois, nombre de lignes lu sans dispatch sur une colonne de rôle (\code{lire\_champ()}, \code{longueur\_lue()}), sinon erreur de programmation (\code{stop()}), inatteignable par une entrée admise (issue~\#372)~; ne contrôle ni les paramètres ni les rôles, contrôlés par \code{construire\_table()} (issues~\#22 et~\#82) \\
 \catalogue{fonctions-donnees}{UNITE\_AGREGAT} & constante & --- & textes de l'avertissement \code{unite\_agregat} (recette \code{agregats}, unité non déterminée), par porteur de la transition (tête, contrat)~; fin révisée par l'issue~\#361 (erreur de sens propre à chaque grandeur, réserve asymptotique~; section~\ref{sec:unite-observation}) \\
 \catalogue{fonctions-donnees}{avertir\_releves\_agregats()} & interne & avertissements, relevés & avertissements des relevés de la recette \code{agregats}, quand les deux expositions sont déclarées~: $E^i < E^c$ (\code{exposition\_initiale\_}\allowbreak\code{inferieure\_centrale}), $E^i - E^c > D$ (\code{complement\_superieur\_}\allowbreak\code{aux\_evenements}), au-delà de la tolérance relative \code{TOLERANCE\_}\allowbreak\code{RELEVES\_AGREGATS}, que le texte de l'avertissement mentionne~; jamais un refus \\
 \catalogue{fonctions-donnees}{avertir\_releves\_stocks()} & interne & avertissements, relevés & avertissements des relevés de la recette \code{stocks\_successifs}~: \code{entrees\_entre\_inventaires} (unités E), \code{evenements\_hors\_fenetre} (unités HF)~; le relevé des unités ES est averti par l'étape \code{exposition}~; jamais un refus \\
@@ -21825,7 +21856,14 @@ distincts, «~number of items to replace is not a multiple of replacement
 length~» et «~longer object length is not a multiple of shorter object
 length~»~; elle n'en lève plus aucun depuis, \emph{constat} de
 mesure), et faisait citer par le rejeu un nombre de lignes
-et de colonnes faux. Une garde mécanique,
+et de colonnes faux. Depuis l'issue~\#372, une lecture faussée du
+nombre de lignes dans \code{preparer\_donnees()} n'y produirait plus ni
+résultat faux ni erreur R, mais l'erreur de programmation d'une garde
+qui confronte les numéros des lignes conservées et exclues au nombre de
+lignes lu sur une colonne de rôle (section~\ref{sec:controles-donnees},
+«~Extraction des lignes conservées et son contrôle~»~; \emph{constat}
+des tests, sur la copie de la fonction qui relit \code{nrow()}, sous les
+trois recettes). Une garde mécanique,
 \code{tests/unitaires/test\_lignes\_sans\_dispatch.R}, relève sur
 l'arbre syntaxique de \code{R/*.R} (commentaires et chaînes exclus) les
 appels de \code{nrow()} et de \code{ncol()} dont l'argument est
@@ -21837,7 +21875,9 @@ démontrée pour toute méthode~: classe de test dont la méthode
 la fonction visée, un test par fonction et par recette où elle est
 appelée, résultat et fiche \code{identical()} à ceux de la même
 classe sans mensonge, et contrôle, par site, qu'une copie de la fonction qui relit
-\code{nrow()} produit l'effet d'avant~; méthode qui ment partout sauf
+\code{nrow()} produit l'effet d'avant (pour \code{preparer\_donnees()},
+depuis l'issue~\#372, l'erreur de programmation de la garde de cette
+issue)~; méthode qui ment partout sauf
 dans le contrôle, sur le jeu en lignes des tests du module
 \code{donnees}~: empreinte des données, étapes et fiche identiques à
 celles du \code{data.frame} nu, hors la classe des lignes conservées,
