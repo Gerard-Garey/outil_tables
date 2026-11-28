@@ -1056,36 +1056,36 @@ local({
   RV <- "comptent %d ligne(s) comme demandé mais ne reprennent pas les valeurs des lignes demandées dans la ou les colonne(s) de rôle %s"
   T1c <- T1; T1c$cause_sortie[5L] <- "rachat"
   colonne <- function(d, nom) { d[[nom]] <- structure(factor(d[[nom]]), class = c("k320cpos", "factor")); d }
-  # nom, données, rôles, message attendu, lignes, attendu, colonnes, classe
+  # nom, données, rôles, message attendu, lignes, attendu, colonnes, cause (#369)
   cas <- list(
     list("méthode qui rend une ligne de moins sous indices positifs, unité tête", structure(T1, class = c("k320pos", "data.frame")),
-         ROLES_SIM, paste0(SUJET, "k320pos/data.frame, comptent 3 ligne(s) au lieu de 4", SUFF), 3L, 4L, character(0)),
+         ROLES_SIM, paste0(SUJET, "k320pos/data.frame, comptent 3 ligne(s) au lieu de 4", SUFF), 3L, 4L, character(0), "1"),
     list("méthode qui rend une ligne de moins sous indices positifs, unité contrat", structure(T1, class = c("k320pos", "data.frame")),
-         ROLES_SANS_TETE, paste0(SUJET, "k320pos/data.frame, comptent 2 ligne(s) au lieu de 3", SUFF), 2L, 3L, character(0)),
+         ROLES_SANS_TETE, paste0(SUJET, "k320pos/data.frame, comptent 2 ligne(s) au lieu de 3", SUFF), 2L, 3L, character(0), "1"),
     # Sens d'`attendu` (QD2, Q-A1) : sous l'unité tête, la troisième extraction (lignes conservées des têtes
     # touchées, ici la ligne 1 seule, après R_t u S = 1, 5, 6, 7 et ses lignes hors têtes indéterminées, justes)
     # est la première fausse : attendu 1, inférieur à |S| = 3 comme à |R_t u S| = 4.
     list("méthode qui ne ment que sur deux lignes ou moins demandées, unité tête (attendu = lignes de la première extraction fausse)",
          structure(T1, class = c("k320sel", "data.frame")), ROLES_SIM,
-         paste0(SUJET, "k320sel/data.frame, comptent 0 ligne(s) au lieu de 1", SUFF), 0L, 1L, character(0)),
+         paste0(SUJET, "k320sel/data.frame, comptent 0 ligne(s) au lieu de 1", SUFF), 0L, 1L, character(0), "1"),
     list("méthode qui inverse les lignes sous indices positifs, unité tête", structure(T1, class = c("k320perm", "data.frame")),
          ROLES_SIM, paste0(SUJET, "k320perm/data.frame, ",
                            sprintf(RV, 4L, "« id_contrat », « id_tete », « sexe », « date_entree », « date_sortie »"), SUFF),
-         4L, 4L, c("id_contrat", "id_tete", "sexe", "date_entree", "date_sortie")),
+         4L, 4L, c("id_contrat", "id_tete", "sexe", "date_entree", "date_sortie"), "3 b"),
     list("méthode qui inverse les lignes sous indices positifs, unité contrat", structure(T1, class = c("k320perm", "data.frame")),
          ROLES_SANS_TETE, paste0(SUJET, "k320perm/data.frame, ",
                                  sprintf(RV, 3L, "« id_contrat », « date_entree », « date_sortie »"), SUFF),
-         3L, 3L, c("id_contrat", "date_entree", "date_sortie")),
+         3L, 3L, c("id_contrat", "date_entree", "date_sortie"), "3 b"),
     list("entrée data.frame, colonne sexe dont la méthode « [ » inverse les valeurs sous indices positifs, unité tête",
          colonne(T1, "sexe"), ROLES_SIM,
          paste0(SUJET, "data.frame, qui applique à chaque colonne la méthode « [ » de sa classe, ",
                 sprintf(RV, 4L, "« sexe » (classe k320cpos/factor)"), SUFF_COL("k320cpos/factor")),
-         4L, 4L, "sexe"),
+         4L, 4L, "sexe", "3 b"),
     list("entrée data.frame, colonne cause_sortie dont la méthode « [ » inverse les valeurs sous indices positifs, unité contrat",
          colonne(T1c, "cause_sortie"), ROLES_SANS_TETE,
          paste0(SUJET, "data.frame, qui applique à chaque colonne la méthode « [ » de sa classe, ",
                 sprintf(RV, 3L, "« cause_sortie » (classe k320cpos/factor)"), SUFF_COL("k320cpos/factor")),
-         3L, 3L, "cause_sortie"))
+         3L, 3L, "cause_sortie", "3 b"))
   for (c1 in cas) {
     x <- attrape(construire_table(c1[[2L]], c1[[3L]], plan_ie()))
     verifier(sprintf("#320 %s -> refus donnees_mal_formees du module importance_exclusions (valeur calculée à la main), message attendu, une ligne UTF-8 valide, details de #319", c1[[1L]]), {
@@ -1097,7 +1097,7 @@ local({
       else if (!identical(conditionMessage(x), c1[[4L]])) paste("message :", conditionMessage(x))
       else if (grepl("[\n\v\f]", conditionMessage(x)) || !validUTF8(conditionMessage(x)) ||
                !identical(Encoding(conditionMessage(x)), "UTF-8")) "message sur plusieurs lignes ou non UTF-8"
-      else if (!identical(x$details, list(classe = cl, classe_rendue = cl, lignes = c1[[5L]], attendu = c1[[6L]],
+      else if (!identical(x$details, list(cause = c1[[8L]], classe = cl, classe_rendue = cl, lignes = c1[[5L]], attendu = c1[[6L]],
                                           colonnes = c1[[7L]], colonne = character(0), position = integer(0),
                                           lignes_colonne = numeric(0))))
         paste("details :", paste(deparse(x$details), collapse = " "))
@@ -1289,7 +1289,7 @@ local({
            sprintf(CONSTAT, cites), " : le moteur ne corrige pas une extraction fausse ; passer un data.frame dont la",
            " m\u00e9thode \u00ab [ \u00bb rend exactement les lignes demand\u00e9es (ou qui n'a pas de m\u00e9thode",
            " \u00ab [ \u00bb propre).")
-  details <- function(cl, colonnes) list(classe = cl, classe_rendue = cl, lignes = 4L, attendu = 4L, colonnes = colonnes,
+  details <- function(cl, colonnes) list(cause = "3 a", classe = cl, classe_rendue = cl, lignes = 4L, attendu = 4L, colonnes = colonnes,
                                          colonne = character(0), position = integer(0), lignes_colonne = numeric(0))
   juger <- function(m, module, attendu, det) {
     r <- m$r

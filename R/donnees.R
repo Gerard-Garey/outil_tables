@@ -2135,8 +2135,11 @@ SUJETS_LIGNES_EXTRAITES <- c(
 # Rend TRUE (invisible) ou refuse donnees_mal_formees : une méthode `[` qui ne
 # rend pas les lignes demandées ferait calculer, sans signal, sur d'autres
 # lignes que celles de la fiche. Cinq contrôles, dans cet ordre, le premier en
-# défaut donnant son refus (le message et les details disent la cause :
-# classe_rendue, lignes, attendu, colonnes pour l'identité, colonne, position
+# défaut donnant son refus (le message et les details disent la cause ; details,
+# neuf champs : cause en premier, le contrôle en défaut, character(1) ASCII
+# parmi "0", "1", "1 bis", "2", "3 a", "3 b" (#369 ; calculée une fois, le
+# constat du message est choisi d'après elle), puis classe, classe_rendue,
+# lignes, attendu, colonnes pour l'identité, colonne, position
 # et lignes_colonne pour les décomptes de colonne ; colonne seule pour le (1
 # bis) : les seules colonnes absentes de l'extraction, noms de l'entrée, les
 # colonnes en trop ou sans nom ne figurant que dans le message) : (0) le
@@ -2269,22 +2272,25 @@ controler_lignes_extraites <- function(donnees, extraites, numeros, roles, etape
         cles <- seq_along(colonnes)
       }
     }
-    constat <- if (!forme)
+    # Cause du refus (#369), calculée une fois ; le constat est choisi d'après elle (une seule cascade).
+    cause <- if (!forme) "0" else if (ecart_compte) "1" else if (ecart_colonnes) "1 bis"
+             else if (length(k)) "2" else if (mal_formees) "3 a" else "3 b"
+    constat <- if (cause == "0")
       formuler("ne sont pas un data.frame (classe rendue %s, type « %s »)",
                paste(citer(class(extraites)), collapse = "/"), citer(typeof(extraites)))
-    else if (ecart_compte)
+    else if (cause == "1")
       formuler("comptent %s au lieu de %d",
                if (is.na(nc)) "un nombre de lignes illisible" else formuler("%d ligne(s)", nc), attendu)
-    else if (ecart_colonnes)
+    else if (cause == "1 bis")
       # Liste incohérente (#345) : le constat commun de F344 remplace tout le constat des noms, même si les noms
       # diffèrent aussi de ceux de l'entrée (une liste incohérente n'a pas de colonnes nommées comparables).
       formuler("comptent %d ligne(s) comme demandé mais n'ont pas les colonnes des données (%s)",
                nc, if (coherente) paste(colonnes_ecart_citees(nom_c, nom_d, premiere), collapse = " ; ")
                    else constat_colonnes_lues(lues))
-    else if (length(k))
+    else if (cause == "2")
       formuler("comptent %d ligne(s) comme demandé mais leurs colonnes ne comptent pas toutes ce nombre de lignes (%s)",
                nc, paste(colonnes_decompte_citees(k, dec, classes), collapse = " ; "))
-    else if (mal_formees)
+    else if (cause == "3 a")
       formuler(paste("comptent %d ligne(s) comme demandé mais leur(s) colonne(s) de rôle %s sont des facteurs mal",
                      "formés (niveaux absents ou non character, ou code qui n'est ni NA ni un integer de 1 au nombre",
                      "de niveaux)"), nc,
@@ -2308,7 +2314,7 @@ controler_lignes_extraites <- function(donnees, extraites, numeros, roles, etape
                              "« [ » propre)."),
                        texte_moteur(SUJETS_LIGNES_EXTRAITES[[etape]]), paste(citer(class(donnees)), collapse = "/"),
                        constat),
-            list(classe = class(donnees), classe_rendue = class(extraites), lignes = nc,
+            list(cause = cause, classe = class(donnees), classe_rendue = class(extraites), lignes = nc,
                  attendu = attendu, colonnes = colonnes,
                  colonne = if (ecart_colonnes) setdiff(nom_d, nom_c)
                            else if (length(k)) dec$noms[k] else character(0),

@@ -835,31 +835,31 @@ local({
   SUFF <- " : le moteur ne corrige pas une extraction fausse ; passer un data.frame dont la m\u00e9thode \u00ab [ \u00bb rend exactement les lignes demand\u00e9es (ou qui n'a pas de m\u00e9thode \u00ab [ \u00bb propre)."
   cas <- list(
     list("m\u00e9thode qui rend une ligne de moins (cas de la r\u00e9serve R1 de #312)", "k319moins",
-         "k319moins/data.frame, comptent 2 ligne(s) au lieu de 3", 2L, character(0)),
+         "k319moins/data.frame, comptent 2 ligne(s) au lieu de 3", 2L, character(0), "1"),
     list("m\u00e9thode qui rend une ligne de plus", "k319plus",
-         "k319plus/data.frame, comptent 4 ligne(s) au lieu de 3", 4L, character(0)),
+         "k319plus/data.frame, comptent 4 ligne(s) au lieu de 3", 4L, character(0), "1"),
     list("m\u00e9thode qui rend des noms de lignes illisibles (NA)", "k319na",
-         "k319na/data.frame, comptent un nombre de lignes illisible au lieu de 3", NA_integer_, character(0)),
+         "k319na/data.frame, comptent un nombre de lignes illisible au lieu de 3", NA_integer_, character(0), "1"),
     list("m\u00e9thode qui rend le bon nombre de lignes, la premi\u00e8re remplac\u00e9e par un doublon de la deuxi\u00e8me", "k319sub",
          paste0("k319sub/data.frame, comptent 3 ligne(s) comme demand\u00e9 mais ne reprennent pas les valeurs des lignes demand\u00e9es dans la ou les colonne(s) de r\u00f4le ",
                 "\u00ab contrat \u00bb, \u00ab tete \u00bb, \u00ab naissance \u00bb, \u00ab sortie \u00bb, \u00ab cause \u00bb"),
-         3L, c("contrat", "tete", "naissance", "sortie", "cause")),
+         3L, c("contrat", "tete", "naissance", "sortie", "cause"), "3 b"),
     list("m\u00e9thode qui rend le bon nombre de lignes dans l'ordre inverse", "k319perm",
          paste0("k319perm/data.frame, comptent 3 ligne(s) comme demand\u00e9 mais ne reprennent pas les valeurs des lignes demand\u00e9es dans la ou les colonne(s) de r\u00f4le ",
                 "\u00ab contrat \u00bb, \u00ab tete \u00bb, \u00ab naissance \u00bb, \u00ab entree \u00bb, \u00ab sortie \u00bb, \u00ab cause \u00bb"),
-         3L, c("contrat", "tete", "naissance", "entree", "sortie", "cause")))
+         3L, c("contrat", "tete", "naissance", "entree", "sortie", "cause"), "3 b"))
   for (c1 in cas) for (k in names(chemins)) {
     d <- classee(B1, c1[[2L]])
     x <- attrape(chemins[[k]](d))
     avertissements(chemins[[k]](d))  # amorce : premier appel sous la locale C (chargement paresseux)
-    verifier(sprintf("#319 %s : %s -> refus donnees_mal_formees du module donnees, message attendu, une ligne UTF-8 valide, details classe, classe_rendue, lignes, attendu, colonnes, colonne, position, lignes_colonne, 0 avertissement R", c1[[1L]], k), {
+    verifier(sprintf("#319 %s : %s -> refus donnees_mal_formees du module donnees, message attendu, une ligne UTF-8 valide, details cause (#369), classe, classe_rendue, lignes, attendu, colonnes, colonne, position, lignes_colonne, 0 avertissement R", c1[[1L]], k), {
       if (is.null(x)) "aucun refus"
       else if (!inherits(x, "refus_tablexp")) sprintf("condition %s : %s", class(x)[1L], conditionMessage(x))
       else if (!identical(x$module, "donnees") || !identical(x$motif, "donnees_mal_formees")) sprintf("%s / %s", x$module, x$motif)
       else if (!identical(conditionMessage(x), paste0(PREF, c1[[3L]], SUFF))) paste("message :", conditionMessage(x))
       else if (grepl("[\n\v\f]", conditionMessage(x)) || !validUTF8(conditionMessage(x)) ||
                !identical(Encoding(conditionMessage(x)), "UTF-8")) "message sur plusieurs lignes ou non UTF-8"
-      else if (!identical(x$details, list(classe = c(c1[[2L]], "data.frame"), classe_rendue = c(c1[[2L]], "data.frame"),
+      else if (!identical(x$details, list(cause = c1[[6L]], classe = c(c1[[2L]], "data.frame"), classe_rendue = c(c1[[2L]], "data.frame"),
                                           lignes = c1[[4L]], attendu = 3L, colonnes = c1[[5L]], colonne = character(0),
                                           position = integer(0), lignes_colonne = numeric(0))))
         paste("details :", paste(deparse(x$details), collapse = " "))
@@ -904,10 +904,10 @@ local({
     avertissements(chemins[[k]](d))  # amorce : premier appel sous la locale C (chargement paresseux)
     verifier(sprintf("#319 reprise, %s : %s -> refus donnees_mal_formees du module donnees, message attendu, une ligne UTF-8 valide, details complets, 0 avertissement R", c1[[1L]], k), {
       forme_refusee <- is.na(c1[[5L]])
-      attendu <- if (forme_refusee) list(classe = c(c1[[2L]], "data.frame"), classe_rendue = c1[[6L]], lignes = NA_integer_,
+      attendu <- if (forme_refusee) list(cause = "0", classe = c(c1[[2L]], "data.frame"), classe_rendue = c1[[6L]], lignes = NA_integer_,
                                          attendu = 3L, colonnes = character(0), colonne = character(0),
                                          position = integer(0), lignes_colonne = numeric(0))
-                 else list(classe = c(c1[[2L]], "data.frame"), classe_rendue = c1[[6L]], lignes = 3L, attendu = 3L,
+                 else list(cause = "2", classe = c(c1[[2L]], "data.frame"), classe_rendue = c1[[6L]], lignes = 3L, attendu = 3L,
                            colonnes = character(0), colonne = c1[[7L]], position = c1[[8L]], lignes_colonne = c1[[9L]])
       if (is.null(x)) "aucun refus"
       else if (!inherits(x, "refus_tablexp")) sprintf("condition %s : %s", class(x)[1L], conditionMessage(x))
@@ -940,7 +940,7 @@ local({
     x <- attrape(chemins[[k]](d))
     avertissements(chemins[[k]](d))  # amorce : premier appel sous la locale C (chargement paresseux)
     verifier(sprintf("#319 reprise, entr\u00e9e data.frame ordinaire, %s : %s -> refus donnees_mal_formees, message qui nomme la classe des colonnes (et non celle de l'entr\u00e9e), une ligne UTF-8 valide, details complets, 0 avertissement R", c1[[1L]], k), {
-      attendu <- list(classe = "data.frame", classe_rendue = "data.frame", lignes = 3L, attendu = 3L, colonnes = character(0),
+      attendu <- list(cause = "2", classe = "data.frame", classe_rendue = "data.frame", lignes = 3L, attendu = 3L, colonnes = character(0),
                       colonne = c1[[5L]], position = c1[[6L]], lignes_colonne = c1[[7L]])
       if (is.null(x)) "aucun refus"
       else if (!inherits(x, "refus_tablexp")) sprintf("condition %s : %s", class(x)[1L], conditionMessage(x))
@@ -971,7 +971,7 @@ local({
       msg <- paste0(PREF4, "ne reprennent pas les valeurs des lignes demand\u00e9es dans la ou les colonne(s) de r\u00f4le ", c1[[3L]],
                     " : le moteur ne corrige pas une extraction fausse ; passer un data.frame dont les colonnes cit\u00e9es (classe ", c1[[4L]],
                     ") ont une m\u00e9thode \u00ab [ \u00bb qui rend exactement les lignes demand\u00e9es (ou n'ont pas de m\u00e9thode \u00ab [ \u00bb propre).")
-      attendu <- list(classe = "data.frame", classe_rendue = "data.frame", lignes = 3L, attendu = 3L, colonnes = c1[[5L]],
+      attendu <- list(cause = "3 b", classe = "data.frame", classe_rendue = "data.frame", lignes = 3L, attendu = 3L, colonnes = c1[[5L]],
                       colonne = character(0), position = integer(0), lignes_colonne = numeric(0))
       if (is.null(x)) "aucun refus"
       else if (!inherits(x, "refus_tablexp")) sprintf("condition %s : %s", class(x)[1L], conditionMessage(x))
@@ -1065,7 +1065,7 @@ local({
     x <- attrape(chemins[[k]](d))
     avertissements(chemins[[k]](d))  # amorce : premier appel sous la locale C (chargement paresseux)
     verifier(sprintf("#319 reprise, contr\u00f4le (1 bis), %s : %s -> refus donnees_mal_formees, message attendu, une ligne UTF-8 valide, details complets, 0 avertissement R", c1[[1L]], k), {
-      attendu <- list(classe = unname(c1[[4L]]), classe_rendue = unname(c1[[4L]]), lignes = 3L, attendu = 3L, colonnes = character(0),
+      attendu <- list(cause = "1 bis", classe = unname(c1[[4L]]), classe_rendue = unname(c1[[4L]]), lignes = 3L, attendu = 3L, colonnes = character(0),
                       colonne = c1[[5L]], position = integer(0), lignes_colonne = numeric(0))
       if (is.null(x)) "aucun refus"
       else if (!inherits(x, "refus_tablexp")) sprintf("condition %s : %s", class(x)[1L], conditionMessage(x))
@@ -1286,7 +1286,7 @@ local({
       else if (!identical(r$module, "donnees") || !identical(r$motif, "donnees_mal_formees")) sprintf("%s / %s", r$module, r$motif)
       else if (!identical(conditionMessage(r), attendu_message(k, cl))) paste("message :", conditionMessage(r))
       else if (!identical(Encoding(conditionMessage(r)), "UTF-8")) "message non marqu\u00e9 UTF-8"
-      else if (!identical(r$details, list(classe = class(x), classe_rendue = class(x), lignes = 3L, attendu = 3L,
+      else if (!identical(r$details, list(cause = "3 b", classe = class(x), classe_rendue = class(x), lignes = 3L, attendu = 3L,
                                           colonnes = "sexe", colonne = character(0), position = integer(0),
                                           lignes_colonne = numeric(0))))
         paste("details :", paste(deparse(r$details), collapse = " "))
@@ -1357,7 +1357,7 @@ local({
                 "(liste de 1 colonne(s) pour 8 nom(s) de colonne)", SUFF_E)
   SUJET_IE <- paste0("Les lignes relues par l'\u00e9tape \u00ab importance_exclusions \u00bb (lignes exclues et, sous ",
                      "l'unit\u00e9 t\u00eate, lignes conserv\u00e9es des m\u00eames t\u00eates)")
-  details_k <- list(classe = class(dk), classe_rendue = class(dk), lignes = 3L, attendu = 3L, colonnes = character(0),
+  details_k <- list(cause = "1 bis", classe = class(dk), classe_rendue = class(dk), lignes = 3L, attendu = 3L, colonnes = character(0),
                     colonne = character(0), position = integer(0), lignes_colonne = numeric(0))
   chemins <- list(
     outil = function(x) tablexp:::controler_lignes_extraites(x, x[-2L, , drop = FALSE], c(1L, 3L, 4L), ROLES),
@@ -1396,7 +1396,7 @@ local({
            else if (!inherits(r, "refus_tablexp")) sprintf("condition %s : %s", class(r)[1L], conditionMessage(r))
            else if (!identical(r$module, "donnees") || !identical(r$motif, "donnees_mal_formees")) sprintf("%s / %s", r$module, r$motif)
            else if (!identical(conditionMessage(r), sub("k322klen/data.frame", "data.frame", msg, fixed = TRUE))) paste("message :", conditionMessage(r))
-           else if (!identical(r$details, list(classe = "data.frame", classe_rendue = "data.frame", lignes = 3L, attendu = 3L,
+           else if (!identical(r$details, list(cause = "1 bis", classe = "data.frame", classe_rendue = "data.frame", lignes = 3L, attendu = 3L,
                                                colonnes = character(0), colonne = character(0), position = integer(0),
                                                lignes_colonne = numeric(0))))
              paste("details :", paste(deparse(r$details), collapse = " "))
@@ -1409,13 +1409,13 @@ local({
              if (is.null(r)) "aucun refus"
              else if (!inherits(r, "refus_tablexp")) sprintf("condition %s : %s", class(r)[1L], conditionMessage(r))
              else if (!identical(r$module, et) || !identical(r$motif, "donnees_mal_formees")) sprintf("%s / %s", r$module, r$motif)
-             else grepl("ne sont pas un data.frame", conditionMessage(r), fixed = TRUE))
+             else grepl("ne sont pas un data.frame", conditionMessage(r), fixed = TRUE) && identical(r$details$cause, "0"))
   }
   de <- structure(d, class = c("k322env", "data.frame"))
   r <- attrape(prep(de, exclusions = "entree_manquante"))
   verifier("#322 revue finale, preparer_donnees : `[` qui rend un environnement classé data.frame -> refus (0) du module donnees",
            inherits(r, "refus_tablexp") && identical(r$module, "donnees") && identical(r$motif, "donnees_mal_formees") &&
-             grepl("ne sont pas un data.frame", conditionMessage(r), fixed = TRUE))
+             grepl("ne sont pas un data.frame", conditionMessage(r), fixed = TRUE) && identical(r$details$cause, "0"))
 })
 verifier("#322 revue finale : les méthodes de session sont retirées de globalenv()",
          !any(vapply(c("length.k322klen", "[.k322env"), exists, logical(1L), envir = globalenv(), inherits = FALSE)))
@@ -1452,7 +1452,7 @@ local({
   MILIEU <- "comptent 3 ligne(s) comme demand\u00e9 mais n'ont pas les colonnes des donn\u00e9es ("
   SUFF <- paste0(") : le moteur ne corrige pas une extraction fausse ; passer un data.frame dont la m\u00e9thode \u00ab [ \u00bb ",
                  "rend exactement les lignes demand\u00e9es (ou qui n'a pas de m\u00e9thode \u00ab [ \u00bb propre).")
-  details <- function(cl, colonne) list(classe = "data.frame", classe_rendue = c(cl, "data.frame"), lignes = 3L, attendu = 3L,
+  details <- function(cl, colonne) list(cause = "1 bis", classe = "data.frame", classe_rendue = c(cl, "data.frame"), lignes = 3L, attendu = 3L,
                                         colonnes = character(0), colonne = colonne, position = integer(0),
                                         lignes_colonne = numeric(0))
   cas <- list(
@@ -1485,7 +1485,7 @@ local({
            else if (!identical(conditionMessage(r),
                                paste0(PREF, "comptent 2 ligne(s) au lieu de 3", sub(")", "", SUFF, fixed = TRUE))))
              paste("message :", conditionMessage(r))
-           else identical(r$details, list(classe = "data.frame", classe_rendue = c("k345a", "data.frame"), lignes = 2L,
+           else identical(r$details, list(cause = "1", classe = "data.frame", classe_rendue = c("k345a", "data.frame"), lignes = 2L,
                                           attendu = 3L, colonnes = character(0), colonne = character(0),
                                           position = integer(0), lignes_colonne = numeric(0))))
   # Témoins : extraction juste (admise) ; liste cohérente aux noms différents (constat des noms, inchangé).
@@ -1502,12 +1502,36 @@ local({
                               "pas une extraction fausse ; passer un data.frame dont les colonnes cit\u00e9es (classe integer) ont une ",
                               "m\u00e9thode \u00ab [ \u00bb qui rend exactement les lignes demand\u00e9es (ou n'ont pas de m\u00e9thode ",
                               "\u00ab [ \u00bb propre).")) &&
-             identical(r$details, list(classe = "data.frame", classe_rendue = "data.frame", lignes = 3L, attendu = 3L,
+             identical(r$details, list(cause = "1 bis", classe = "data.frame", classe_rendue = "data.frame", lignes = 3L, attendu = 3L,
                                        colonnes = character(0), colonne = "b", position = integer(0),
                                        lignes_colonne = numeric(0))))
 })
 verifier("#345 les m\u00e9thodes de session sont retir\u00e9es de globalenv()",
          !any(vapply(c("length.k345a", "length.k345z", "length.k345d"), exists, logical(1L), envir = globalenv(), inherits = FALSE)))
+# Champ cause des details du refus donnees_mal_formees d'une extraction (#369 ;
+# avis d'actuary du 28/11/2026) : le contrôle en défaut de
+# controler_lignes_extraites(), character(1) parmi "0", "1", "1 bis", "2", "3 a",
+# "3 b", premier champ des details, aux deux étapes appelantes. Une entrée
+# data.frame ordinaire et une extraction construite à la main par cause
+# (valeurs écrites à la main) ; ordre des champs : cause en premier, neuf champs.
+local({
+  d <- data.frame(a = 1:3, s = factor(c("x", "y", "x")))
+  ro <- c(age = "a", sexe = "s")
+  bad <- d; bad$s <- structure(c(1L, 2L, 99L), levels = c("x", "y"), class = "factor")
+  perm <- d; perm$a <- 3:1
+  court <- structure(list(a = 1:3, s = d$s[1:2]), class = "data.frame", row.names = 1:3)
+  cas <- list(list("0", NULL), list("1", d[1:2, ]), list("1 bis", d[, "a", drop = FALSE]),
+              list("2", court), list("3 a", bad), list("3 b", perm))
+  for (e in c("donnees", "importance_exclusions")) for (c1 in cas) {
+    r <- tryCatch(tablexp:::controler_lignes_extraites(d, c1[[2L]], 1:3, ro, etape = e), refus_tablexp = function(r) r)
+    verifier(sprintf("#369 appel direct, \u00e9tape %s, cause %s -> refus donnees_mal_formees, details$cause \"%s\" en premier champ (neuf champs)", e, c1[[1L]], c1[[1L]]),
+             if (!inherits(r, "refus_tablexp")) "aucun refus"
+             else if (!identical(r$module, e) || !identical(r$motif, "donnees_mal_formees")) sprintf("%s / %s", r$module, r$motif)
+             else if (!identical(names(r$details), c("cause", "classe", "classe_rendue", "lignes", "attendu", "colonnes",
+                                                     "colonne", "position", "lignes_colonne"))) paste(names(r$details), collapse = ",")
+             else identical(r$details$cause, c1[[1L]]))
+  }
+})
 # Cohérence de la liste des colonnes et de ses noms à l'entrée (#344, F344 ;
 # spécification d'actuary-approfondi, commentaire de #344) : sous une classe
 # dont length() ment, `[.data.frame` rend une liste de 1 (ou 3) élément(s)
