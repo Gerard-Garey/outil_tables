@@ -1870,7 +1870,11 @@ observations_stocks <- function(lignes, numeros, roles, segmentation, p, donnees
 #                                      fichier), ou est un data.frame dont la
 #                                      liste des colonnes et les noms n'ont
 #                                      pas la même longueur (#355 ; première
-#                                      table en défaut) ;
+#                                      table en défaut), ou dont les noms de
+#                                      lignes (lus sans dispatch) et les
+#                                      colonnes ne donnent pas un même nombre
+#                                      de lignes (#368 ; première table en
+#                                      défaut) ;
 #   empilement_colonne_type_invalide : `colonne_type` hors de la forme
 #                                      ci-dessus ;
 #   empilement_noms_invalides        : nom de colonne NA, vide, en double ou
@@ -1913,6 +1917,26 @@ empiler_stocks <- function(inventaires, evenements, colonne_type) {
                        citer(nom_table), constat_colonnes_lues(lues), paste(citer(class(tables[[nom_table]])), collapse = "/")),
               list(table = nom_table, classe = lapply(tables[nom_table], class),
                    nombre_colonnes = lues$nombre_colonnes, nombre_noms = lues$nombre_noms))
+    # Nombre de lignes de la table et longueur de chaque colonne (#368), lus sans
+    # dispatch (règle de controler_lignes_donnees(), sans nrow()), avant toute
+    # lecture de colonne : une colonne plus courte était complétée par des NA, une
+    # plus longue tronquée, une table sans noms de lignes perdait ses lignes.
+    rn <- .row_names_info(tables[[nom_table]], 2L)
+    dec <- decomptes_colonnes(tables[[nom_table]])
+    k <- if (is.na(rn)) integer(0) else which(is.na(dec$lc) | dec$lc != rn)
+    if (is.na(rn) || length(k))
+      refuser("donnees", "empilement_table_invalide",
+              formuler(paste("Empilement des stocks successifs : la table « %s » est un data.frame mal formé, dont les noms",
+                             "de lignes et les colonnes ne donnent pas un même nombre de lignes (%s ; classe %s). Le moteur",
+                             "ne choisit pas entre ces décomptes, et ne les corrige pas (une colonne plus courte serait",
+                             "complétée par des valeurs manquantes, une plus longue tronquée) : passer un data.frame dont",
+                             "les noms de lignes et chaque colonne comptent le même nombre de lignes."),
+                       citer(nom_table),
+                       paste(c(if (is.na(rn)) "noms de lignes : illisibles" else formuler("noms de lignes : %d", rn),
+                               colonnes_decompte_citees(k, dec)), collapse = " ; "),
+                       paste(citer(class(tables[[nom_table]])), collapse = "/")),
+              list(table = nom_table, classe = lapply(tables[nom_table], class), lignes = rn,
+                   colonne = dec$noms[k], position = k, lignes_colonne = dec$lc[k]))
   }
   if (!chaine_unique(colonne_type) || Encoding(colonne_type) == "bytes")
     refuser("donnees", "empilement_colonne_type_invalide",
@@ -2811,6 +2835,26 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
                            "noms de colonnes ont la même longueur."),
                      nom_cite, constat_colonnes_lues(lues), paste(citer(class(x)), collapse = "/")),
             list(classe = class(x), nombre_colonnes = lues$nombre_colonnes, nombre_noms = lues$nombre_noms))
+  # Nombre de lignes et longueur de chaque colonne (#368), lus sans dispatch (règle
+  # de controler_lignes_donnees(), sans nrow()), avant toute lecture de colonne
+  # et avant table_vide : sous une colonne plus courte ou plus longue, x$sexe
+  # arrêtait R (« argument lengths differ ») ; sans noms de lignes, une table de
+  # colonnes non vides était refusée table_vide à tort. Une table vraiment vide
+  # (colonnes de longueur 0) reste table_vide.
+  rn <- .row_names_info(x, 2L)
+  dec <- decomptes_colonnes(x)
+  k <- if (is.na(rn)) integer(0) else which(is.na(dec$lc) | dec$lc != rn)
+  if (is.na(rn) || length(k))
+    refuser("donnees", "table_mal_formee",
+            formuler(paste("Table « %s » : la table est un data.frame mal formé, dont les noms de lignes et les colonnes ne",
+                           "donnent pas un même nombre de lignes (%s ; classe %s). Le moteur ne choisit pas entre ces",
+                           "décomptes, et ne les corrige pas : passer un data.frame dont les noms de lignes et chaque",
+                           "colonne comptent le même nombre de lignes."),
+                     nom_cite,
+                     paste(c(if (is.na(rn)) "noms de lignes : illisibles" else formuler("noms de lignes : %d", rn),
+                             colonnes_decompte_citees(k, dec)), collapse = " ; "),
+                     paste(citer(class(x)), collapse = "/")),
+            list(classe = class(x), lignes = rn, colonne = dec$noms[k], position = k, lignes_colonne = dec$lc[k]))
   # Colonnes (spécification de #146, § 1.2 ; ADR 0019, point 1.2) : age, sexe,
   # au plus un axe temporel (annee ou generation), et exactement une des
   # colonnes qx ou lx ; lx ne se reçoit que sous la forme

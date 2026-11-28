@@ -149,13 +149,21 @@ local({
   # rend NULL si le nombre d'appels remplacés n'est pas `attendu`.
   # `symboles` : arguments dont la lecture .row_names_info(s, 2L) est
   # remplacée par nrow(s) (« donnees » par défaut ; #367 : inventaires et
-  # evenements, ou x).
-  copie_avant <- function(nom, attendu, symboles = "donnees") {
+  # evenements, ou x). `gardees` : nombre de premières lectures (ordre du texte)
+  # laissées intactes, comptées à part, qui ne sont pas des lectures d'avant
+  # (#368 : table_reference() lit d'abord .row_names_info(x, 2L) pour comparer
+  # la longueur des colonnes, puis pour table_vide ; seule la seconde est celle
+  # d'avant #367).
+  copie_avant <- function(nom, attendu, symboles = "donnees", gardees = 0L) {
     reel <- get(nom, envir = asNamespace("tablexp"))
-    k <- 0L
+    k <- 0L; vues <- 0L
     remplacer <- function(e) {
       for (s in symboles)
-        if (identical(e, call(".row_names_info", as.name(s), 2L))) { k <<- k + 1L; return(call("nrow", as.name(s))) }
+        if (identical(e, call(".row_names_info", as.name(s), 2L))) {
+          vues <<- vues + 1L
+          if (vues <= gardees) return(e)
+          k <<- k + 1L; return(call("nrow", as.name(s)))
+        }
       if (identical(e, quote(longueur_lue(donnees)))) { k <<- k + 1L; return(quote(ncol(donnees))) }
       for (i in seq_along(e)) if (is.call(e[[i]])) e[[i]] <- remplacer(e[[i]])
       e
@@ -171,8 +179,8 @@ local({
                 preparer_donnees = copie_avant("preparer_donnees", 1L),
                 rejouer_fiche = copie_avant("rejouer_fiche", 4L),
                 empiler_stocks = copie_avant("empiler_stocks", 2L, c("inventaires", "evenements")),
-                table_reference = copie_avant("table_reference", 1L, "x"))
-  verifier("#354 copies d'avant (nrow(donnees), ncol(donnees)) formées : une lecture remplacée par fonction, quatre dans rejouer_fiche() (deux lignes, deux colonnes), deux dans empiler_stocks() et une dans table_reference() (#367), corps différents",
+                table_reference = copie_avant("table_reference", 1L, "x", gardees = 1L))
+  verifier("#354 copies d'avant (nrow(donnees), ncol(donnees)) formées : une lecture remplacée par fonction, quatre dans rejouer_fiche() (deux lignes, deux colonnes), deux dans empiler_stocks() et une dans table_reference() (#367 ; la première lecture de table_reference(), ajoutée par #368, est gardée), corps différents",
            !any(vapply(AVANT, is.null, NA)))
   reel <- function(nom) get(nom, envir = asNamespace("tablexp"))
   NU <- lapply(JEUX, function(J) construire_table(J$d, J$r, J$plan))

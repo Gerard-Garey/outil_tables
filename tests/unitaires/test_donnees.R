@@ -2973,6 +2973,84 @@ local({
     })
 })
 
+# Nombre de lignes et longueur de chaque colonne à l'entrée de table_reference()
+# (#368 ; spécification d'actuary, avis de l'étape (0') de B41) : le nombre de
+# lignes lu sans dispatch (.row_names_info(x, 2L)) doit être celui de chaque
+# colonne ; sinon refus table_mal_formee, avant toute lecture de colonne, donc
+# avant table_colonne_manquante et table_vide. Avant #368 (mesuré à 992749c) :
+# colonne plus courte ou plus longue, erreur R « argument lengths differ » ; table
+# sans attribut row.names (ou row.names = integer(0)) à colonnes de trois
+# valeurs, refus table_vide à tort ; noms de lignes illisibles
+# (row.names = c(NA_integer_, NA_integer_)), erreur R « missing value where
+# TRUE/FALSE needed ». Une table vraiment vide (colonnes de longueur 0) reste
+# table_vide. Messages et details écrits à la main (texte de l'avis) ;
+# lignes_colonne est un double (décompte lu par decomptes_colonnes()).
+local({
+  df_noms <- function(l, row.names) {
+    x <- structure(l, class = "data.frame")
+    if (!missing(row.names)) attr(x, "row.names") <- row.names
+    x
+  }
+  cols <- list(age = 0:2, sexe = c("H", "H", "H"), qx = c(0.01, 0.02, 0.03))
+  # Avertissements R comptés au second appel (comme au test de #355).
+  appel <- function(x) {
+    f <- function() tryCatch(table_reference(x, "t", "importee", "s"), refus_tablexp = function(c) c, error = function(c) c)
+    r <- suppressWarnings(f())
+    n <- 0L
+    withCallingHandlers(f(), warning = function(w) { n <<- n + 1L; invokeRestart("muffleWarning") })
+    list(r = r, n = n)
+  }
+  MSG <- function(constat) paste0(
+    "Table « t » : la table est un data.frame mal formé, dont les noms de lignes et les colonnes ne donnent pas un ",
+    "même nombre de lignes (", constat, " ; classe data.frame). Le moteur ne choisit pas entre ces décomptes, et ne ",
+    "les corrige pas : passer un data.frame dont les noms de lignes et chaque colonne comptent le même nombre de lignes.")
+  trois <- "noms de lignes : 0 ; colonne « age » : 3 ; colonne « sexe » : 3 ; colonne « qx » : 3"
+  det3 <- list(classe = "data.frame", lignes = 0L, colonne = c("age", "sexe", "qx"), position = 1:3,
+               lignes_colonne = c(3, 3, 3))
+  cas <- list(
+    list("colonne sexe de 1 valeur pour 3 lignes (avant : erreur R « argument lengths differ »)",
+         df_noms(list(age = 0:2, sexe = "H", qx = cols$qx), c(NA_integer_, -3L)),
+         MSG("noms de lignes : 3 ; colonne « sexe » : 1"),
+         list(classe = "data.frame", lignes = 3L, colonne = "sexe", position = 2L, lignes_colonne = 1)),
+    list("colonne sexe de 4 valeurs pour 3 lignes (avant : erreur R « argument lengths differ »)",
+         df_noms(list(age = 0:2, sexe = rep("H", 4L), qx = cols$qx), c(NA_integer_, -3L)),
+         MSG("noms de lignes : 3 ; colonne « sexe » : 4"),
+         list(classe = "data.frame", lignes = 3L, colonne = "sexe", position = 2L, lignes_colonne = 4)),
+    list("sans attribut row.names, colonnes de 3 valeurs (avant : table_vide à tort)", df_noms(cols),
+         MSG(trois), det3),
+    list("row.names = integer(0), colonnes de 3 valeurs (avant : table_vide à tort)", df_noms(cols, integer(0)),
+         MSG(trois), det3),
+    list("noms de lignes illisibles (avant : erreur R « missing value where TRUE/FALSE needed »)",
+         df_noms(list(age = 0:1, sexe = c("H", "H"), qx = c(0.01, 0.02)), c(NA_integer_, NA_integer_)),
+         MSG("noms de lignes : illisibles"),
+         list(classe = "data.frame", lignes = NA_integer_, colonne = character(0), position = integer(0),
+              lignes_colonne = numeric(0))),
+    list("colonne qx absente, colonne sexe de 1 valeur (nombre de lignes jugé avant table_colonne_manquante)",
+         df_noms(list(age = 0:2, sexe = "H"), c(NA_integer_, -3L)),
+         MSG("noms de lignes : 3 ; colonne « sexe » : 1"),
+         list(classe = "data.frame", lignes = 3L, colonne = "sexe", position = 2L, lignes_colonne = 1)))
+  for (c1 in cas)
+    verifier(sprintf("#368 table_reference : %s -> refus table_mal_formee du module donnees, message et details exacts, une ligne marquée UTF-8, aucune erreur R, 0 avertissement R", c1[[1L]]), {
+      a <- appel(c1[[2L]])
+      x <- a$r
+      if (!inherits(x, "refus_tablexp")) {
+        if (inherits(x, "error")) paste("erreur R :", conditionMessage(x)) else "aucun refus levé"
+      }
+      else if (!identical(x$module, "donnees") || !identical(x$motif, "table_mal_formee")) sprintf("%s / %s", x$module, x$motif)
+      else if (!identical(conditionMessage(x), c1[[3L]])) paste("message :", conditionMessage(x))
+      else if (grepl("[\n\v\f]", conditionMessage(x)) || !validUTF8(conditionMessage(x)) ||
+               !identical(Encoding(conditionMessage(x)), "UTF-8")) "message sur plusieurs lignes ou non marqué UTF-8"
+      else if (!identical(x$details, c1[[4L]])) paste("details :", paste(deparse(x$details), collapse = " "))
+      else if (a$n != 0L) sprintf("%d avertissement(s) R", a$n)
+      else TRUE
+    })
+  verifier("#368 table_reference, table vraiment vide (colonnes de longueur 0) : refus table_vide conservé, aucune erreur R",
+           { a <- appel(data.frame(age = integer(0), sexe = character(0), qx = numeric(0)))
+             inherits(a$r, "refus_tablexp") && identical(a$r$motif, "table_vide") && a$n == 0L })
+  verifier("#368 table_reference, témoin : trois lignes bien formées (noms de lignes automatiques) admises, classe table_reference",
+           inherits(appel(data.frame(cols))$r, "table_reference"))
+})
+
 # Un nom d'état vide était refusé au second contrôle de la transition (non prise
 # en charge) ; il l'est au premier (forme), sous le même motif.
 verifier("transition : nom d'état vide (depart, puis arrivee) -> refus transition_inconnue",
