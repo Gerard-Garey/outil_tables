@@ -3146,6 +3146,61 @@ local({
              inherits(a$r, "refus_tablexp") && identical(a$r$motif, "table_vide") && a$n == 0L })
   verifier("#368 table_reference, témoin : trois lignes bien formées (noms de lignes automatiques) admises, classe table_reference",
            inherits(appel(data.frame(cols))$r, "table_reference"))
+  # Colonne liste classée dont la méthode length() ou dim() lève une erreur R
+  # (revue finale de B41 ; #368 comptait les lignes d'une telle colonne par NROW(),
+  # avec dispatch : erreur R nue, là où avant #368 (mesuré à 3ed3973) la colonne
+  # inconnue ou mal typée était refusée). Une telle colonne n'est pas comptée : son
+  # refus est celui d'avant, une colonne atomique discordante de la même table
+  # reste refusée par #368. Méthodes S3 de session dans globalenv(), retirées
+  # ensuite ; les data.frame sont formés avant leur pose (leur construction
+  # appelle length()). Motifs écrits à la main (colonne l : inconnue ; colonnes
+  # admises : mal typées, sauf lx, présente avec qx : formes incohérentes).
+  k <- structure(list(1, 2, 3), class = "k368")
+  k2 <- structure(list(1, 2), class = "k368")
+  avec <- function(nom, v = k, l = cols) { l[[nom]] <- v; df_noms(l, c(NA_integer_, -3L)) }
+  tables <- list(
+    list("l", "table_colonne_inconnue", avec("l")),
+    list("age", "table_colonne_mal_typee", avec("age")),
+    list("sexe", "table_colonne_mal_typee", avec("sexe")),
+    list("qx", "table_colonne_mal_typee", avec("qx")),
+    list("lx", "table_forme_incoherente", avec("lx")),
+    list("annee", "table_colonne_mal_typee", avec("annee")),
+    list("generation", "table_colonne_mal_typee", avec("generation")),
+    list("l de 2 valeurs pour 3 lignes", "table_colonne_inconnue", avec("l", k2)))
+  mixte <- avec("l", k, list(age = 0:2, sexe = "H", qx = cols$qx))
+  methodes <- list(length = list(length.k368 = function(x) stop("length.k368 : erreur de session")),
+                   dim = list(dim.k368 = function(x) stop("dim.k368 : erreur de session")),
+                   `length et dim` = list(length.k368 = function(x) stop("length.k368 : erreur de session"),
+                                          dim.k368 = function(x) stop("dim.k368 : erreur de session")))
+  for (m in names(methodes)) {
+    for (n in names(methodes[[m]])) assign(n, methodes[[m]][[n]], envir = globalenv())
+    ap <- lapply(tables, function(t) appel(t[[3L]]))
+    ap_mixte <- appel(mixte)
+    for (n in names(methodes[[m]])) rm(list = n, envir = globalenv())
+    for (i in seq_along(tables))
+      verifier(sprintf("#368 table_reference, colonne liste classée %s, méthode %s en erreur : refus %s (comme avant #368), aucune erreur R", tables[[i]][[1L]], m, tables[[i]][[2L]]), {
+        x <- ap[[i]]$r
+        if (!inherits(x, "refus_tablexp")) {
+          if (inherits(x, "error")) paste("erreur R :", conditionMessage(x)) else "aucun refus levé"
+        }
+        else if (!identical(x$module, "donnees") || !identical(x$motif, tables[[i]][[2L]])) sprintf("%s / %s", x$module, x$motif)
+        else if (ap[[i]]$n != 0L) sprintf("%d avertissement(s) R", ap[[i]]$n)
+        else TRUE
+      })
+    verifier(sprintf("#368 table_reference, colonne liste classée l et colonne atomique sexe de 1 valeur pour 3 lignes, méthode %s en erreur : refus table_mal_formee qui cite sexe seule (acquis conservé), aucune erreur R", m), {
+      x <- ap_mixte$r
+      if (!inherits(x, "refus_tablexp")) {
+        if (inherits(x, "error")) paste("erreur R :", conditionMessage(x)) else "aucun refus levé"
+      }
+      else if (!identical(x$motif, "table_mal_formee")) x$motif
+      else if (!identical(x$details$colonne, "sexe") || !identical(x$details$position, 2L) ||
+               !identical(x$details$lignes_colonne, 1)) paste("details :", paste(deparse(x$details), collapse = " "))
+      else if (ap_mixte$n != 0L) sprintf("%d avertissement(s) R", ap_mixte$n)
+      else TRUE
+    })
+  }
+  verifier("#368 les méthodes length.k368 et dim.k368 de session sont retirées de globalenv()",
+           !any(c("length.k368", "dim.k368") %in% ls(globalenv(), all.names = TRUE)))
 })
 
 # Un nom d'état vide était refusé au second contrôle de la transition (non prise

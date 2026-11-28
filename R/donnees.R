@@ -559,7 +559,12 @@ deduire_recette <- function(roles, catalogue = CATALOGUE_RECETTES, matrice = MAT
 # dispatch, pour une liste munie d'une classe autre que « bytes » (POSIXlt,
 # colonne data.frame : son nombre de lignes n'est défini que par sa méthode) ;
 # sinon longueur_lue(), sans dispatch (vecteur atomique classé ou non, liste
-# nue, classe « bytes » que NROW() ne lit pas : erreur R). decompte_lisible()
+# nue, classe « bytes » que NROW() ne lit pas : erreur R). Une telle liste est
+# dite « par méthode » ; sous `par_methode = FALSE`, decompte_colonne() ne
+# l'appelle pas et rend NULL (#368 : empiler_stocks() et table_reference() la
+# refusent plus loin sous leur propre motif, colonne non atomique, colonne mal
+# typée ou inconnue, et ne doivent lever aucune erreur R sous une méthode
+# length() ou dim() qui en lève une). decompte_lisible()
 # juge une valeur ainsi rendue, avant toute conversion (une méthode length() ou
 # dim() de la classe peut rendre « abc », NA ou deux valeurs) : numérique
 # (is.numeric(), avec dispatch, comme avant #322 : une Date, un facteur ou une
@@ -571,8 +576,11 @@ deduire_recette <- function(roles, catalogue = CATALOGUE_RECETTES, matrice = MAT
 # liste x par position (unclass() : jamais [[, names(), ncol() ni length(x),
 # qui dispatchent ; coût en O(colonnes), aucune colonne copiée) et rend les
 # valeurs rendues (rendus), leur lisibilité (lisibles), les décomptes en double
-# (lc, as.double(unclass()), NA si illisibles) et les noms des colonnes
-# (noms_colonnes_lus(), seule lecture des noms de colonnes de ces contrôles).
+# (lc, as.double(unclass()), NA si illisibles), les colonnes laissées à leur
+# refus propre (ignorees : rendu NULL, colonnes par méthode sous `par_methode =
+# FALSE`, toutes FALSE sinon ; l'appelant les écarte des colonnes discordantes)
+# et les noms des colonnes (noms_colonnes_lus(), seule lecture des noms de
+# colonnes de ces contrôles).
 # Précondition : liste cohérente (colonnes_lues(), #344) ; sinon erreur de
 # programmation, stop() : les appelants refusent une liste incohérente avant.
 # colonnes_decompte_citees(k, dec, classes) : texte d'une ligne par colonne
@@ -588,22 +596,23 @@ decompte_lisible <- function(v) {
   is.numeric(u) && length(u) == 1L && !is.na(u) && u >= 0 && u <= .Machine$integer.max && u == trunc(u)
 }
 
-decompte_colonne <- function(v) {
+decompte_colonne <- function(v, par_methode = TRUE) {
   dm <- attr(v, "dim", exact = TRUE)
   if (!is.null(dm)) return(dm[1L])
-  if (is.list(v) && !is.null(attr(v, "class", exact = TRUE)) && !classe_bytes(v)) return(NROW(v))
+  if (is.list(v) && !is.null(attr(v, "class", exact = TRUE)) && !classe_bytes(v)) return(if (par_methode) NROW(v))
   longueur_lue(v)
 }
 
-decomptes_colonnes <- function(x) {
+decomptes_colonnes <- function(x, par_methode = TRUE) {
   if (!colonnes_lues(x)$coherente)
     stop("decomptes_colonnes() : liste de colonnes et noms de colonnes de longueurs différentes (erreur de programmation).",
          call. = FALSE)
-  rendus <- lapply(unclass(x), decompte_colonne)
+  rendus <- lapply(unclass(x), decompte_colonne, par_methode = par_methode)
   lisibles <- vapply(rendus, decompte_lisible, logical(1L))
   lc <- rep(NA_real_, length(rendus))
   lc[lisibles] <- vapply(rendus[lisibles], function(v) as.double(unclass(v)), numeric(1L))
-  list(rendus = rendus, lisibles = lisibles, lc = lc, noms = noms_colonnes_lus(x))
+  ignorees <- if (par_methode) rep(FALSE, length(rendus)) else unname(vapply(rendus, is.null, logical(1L)))
+  list(rendus = rendus, lisibles = lisibles, lc = lc, ignorees = ignorees, noms = noms_colonnes_lus(x))
 }
 
 colonnes_decompte_citees <- function(k, dec, classes = NULL) {
@@ -1878,7 +1887,12 @@ observations_stocks <- function(lignes, numeros, roles, segmentation, p, donnees
 #                                      lignes (lus sans dispatch) et les
 #                                      colonnes ne donnent pas un même nombre
 #                                      de lignes (#368 ; première table en
-#                                      défaut) ;
+#                                      défaut ; une colonne liste classée, dont
+#                                      le décompte ne se lit que par une
+#                                      méthode, n'est pas comptée : elle est
+#                                      refusée plus loin, au plus tard sous
+#                                      empilement_colonne_non_atomique, sauf
+#                                      refus antérieur) ;
 #   empilement_colonne_type_invalide : `colonne_type` hors de la forme
 #                                      ci-dessus ;
 #   empilement_noms_invalides        : nom de colonne NA, vide, en double ou
@@ -1937,10 +1951,14 @@ empiler_stocks <- function(inventaires, evenements, colonne_type) {
     # Nombre de lignes de la table et longueur de chaque colonne (#368), lus sans
     # dispatch (règle de controler_lignes_donnees(), sans nrow()), avant toute
     # lecture de colonne : une colonne plus courte était complétée par des NA, une
-    # plus longue tronquée, une table sans noms de lignes perdait ses lignes.
+    # plus longue tronquée, une table sans noms de lignes perdait ses lignes. Une
+    # colonne liste classée n'est pas comptée (par_methode = FALSE : NROW() la
+    # lirait par une méthode length() ou dim(), qui peut lever une erreur R) : elle est
+    # refusée plus bas, au plus tard sous empilement_colonne_non_atomique, sauf
+    # refus antérieur (colonne_type invalide, empilement_noms_invalides).
     rn <- .row_names_info(tables[[nom_table]], 2L)
-    dec <- decomptes_colonnes(tables[[nom_table]])
-    k <- if (is.na(rn)) integer(0) else which(is.na(dec$lc) | dec$lc != rn)
+    dec <- decomptes_colonnes(tables[[nom_table]], par_methode = FALSE)
+    k <- if (is.na(rn)) integer(0) else which(!dec$ignorees & (is.na(dec$lc) | dec$lc != rn))
     if (is.na(rn) || length(k))
       refuser("donnees", "empilement_table_invalide",
               formuler(paste("Empilement des stocks successifs : la table « %s » est un data.frame mal formé, dont les noms",
@@ -2763,7 +2781,13 @@ lignes_citees_table <- function(k, sexes, axe, valeurs, ages) {
 # sexe (et année ou génération) ne donne aucune ligne (#146).
 #   x            : data.frame (age, sexe, qx ou lx [, annee ou generation]),
 #                  dont la classe ne porte aucune chaîne d'encodage « bytes »
-#                  (#158) ;
+#                  (#158), et dont les noms de lignes (lus sans dispatch) et
+#                  chaque colonne donnent un même nombre de lignes (#368),
+#                  sinon table_mal_formee, avant table_colonne_manquante et
+#                  table_vide ; une colonne liste classée, dont le décompte ne se
+#                  lit que par une méthode, n'est pas comptée (refusée plus loin,
+#                  au plus tard sous table_colonne_inconnue ou
+#                  table_colonne_mal_typee, sauf refus antérieur) ;
 #   nom, source  : chaînes non vides, d'encodage autre que « bytes » (#158 ;
 #                  source : arrêté, URL, fichier de provenance) ;
 #   statut       : synthetique, embarquee ou importee ;
@@ -2816,9 +2840,10 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
             formuler("Table « %s » de statut « %s » : aucun paramètre de loi attendu.", nom_cite, citer(statut)))
   # Classe d'encodage « bytes » de `parametres` lui-même (#392 ; même règle que
   # celle de x, #158, et de controler_roles(), #150) : refus ici, sous le motif de
-  # l'argument, avant parametres_bytes() ; la classe ne se cite pas (repère de
-  # neutraliser_citation()) et details$classe porte la valeur reçue. Une classe
-  # qui n'est pas « bytes » reste admise (non lue, #256).
+  # l'argument, avant parametres_bytes() ; le message cite la classe par
+  # citer(class(parametres)), chaque chaîne « bytes » sous le repère de
+  # neutraliser_citation(), et details$classe porte la valeur reçue. Une classe qui
+  # n'est pas « bytes » reste admise (non lue, #256).
   if (classe_bytes(parametres))
     refuser("donnees", "table_parametres_manquants",
             formuler(paste("Table synthétique « %s » : ses paramètres portent une classe d'encodage « bytes » (classe %s), non",
@@ -2892,10 +2917,15 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
   # et avant table_vide : sous une colonne plus courte ou plus longue, x$sexe
   # arrêtait R (« argument lengths differ ») ; sans noms de lignes, une table de
   # colonnes non vides était refusée table_vide à tort. Une table vraiment vide
-  # (colonnes de longueur 0) reste table_vide.
+  # (colonnes de longueur 0) reste table_vide. Une colonne liste classée n'est
+  # pas comptée (par_methode = FALSE : NROW() la lirait par une méthode length()
+  # ou dim(), qui peut lever une erreur R) : elle est refusée plus bas, au plus
+  # tard sous table_colonne_inconnue (nom hors des colonnes admises) ou
+  # table_colonne_mal_typee (nom admis), sauf refus antérieur (table_colonne_manquante,
+  # table_annee_et_generation, table_forme_incoherente, table_vide).
   rn <- .row_names_info(x, 2L)
-  dec <- decomptes_colonnes(x)
-  k <- if (is.na(rn)) integer(0) else which(is.na(dec$lc) | dec$lc != rn)
+  dec <- decomptes_colonnes(x, par_methode = FALSE)
+  k <- if (is.na(rn)) integer(0) else which(!dec$ignorees & (is.na(dec$lc) | dec$lc != rn))
   if (is.na(rn) || length(k))
     refuser("donnees", "table_mal_formee",
             formuler(paste("Table « %s » : la table est un data.frame mal formé, dont les noms de lignes et les colonnes ne",

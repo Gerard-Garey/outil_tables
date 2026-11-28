@@ -364,6 +364,59 @@ local({
                               c = c(NA, NA, NA, "deces", "rachat", "deces"),
                               t = rep(c("inventaire", "evenement"), each = 3L), stringsAsFactors = FALSE)) && a$n == 0L
   })
+  # Colonne liste classée dont la méthode length() ou dim() lève une erreur R
+  # (revue finale de B41 ; #368 comptait les lignes d'une telle colonne par NROW(),
+  # avec dispatch : erreur R nue, là où avant #368 (mesuré à 3ed3973) le refus
+  # empilement_colonne_non_atomique était levé). Une telle colonne n'est pas
+  # comptée : son refus est celui d'avant, une colonne atomique discordante de la
+  # même table reste refusée par #368. Méthodes S3 de session dans globalenv(),
+  # retirées ensuite ; les data.frame sont formés avant leur pose (leur
+  # construction appelle length()). Valeurs écrites à la main.
+  k <- structure(list(1, 2, 3), class = "k368")
+  k2 <- structure(list(1, 2), class = "k368")
+  I_k <- structure_df(list(id = 1:3, l = k), c(NA_integer_, -3L))
+  E_k <- structure_df(list(id = 2:4, l = k), c(NA_integer_, -3L))
+  I_k_court <- structure_df(list(id = 1:3, l = k2), c(NA_integer_, -3L))
+  I_k_et_court <- structure_df(list(id = 1:3, l = k, sx = "H"), c(NA_integer_, -3L))
+  methodes <- list(length = list(length.k368 = function(x) stop("length.k368 : erreur de session")),
+                   dim = list(dim.k368 = function(x) stop("dim.k368 : erreur de session")),
+                   `length et dim` = list(length.k368 = function(x) stop("length.k368 : erreur de session"),
+                                          dim.k368 = function(x) stop("dim.k368 : erreur de session")))
+  motif_non_atomique <- function(a, table) {
+    x <- a$r
+    if (!inherits(x, "refus_tablexp")) {
+      if (inherits(x, "error")) paste("erreur R :", conditionMessage(x)) else "aucun refus levé"
+    }
+    else if (!identical(x$module, "donnees") || !identical(x$motif, "empilement_colonne_non_atomique"))
+      sprintf("%s / %s", x$module, x$motif)
+    else if (!identical(x$details, list(table = table, colonne = "l"))) paste("details :", paste(deparse(x$details), collapse = " "))
+    else if (a$n != 0L) sprintf("%d avertissement(s) R", a$n)
+    else TRUE
+  }
+  for (m in names(methodes)) {
+    for (n in names(methodes[[m]])) assign(n, methodes[[m]][[n]], envir = globalenv())
+    ap <- list(inv = appel(I_k, E3), eve = appel(I3, E_k), court = appel(I_k_court, E3), mixte = appel(I_k_et_court, E3))
+    for (n in names(methodes[[m]])) rm(list = n, envir = globalenv())
+    verifier(sprintf("#368 colonne liste classée l, méthode %s en erreur, dans inventaires : refus empilement_colonne_non_atomique (comme avant #368), aucune erreur R", m),
+             motif_non_atomique(ap$inv, "inventaires"))
+    verifier(sprintf("#368 colonne liste classée l, méthode %s en erreur, dans evenements : refus empilement_colonne_non_atomique, aucune erreur R", m),
+             motif_non_atomique(ap$eve, "evenements"))
+    verifier(sprintf("#368 colonne liste classée l de 2 valeurs pour 3 lignes, méthode %s en erreur : refus empilement_colonne_non_atomique (non comptée), aucune erreur R", m),
+             motif_non_atomique(ap$court, "inventaires"))
+    verifier(sprintf("#368 colonne liste classée l et colonne atomique sx de 1 valeur pour 3 lignes, méthode %s en erreur : refus #368, qui cite sx seule (acquis conservé), aucune erreur R", m), {
+      x <- ap$mixte$r
+      if (!inherits(x, "refus_tablexp")) {
+        if (inherits(x, "error")) paste("erreur R :", conditionMessage(x)) else "aucun refus levé"
+      }
+      else if (!identical(x$motif, "empilement_table_invalide")) x$motif
+      else if (!identical(x$details$colonne, "sx") || !identical(x$details$position, 3L) ||
+               !identical(x$details$lignes_colonne, 1)) paste("details :", paste(deparse(x$details), collapse = " "))
+      else if (ap$mixte$n != 0L) sprintf("%d avertissement(s) R", ap$mixte$n)
+      else TRUE
+    })
+  }
+  verifier("#368 les méthodes length.k368 et dim.k368 de session sont retirées de globalenv()",
+           !any(c("length.k368", "dim.k368") %in% ls(globalenv(), all.names = TRUE)))
 })
 
 # --- classe d'encodage bytes (#366) ---------------------------------------------------
