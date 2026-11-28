@@ -27,6 +27,14 @@
 #  mesuré avant correction ; sans lui, un test qui ne compte aucun mensonge
 #  ne prouverait rien.
 #
+#  Suite #367 (B41) : empiler_stocks() (nombre de lignes de `inventaires` et
+#  de `evenements`) et table_reference() (refus table_vide) lisent
+#  .row_names_info(x, 2L), non nrow(x). Même classe k354, dont la méthode dim()
+#  ajoute une ligne (empiler_stocks) ou rend zéro ligne (table_reference,
+#  CIBLE354$mode « zero ») depuis la fonction cible seulement ; contrôle par
+#  copie d'avant, garde mécanique : aucun nrow() ni ncol() dans ces deux
+#  fonctions (critère C6 du plan de B41).
+#
 #  Natures des attendus (ADR 0007, point 11.4) : identité exacte (résultat et
 #  fiche sur k354 identical() à ceux de la classe k354 sans cible ; empreinte
 #  des données égale à celle du data.frame nu) ; valeurs écrites à la main
@@ -97,7 +105,7 @@ JEUX <- list(
                 modif = function(d) { d$n[1:3] <- d$n[1:3] + 1; d }))
 
 local({
-  CIBLE354 <- new.env(); CIBLE354$corps <- NULL; CIBLE354$mensonges <- 0L
+  CIBLE354 <- new.env(); CIBLE354$corps <- NULL; CIBLE354$mensonges <- 0L; CIBLE354$mode <- "plus"
   m354 <- list(
     dim.k354 = function(x) {
       d <- c(.row_names_info(x, 2L), length(unclass(x)))
@@ -108,7 +116,9 @@ local({
         i <- which(vapply(sys.frames(), identical, NA, cadre))
         if (length(i) && identical(body(sys.function(i[length(i)])), CIBLE354$corps)) {
           CIBLE354$mensonges <- CIBLE354$mensonges + 1L
-          d <- d + 1L
+          # « plus » : une ligne et une colonne de trop ; « zero » (#367) :
+          # aucune ligne, colonnes comptées honnêtement.
+          d <- if (identical(CIBLE354$mode, "zero")) c(0L, d[2L]) else d + 1L
         }
       }
       d })
@@ -125,9 +135,9 @@ local({
   }
   # Appel sous la cible `corps` ; rend la valeur, les mensonges comptés et les
   # avertissements de R.
-  sous_cible <- function(corps, expr) {
-    CIBLE354$corps <- corps; CIBLE354$mensonges <- 0L
-    on.exit(CIBLE354$corps <- NULL)
+  sous_cible <- function(corps, expr, mode = "plus") {
+    CIBLE354$corps <- corps; CIBLE354$mensonges <- 0L; CIBLE354$mode <- mode
+    on.exit({ CIBLE354$corps <- NULL; CIBLE354$mode <- "plus" })
     a <- avec_avertissements(expr)
     c(a, list(mensonges = CIBLE354$mensonges))
   }
@@ -137,11 +147,15 @@ local({
   # package) ; remplacement fait sur le langage (appels identical() à
   # .row_names_info(donnees, 2L) ou longueur_lue(donnees)), sans deparse() ;
   # rend NULL si le nombre d'appels remplacés n'est pas `attendu`.
-  copie_avant <- function(nom, attendu) {
+  # `symboles` : arguments dont la lecture .row_names_info(s, 2L) est
+  # remplacée par nrow(s) (« donnees » par défaut ; #367 : inventaires et
+  # evenements, ou x).
+  copie_avant <- function(nom, attendu, symboles = "donnees") {
     reel <- get(nom, envir = asNamespace("tablexp"))
     k <- 0L
     remplacer <- function(e) {
-      if (identical(e, quote(.row_names_info(donnees, 2L)))) { k <<- k + 1L; return(quote(nrow(donnees))) }
+      for (s in symboles)
+        if (identical(e, call(".row_names_info", as.name(s), 2L))) { k <<- k + 1L; return(call("nrow", as.name(s))) }
       if (identical(e, quote(longueur_lue(donnees)))) { k <<- k + 1L; return(quote(ncol(donnees))) }
       for (i in seq_along(e)) if (is.call(e[[i]])) e[[i]] <- remplacer(e[[i]])
       e
@@ -155,8 +169,10 @@ local({
                 evaluer_motifs_agregats = copie_avant("evaluer_motifs_agregats", 1L),
                 evaluer_motifs_stocks = copie_avant("evaluer_motifs_stocks", 1L),
                 preparer_donnees = copie_avant("preparer_donnees", 1L),
-                rejouer_fiche = copie_avant("rejouer_fiche", 4L))
-  verifier("#354 copies d'avant (nrow(donnees), ncol(donnees)) formées : une lecture remplacée par fonction, quatre dans rejouer_fiche() (deux lignes, deux colonnes), corps différents",
+                rejouer_fiche = copie_avant("rejouer_fiche", 4L),
+                empiler_stocks = copie_avant("empiler_stocks", 2L, c("inventaires", "evenements")),
+                table_reference = copie_avant("table_reference", 1L, "x"))
+  verifier("#354 copies d'avant (nrow(donnees), ncol(donnees)) formées : une lecture remplacée par fonction, quatre dans rejouer_fiche() (deux lignes, deux colonnes), deux dans empiler_stocks() et une dans table_reference() (#367), corps différents",
            !any(vapply(AVANT, is.null, NA)))
   reel <- function(nom) get(nom, envir = asNamespace("tablexp"))
   NU <- lapply(JEUX, function(J) construire_table(J$d, J$r, J$plan))
@@ -276,6 +292,62 @@ local({
       inherits(b$valeur, "refus_tablexp") && identical(b$valeur$details$lignes, nl)
     })
   }
+
+  # --- empiler_stocks() et table_reference() (R/donnees.R) : #367 ---
+  # Jeux écrits à la main : trois lignes d'inventaire et trois lignes
+  # d'événement (six lignes empilées) ; table de référence de six lignes.
+  I3 <- data.frame(id = c("A", "B", "C"), di = G3, sx = c("H", "F", "H"), stringsAsFactors = FALSE)
+  E3 <- data.frame(id = c("A", "D", "E"), sx = c("H", "F", "H"),
+                   s = D(c("2016-05-01", "2015-06-01", "2014-06-01")), stringsAsFactors = FALSE)
+  EMPILE <- data.frame(id = c("A", "B", "C", "A", "D", "E"), di = D(c(as.character(G3), NA, NA, NA)),
+                       sx = c("H", "F", "H", "H", "F", "H"), s = D(c(NA, NA, NA, "2016-05-01", "2015-06-01", "2014-06-01")),
+                       t = c(rep("inventaire", 3L), rep("evenement", 3L)), stringsAsFactors = FALSE)
+  TREF <- data.frame(age = c(60L, 61L, 62L, 60L, 61L, 62L), sexe = c("H", "H", "H", "F", "F", "F"),
+                     qx = c(0.01, 0.011, 0.012, 0.006, 0.0066, 0.0072), stringsAsFactors = FALSE)
+  verifier("#367 empiler_stocks, jeu de contrôle (valeurs écrites à la main) : data.frame nu rendu identique à la table de six lignes écrite à la main",
+           identical(empiler_stocks(I3, E3, "t"), EMPILE))
+  for (cas in list(list(nom = "inventaires", i = TRUE, e = FALSE), list(nom = "evenements", i = FALSE, e = TRUE))) {
+    arg_i <- function() if (cas$i) k354(I3) else I3
+    arg_e <- function() if (cas$e) k354(E3) else E3
+    verifier(sprintf("#367 empiler_stocks, `%s` de classe k354, contrôle (copie d'avant, nrow(inventaires), nrow(evenements)) : mensonge atteint, une ligne de trop rendue (sept lignes au lieu de six) sans refus", cas$nom), {
+      a <- sous_cible(body(AVANT$empiler_stocks), AVANT$empiler_stocks(arg_i(), arg_e(), "t"))
+      v <- a$valeur
+      a$mensonges >= 1L && !inherits(v, "condition") && is.data.frame(v) && .row_names_info(v, 2L) == 7L
+    })
+    verifier(sprintf("#367 empiler_stocks, `%s` de classe k354 qui ment à empiler_stocks() (identité exacte) : aucun mensonge, aucun avertissement de R, table de six lignes identique à celle du data.frame nu", cas$nom), {
+      a <- sous_cible(body(reel("empiler_stocks")), empiler_stocks(arg_i(), arg_e(), "t"))
+      if (inherits(a$valeur, "condition")) conditionMessage(a$valeur)
+      else if (a$mensonges != 0L) sprintf("%d mensonge(s)", a$mensonges)
+      else !length(a$avertissements) && identical(a$valeur, EMPILE)
+    })
+  }
+  verifier("#367 empiler_stocks, les deux tables de classe k354 qui mentent à empiler_stocks() (identité exacte) : aucun mensonge, table de six lignes identique à celle du data.frame nu", {
+    a <- sous_cible(body(reel("empiler_stocks")), empiler_stocks(k354(I3), k354(E3), "t"))
+    if (inherits(a$valeur, "condition")) conditionMessage(a$valeur)
+    else if (a$mensonges != 0L) sprintf("%d mensonge(s)", a$mensonges)
+    else identical(a$valeur, EMPILE)
+  })
+  tref <- function(x) table_reference(x, "essai", "importee", "test unitaire")
+  verifier("#367 table_reference, jeu de contrôle : table de six lignes admise, classe table_reference",
+           inherits(tref(TREF), "table_reference"))
+  verifier("#367 table_reference, table de trois lignes de classe k354 dont dim() rend zéro ligne, contrôle (copie d'avant, nrow(x)) : mensonge atteint, refus table_vide à tort (« aucune ligne »)", {
+    a <- sous_cible(body(AVANT$table_reference), AVANT$table_reference(k354(TREF[1:3, ]), "essai", "importee", "test unitaire"),
+                    mode = "zero")
+    v <- a$valeur
+    a$mensonges >= 1L && inherits(v, "refus_tablexp") && identical(v$motif, "table_vide")
+  })
+  verifier("#367 table_reference, table de six lignes de classe k354 dont dim() rend zéro ligne, table_reference() réelle (identité exacte) : aucun mensonge, table admise, colonnes et nombre de lignes identiques à ceux du data.frame nu", {
+    a <- sous_cible(body(reel("table_reference")), tref(k354(TREF)), mode = "zero")
+    v <- a$valeur
+    if (inherits(v, "condition")) conditionMessage(v)
+    else if (a$mensonges != 0L) sprintf("%d mensonge(s)", a$mensonges)
+    else inherits(v, "table_reference") && identical(unclass(v), unclass(tref(TREF)))
+  })
+  verifier("#367 table_reference, table vraiment vide (colonnes de longueur 0), table_reference() réelle : refus table_vide conservé",
+           {
+             a <- sous_cible(body(reel("table_reference")), tref(TREF[0L, ]))
+             inherits(a$valeur, "refus_tablexp") && identical(a$valeur$motif, "table_vide") && a$mensonges == 0L
+           })
 })
 verifier("#354 la méthode dim de session est retirée de globalenv()",
          !("dim.k354" %in% ls(globalenv(), all.names = TRUE)))
@@ -303,8 +375,10 @@ lecture_354 <- local({
 # Rend un data.frame (ligne, lecture, fonction) des lectures relevées dans
 # l'expression analysée `ex` (keep.source = TRUE) ; ligne : première ligne de
 # l'instruction qui contient la lecture (srcref des blocs `{`) ; fonction : nom
-# affecté par l'expression de premier niveau qui la contient.
-lectures_dispatch <- function(ex) {
+# affecté par l'expression de premier niveau qui la contient. `symboles` :
+# symboles dont la lecture est relevée (« donnees » par défaut) ; NULL : toute
+# lecture nrow() ou ncol(), quel que soit l'argument (garde de #367).
+lectures_dispatch <- function(ex, symboles = "donnees") {
   sr <- attr(ex, "srcref")
   rel <- list()
   est_base <- function(f, noms) {
@@ -313,8 +387,9 @@ lectures_dispatch <- function(ex) {
       identical(f[[2L]], as.name("base")) && as.character(f[[3L]]) %in% noms
   }
   commence_par_donnees <- function(a) {
+    if (is.null(symboles)) return(TRUE)
     repeat {
-      if (is.name(a)) return(identical(a, as.name("donnees")))
+      if (is.name(a)) return(as.character(a) %in% symboles)
       if (!is.call(a) || length(a) < 2L) return(FALSE)
       if (!(is.name(a[[1L]]) && as.character(a[[1L]]) %in% c("(", "[", "[[", "$", "@"))) return(FALSE)
       a <- a[[2L]]
@@ -390,5 +465,32 @@ verifier("#354 garde C2 : dans R/*.R, une seule lecture nrow(donnees) ou ncol(do
     identical(r$fonction, "controler_lignes_donnees")
   if (admis) TRUE
   else paste("lectures relevées :", paste(sprintf("R/%s:%d %s() dans %s", r$fichier, r$ligne, r$lecture, r$fonction),
+                                          collapse = " ; "))
+})
+
+# --- garde mécanique de #367 (critère C6 du plan de B41) -------------------------
+# empiler_stocks() et table_reference() (R/donnees.R) : aucune lecture nrow() ni
+# ncol(), quel que soit l'argument (alias, boucle sur les tables comprises) ;
+# le nombre de lignes se lit par .row_names_info(x, 2L). Même relevé sur
+# l'arbre du langage que la garde C2 (commentaires et textes de message ignorés).
+verifier("#367 garde, contrôle de la règle sur un texte écrit à la main : nrow() et ncol() relevés quel que soit l'argument (symbole, indiçage, alias), seulement dans la fonction englobante ; .row_names_info(), commentaire et texte de message ignorés", {
+  t <- c("f <- function(a, b) {",
+         "  n <- .row_names_info(a, 2L)  # nrow(a) en commentaire",
+         "  stop(\"nrow(b)\")",
+         "  tab <- b; nrow(tab) + ncol(a[[1L]])",
+         "}",
+         "g <- function(x) !nrow(x)")
+  r <- lectures_dispatch(parse(text = t, keep.source = TRUE), symboles = NULL)
+  att <- data.frame(ligne = c(4L, 4L, 6L), lecture = c("nrow", "ncol", "nrow"), fonction = c("f", "f", "g"),
+                    stringsAsFactors = FALSE)
+  if (identical(r, att)) TRUE
+  else paste("relevé :", paste(sprintf("%d %s %s", r$ligne, r$lecture, r$fonction), collapse = " ; "))
+})
+verifier("#367 garde : aucune lecture nrow() ni ncol() dans empiler_stocks() et table_reference() (R/donnees.R)", {
+  r <- lectures_dispatch(lecture_354$analyser_fichier(file.path(RACINE, "R", "donnees.R"), keep.source = TRUE),
+                         symboles = NULL)
+  r <- r[r$fonction %in% c("empiler_stocks", "table_reference"), ]
+  if (!nrow(r)) TRUE
+  else paste("lectures relevées :", paste(sprintf("R/donnees.R:%d %s() dans %s", r$ligne, r$lecture, r$fonction),
                                           collapse = " ; "))
 })

@@ -1985,7 +1985,10 @@ empiler_stocks <- function(inventaires, evenements, colonne_type) {
                      paste(desc, collapse = " ; ")),
             list(colonne = discordantes))
   }
-  n_i <- nrow(inventaires); n_e <- nrow(evenements)
+  # Nombre de lignes lu sans dispatch (#367 ; précédent de #354, CONTEXT.md,
+  # « Lecture sans dispatch ») : nrow() dispatche sur dim(), qu'une méthode de
+  # classe peut fausser ; .row_names_info(x, 2L) lit les noms de lignes.
+  n_i <- .row_names_info(inventaires, 2L); n_e <- .row_names_info(evenements, 2L)
   noms <- c(ni, ne[!(ne %in% ni)])
   colonnes <- lapply(noms, function(k) {
     ja <- match(k, ni); jb <- match(k, ne)
@@ -2851,7 +2854,9 @@ table_reference <- function(x, nom, statut, source, parametres = NULL, forme_ori
             formuler("Table « %s » : colonne « lx » reçue avec la forme d'origine « qx » ; déclarer forme_origine = « lx ».",
                      nom_cite),
             list(colonnes = "lx", forme_origine = forme_origine))
-  if (!nrow(x)) refuser("donnees", "table_vide", formuler("Table « %s » : aucune ligne.", nom_cite))
+  # Nombre de lignes lu sans dispatch (#367 ; précédent de #354) : nrow()
+  # dispatche sur dim(), qu'une méthode de classe peut fausser.
+  if (!.row_names_info(x, 2L)) refuser("donnees", "table_vide", formuler("Table « %s » : aucune ligne.", nom_cite))
   mal_typees <- c(
     age = !type_conforme(x$age, "entier_positif") || anyNA(x$age),
     sexe = !type_conforme(x$sexe, "categorie") || anyNA(x$sexe),
