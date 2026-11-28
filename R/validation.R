@@ -3494,8 +3494,9 @@ exposition_lignes <- function(lignes, cles, ctx) {
 # contrat : exposition de S seule (additivité), sans garde. Unité tête :
 # têtes touchées T (id_tete des lignes de S), lignes conservées R_t de ces
 # têtes ; garde de réintégration : evaluer_motifs() sur le sous-tableau R_t
-# u S, lignes_tete = toutes ses lignes (indices relatifs), segmentation de
-# la construction, seuls ses motifs de tête lus (ses motifs de ligne, dont
+# u S, lignes_tete = toutes ses lignes (indices relatifs), segmentation et
+# porteur de l'état de départ (ctx$p$transition$etat_de, #380) de la
+# construction, seuls ses motifs de tête lus (ses motifs de ligne, dont
 # contrat_duplique, dépendent du jeu entier) ; une tête qui porte un motif de
 # tête est indéterminée et sort entièrement ; puis deux passages, R_t u S et
 # R_t, sur les têtes restantes. Lignes extraites par la méthode « [ » de la
@@ -3542,7 +3543,7 @@ retrait_contrefactuel <- function(S, cles, ctx) {
     extraites <- ctx$donnees[L, , drop = FALSE]
     controler_lignes_extraites(ctx$donnees, extraites, L, ctx$roles, "importance_exclusions")
     ev <- evaluer_motifs(extraites, ctx$roles, ctx$p$debut, ctx$p$fin, ctx$p$borne,
-                         ctx$segmentation, lignes_tete = seq_along(L))
+                         ctx$segmentation, ctx$p$transition$etat_de, lignes_tete = seq_along(L))
     ti <- unique(idt[L[unique(unlist(ev$motifs[MOTIFS_TETE], use.names = FALSE))]])
     garde <- !(idt[L] %in% ti)
     t_rs <- exposition_lignes(L[garde], cles, ctx)

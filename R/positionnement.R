@@ -215,9 +215,24 @@ hors_plage_attendus <- function(Ec, qx) {
 # avec E^c > 0 n'a lieu qu'à q~ = 0 (taux_table_nul,
 # evenement_sous_taux_nul). Clé `cle` NULL (relation lissee : table
 # construite, aucune table lue) : le message nomme la table construite.
+# Gardes (#375), erreurs de programmation (stop(), jamais un refus) : E^c et
+# q~ finis ; E^c >= 0 et q~ dans [0, 1], dans cet ordre, deux messages. Aucun
+# des trois appelants ne reçoit de valeur hors de ce domaine. E^c : étape
+# exposition (motifs de valeur de la recette agregats, dont
+# exposition_negative, exposition_hors_plage, dates bornées sous les recettes
+# en lignes) et, au comparateur 2, garde G2 de retrait_contrefactuel(). q~ :
+# table_reference() (refus table_qx_non_fini, table_lx_non_fini,
+# table_qx_hors_bornes), appariement (cellule_sans_valeur_table ; comparateur 2 :
+# cellules sans valeur écartées avant l'appel) et, sous lissee, contrat de la
+# table construite (table_construite()).
 # Rend list(taux_table, attendus, etat).
 attendus_cellules <- function(Ec, D, qx, cle, etape) {
   if (!(etape %in% ETAPES_TABLE)) stop("attendus_cellules() : étape inconnue (erreur de programmation).", call. = FALSE)
+  if (!all(is.finite(Ec)) || !all(is.finite(qx)))
+    stop("attendus_cellules() : exposition centrale ou taux de la table non fini (erreur de programmation).", call. = FALSE)
+  if (any(Ec < 0) || any(qx < 0 | qx > 1))
+    stop("attendus_cellules() : exposition centrale négative ou taux de la table hors de [0, 1] (erreur de programmation).",
+         call. = FALSE)
   un <- qx == 1 & Ec > 0
   if (any(un))
     refuser(etape, "taux_table_egal_un",

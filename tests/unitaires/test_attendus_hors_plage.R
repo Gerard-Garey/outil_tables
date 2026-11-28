@@ -2,7 +2,10 @@
 #  tests/unitaires/test_attendus_hors_plage.R : refus attendus_hors_plage
 #  (issue #360 ; spécification d'actuary-approfondi, commentaire 7137107852,
 #  décision du mainteneur P1 (a) du 24/11/2026) et gardes d'erreur de
-#  programmation G1 (smr_comparateur_1()) et G2 (retrait_contrefactuel())
+#  programmation G1 (smr_comparateur_1()) et G2 (retrait_contrefactuel()) ;
+#  gardes d'erreur de programmation de attendus_cellules() sur E^c et q~ non
+#  finis, sur E^c < 0 et sur q~ hors de [0, 1] (issue #375, étendue au domaine
+#  sur l'avis d'actuary)
 #
 #  Natures des attendus (ADR 0007, point 11.4), nommées dans chaque test :
 #  - valeur écrite à la main : constante PLAGE_ATTENDUS, module, motif,
@@ -14,7 +17,9 @@
 #    à état nommé, aucun avertissement de R), juste hors plage refusé ;
 #    comparateur 2 non calculable (attendus_hors_plage, décision du
 #    mainteneur D-a (a) du 25/11/2026) et précédence de ses états ;
-#    gardes G1 et G2 par appel direct.
+#    gardes G1 et G2 par appel direct ; gardes de #375 par appel direct (E^c
+#    ou q~ NA, NaN, Inf, -Inf ; E^c = -1, q~ = -0,01, 1,5, 1 + 1e-15 : erreur
+#    de R, ou valeur rendue sans erreur, selon la valeur, mesuré sur 5b06f86).
 #  Constantes non ASCII des messages attendus écrites en \uXXXX. Graine du
 #  plan 360 (inférieure à 1000, exemptée, tests/controles/graines.R).
 # -----------------------------------------------------------------------------
@@ -299,4 +304,50 @@ verifier("G2 retrait_contrefactuel() : exposition centrale retirée de somme au-
   tous(somme_infinie = g2(erreur_de(avec_expo(c(.Machine$double.xmax, .Machine$double.xmax)))),
        nan = g2(erreur_de(avec_expo(c(NaN, 1)))),
        fini = if (identical(ok$cellules$exposition_centrale_retiree, c(1, 1))) TRUE else "cas fini")
+})
+
+verifier("garde #375 attendus_cellules() : E^c ou q~ NA, NaN, Inf, -Inf -> erreur de programmation de finitude ; E^c < 0 ou q~ hors de [0, 1] -> erreur de programmation de domaine (pas un refus), sous les deux étapes ; témoin fini et bornes admises inchangés", {
+  ac <- tablexp:::attendus_cellules
+  # Messages comparés sur leurs parties ASCII (stop() rend, hors UTF-8, le
+  # caractère accentué du moteur en <U+00E9> ; même précaution que G2).
+  g <- function(e, debut) if (!is.null(e) && !inherits(e, "refus_tablexp") &&
+                              startsWith(conditionMessage(e), debut) &&
+                              endsWith(conditionMessage(e), "(erreur de programmation)."))
+                            TRUE else if (is.null(e)) "aucune erreur" else conditionMessage(e)
+  fini <- function(e) g(e, "attendus_cellules() : exposition centrale ou taux de la table non fini")
+  domaine <- function(e) g(e, "attendus_cellules() : exposition centrale n")
+  # Vrai si tous les cas sont TRUE, sinon les écarts.
+  resume <- function(l) { v <- unlist(l); if (all(v == "TRUE")) TRUE else paste(v[v != "TRUE"], collapse = " ; ") }
+  etapes <- c("validation", "positionnement")
+  non_finis <- c(`NA` = NA_real_, `NaN` = NaN, `Inf` = Inf, `-Inf` = -Inf)
+  # Valeur fautive en 1re cellule, 2e cellule saine. E^c non fini : q~ = 0,01, 0
+  # ou 1 (aucune ne l'esquive) ; q~ non fini : E^c = 1 ou 0.
+  cas_ec <- unlist(lapply(etapes, function(et) lapply(non_finis, function(v) lapply(c(0.01, 0, 1), function(q)
+    fini(erreur_de(ac(c(v, 1), c(1L, 1L), c(q, 0.01), "t", et)))))), recursive = FALSE)
+  cas_qx <- unlist(lapply(etapes, function(et) lapply(non_finis, function(v) lapply(c(1, 0), function(e)
+    fini(erreur_de(ac(c(e, 1), c(1L, 1L), c(v, 0.01), "t", et)))))), recursive = FALSE)
+  # Domaine : E^c = -1 (q~ = 0,01, 0, 1), q~ = -0,01, 1,5 et 1 + 1e-15 (E^c = 1
+  # et 0 ; avec E^c = 1, q~ = 1,5 levait une erreur de R dans
+  # hors_plage_attendus()).
+  cas_dom_ec <- unlist(lapply(etapes, function(et) lapply(c(0.01, 0, 1), function(q)
+    domaine(erreur_de(ac(c(-1, 1), c(1L, 1L), c(q, 0.01), "t", et))))), recursive = FALSE)
+  cas_dom_qx <- unlist(lapply(etapes, function(et) lapply(c(-0.01, 1.5, 1 + 1e-15), function(v) lapply(c(1, 0), function(e)
+    domaine(erreur_de(ac(c(e, 1), c(1L, 1L), c(v, 0.01), "t", et)))))), recursive = FALSE)
+  ok <- ac(c(1, 0, 2), c(1L, 0L, 0L), c(0.01, 0.5, 0), "t", "validation")
+  # Bornes admises, rendues sans erreur : E^c = 0 (pas de 0 x Inf), q~ = 0, q~ = 1
+  # avec E^c = 0 (q~ = 1 avec E^c > 0 : refus taux_table_egal_un, inchangé).
+  bornes <- tryCatch(ac(c(0, 1, 0), c(0L, 1L, 2L), c(0, 0, 1), "t", "positionnement"),
+                     refus_tablexp = function(r) r, error = function(e) e)
+  un <- refus_de(ac(1, 0L, 1, "t", "validation"))
+  tous(Ec = resume(cas_ec), qx = resume(cas_qx), domaine_Ec = resume(cas_dom_ec), domaine_qx = resume(cas_dom_qx),
+       vide = if (identical(ac(numeric(0), integer(0), numeric(0), "t", "validation")$etat, character(0))) TRUE else "vide",
+       # Témoin : A = E^c (-ln(1 - q~)) (même calcul que le moteur), états inchangés.
+       fini = if (identical(ok$attendus, c(1 * -log1p(-0.01), 0, 0)) &&
+                  identical(ok$etat, c("retenue", "sans_exposition", "taux_table_nul"))) TRUE
+              else paste(format(ok$attendus, digits = 17), paste(ok$etat, collapse = ", ")),
+       bornes = if (!inherits(bornes, "condition") &&
+                    identical(bornes$etat, c("sans_exposition", "evenement_sous_taux_nul", "evenement_sans_exposition")) &&
+                    identical(bornes$attendus, c(0, 0, 0))) TRUE
+                else if (inherits(bornes, "condition")) conditionMessage(bornes) else paste(bornes$etat, collapse = ", "),
+       egal_un = controle(un, "validation", "taux_table_egal_un"))
 })

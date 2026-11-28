@@ -125,7 +125,7 @@ for (cas in list(list("vivant -> deces, unité tête, délai 30", VD, ROLES_SIM,
 # --- evaluer_motifs(), argument lignes_tete --------------------------------------
 
 P <- valeurs(VD, PER, 0)
-mot <- function(d, ...) evaluer_motifs(d, ROLES_SIM, P$debut, P$fin, P$borne, "sexe", ...)$motifs
+mot <- function(d, ...) evaluer_motifs(d, ROLES_SIM, P$debut, P$fin, P$borne, "sexe", P$transition$etat_de, ...)$motifs
 M0 <- mot(SC)
 verifier("evaluer_motifs, lignes_tete = NULL (identité exacte) : identical() à l'appel sans l'argument (jeu simulé à défauts)",
          identical(mot(SC, lignes_tete = NULL), M0) && sum(lengths(M0[tablexp:::MOTIFS_TETE])) > 0L)
@@ -219,6 +219,42 @@ verifier("evaluer_motifs, jeu simulé à défauts, lignes_tete = lignes sans id_
     !inherits(m, "error") && identical(m[tablexp:::MOTIFS_LIGNES], M0[tablexp:::MOTIFS_LIGNES]) &&
     sum(lengths(m[tablexp:::MOTIFS_TETE])) > 0L
 })
+
+# --- evaluer_motifs(), argument etat_de (#380, option (c1) ; E2.4) ---------------
+
+# T3 (lignes 3 et 4) dans deux segments (b, c) ; T1 et T2 mono-contrat.
+# Forme de l'appel de la garde de réintégration (lignes_tete = toutes les
+# lignes) et de preparer_donnees() (défaut) ; segmentation par segment.
+B_S <- data.frame(id_contrat = paste0("C", 1:4), id_tete = c("T1", "T2", "T3", "T3"), sexe = c("H", "F", "H", "H"),
+                  date_naissance = D(c("1950-03-15", "1960-07-01", "1945-06-06", "1945-06-06")),
+                  date_entree = D(c("2016-01-01", "2020-03-01", "2016-01-01", "2019-01-01")),
+                  date_sortie = D(c("2019-12-31", NA, "2022-03-01", "2022-03-01")),
+                  cause_sortie = c("rachat", "en_cours", "rachat", "rachat"), segment = c("a", "a", "b", "c"),
+                  stringsAsFactors = FALSE)
+R_S <- c(ROLES_SIM, segment = "segment")
+P_RA <- valeurs(RA, PER, 0)
+mot_s <- function(etat_de, ...) evaluer_motifs(B_S, R_S, P$debut, P$fin, P$borne, c("sexe", "segment"), etat_de, ...)$motifs
+verifier("evaluer_motifs, etat_de lu sur la transition (valeur du catalogue TRANSITIONS) : \"tete\" sous le décès, \"contrat\" sous le rachat",
+         identical(P$transition$etat_de, "tete") && identical(P_RA$transition$etat_de, "contrat"))
+verifier("evaluer_motifs, etat_de = \"tete\" (transition de la personne ; valeur calculée à la main) : tete_segment_incoherent sur les lignes 3 et 4, défaut et lignes_tete = 1:4 (garde)",
+         identical(mot_s("tete")$tete_segment_incoherent, 3:4) &&
+           identical(mot_s("tete", lignes_tete = 1:4)$tete_segment_incoherent, 3:4))
+verifier("evaluer_motifs, etat_de = \"contrat\" (transition du contrat ; valeur calculée à la main) : aucun motif de tête, défaut et lignes_tete = 1:4 (garde : la tête T3 multi-segments n'est pas indéterminée) ; motif au catalogue ; motifs de ligne identiques", {
+  m <- mot_s("contrat"); mg <- mot_s("contrat", lignes_tete = 1:4)
+  identical(names(m), c(tablexp:::MOTIFS_LIGNES, tablexp:::MOTIFS_TETE)) &&
+    vides(m, tablexp:::MOTIFS_TETE) && vides(mg, tablexp:::MOTIFS_TETE) &&
+    identical(m[tablexp:::MOTIFS_LIGNES], mot_s("tete")[tablexp:::MOTIFS_LIGNES])
+})
+verifier("evaluer_motifs, etat_de = \"contrat\" : les autres motifs de tête restent évalués (sexes H, F dans T3 : tete_sexe_incoherent, lignes 3 et 4)",
+         identical(evaluer_motifs(within(B_S, sexe[4] <- "F"), R_S, P$debut, P$fin, P$borne, c("sexe", "segment"),
+                                  "contrat")$motifs$tete_sexe_incoherent, 3:4))
+for (k in list(list("omis", quote(evaluer_motifs(B_S, R_S, P$debut, P$fin, P$borne, "segment"))),
+               list("NA", quote(mot_s(NA_character_))), list("valeur hors catalogue", quote(mot_s("personne"))),
+               list("longueur 2", quote(mot_s(c("tete", "contrat")))), list("facteur", quote(mot_s(factor("tete"))))))
+  verifier(sprintf("evaluer_motifs, etat_de %s : erreur, pas un refus", k[[1]]), {
+    e <- tryCatch({ eval(k[[2]]); NULL }, error = function(e) e)
+    !is.null(e) && !inherits(e, "refus_tablexp") && grepl("etat_de", conditionMessage(e), fixed = TRUE)
+  })
 
 # =============================================================================
 #  Commit (4b) : étape importance_exclusions (spécification, § 1 à § 4 ;
@@ -378,6 +414,25 @@ verifier("condition 2 (constat d'exécution) : evaluer_motifs() appelée avec li
   a <- appels_lignes_tete(construire_table(T1, ROLES_SIM, plan_ie()))
   b <- appels_lignes_tete(construire_table(T1, ROLES_SANS_TETE, plan_ie()))
   if (a > 0L && b == 0L) TRUE else sprintf("unité tête %d appel(s), unité contrat %d", a, b)
+})
+# #380 (c1) : etat_de reçu par evaluer_motifs() à chaque appel, lu sur
+# p$transition$etat_de ; sous le rachat (unité contrat, id_tete déclaré), la
+# garde de réintégration n'est pas atteinte (aucun appel avec lignes_tete).
+etats_appels <- function(expr) {
+  n <- new.env(); n$e <- character(0)
+  suppressMessages(trace("evaluer_motifs", where = ns, print = FALSE,
+                         tracer = bquote(assign("e", c(get("e", envir = .(n)), paste(etat_de, !is.null(lignes_tete))),
+                                                envir = .(n)))))
+  on.exit(suppressMessages(untrace("evaluer_motifs", where = ns)))
+  force(expr)
+  n$e
+}
+verifier("#380 (c1) (constat d'exécution) : evaluer_motifs() reçoit etat_de = \"tete\" sous le décès (preparer_donnees() puis garde, avec lignes_tete) et \"contrat\" sous le rachat, garde non atteinte (unité contrat)", {
+  p_ra <- plan_ie(); p_ra$transition <- RA
+  a <- etats_appels(construire_table(T1, ROLES_SIM, plan_ie()))
+  b <- etats_appels(construire_table(T1, ROLES_SIM, p_ra))
+  if (identical(a[1L], "tete FALSE") && length(a) > 1L && all(a[-1L] == "tete TRUE") && identical(b, "contrat FALSE")) TRUE
+  else sprintf("décès : %s | rachat : %s", paste(a, collapse = ", "), paste(b, collapse = ", "))
 })
 
 # --- T5 : garde de réintégration (valeur calculée à la main) --------------------

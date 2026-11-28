@@ -209,7 +209,7 @@ LIBELLES_MOTIFS <- `Encoding<-`(c(
   contrat_duplique = "identifiant de contrat présent sur plusieurs lignes",
   tete_naissance_incoherente = "dates de naissance différentes au sein d'une même tête",
   tete_sexe_incoherent = "sexes différents au sein d'une même tête",
-  tete_segment_incoherent = "segments différents au sein d'une même tête (segment employé par la segmentation)",
+  tete_segment_incoherent = "segments différents au sein d'une même tête (segment employé par la segmentation, transition de la personne)",
   tete_observee_apres_deces = "tête observée après son premier décès, survenu avant la fin effective de la période",
   age_manquant = "âge manquant",
   age_non_entier = "âge non entier ou non fini",
@@ -1270,6 +1270,17 @@ deces_par_tete <- function(g, sor, cause) {
 # list(motifs) : liste nommée code -> numéros de ligne (1-based, croissants),
 # dans l'ordre MOTIFS_LIGNES puis MOTIFS_TETE (integer(0) pour un motif sans
 # objet).
+#   etat_de     : obligatoire, sans défaut (#380, option (c1)) : porteur de
+#                 l'état de départ de la transition (TRANSITIONS$etat_de,
+#                 p$transition$etat_de chez les deux appelants,
+#                 preparer_donnees() et la garde de réintégration
+#                 d'importance_exclusions). tete_segment_incoherent n'est
+#                 évalué que pour une transition de la personne ("tete") ;
+#                 pour une transition du contrat ("contrat"), le segment est
+#                 traité comme un attribut du contrat (E2.4) et le motif
+#                 reste au catalogue, sans objet. Valeur hors de
+#                 TRANSITIONS$etat_de, ou argument omis : erreur de
+#                 programmation.
 #   lignes_tete : facultatif (#69) ; NULL (défaut) : motifs de tête évalués
 #                 sur les lignes exemptes de motif de ligne ; sinon, numéros
 #                 (integer sans attribut, sans NA ni doublon, dans
@@ -1280,7 +1291,9 @@ deces_par_tete <- function(g, sor, cause) {
 #                 sans identifiant de tête, sans cause de sortie ou sans
 #                 date de sortie hors « en_cours » (motifs non mesurables,
 #                 #69, § 2) est une erreur de programmation.
-evaluer_motifs <- function(donnees, roles, debut, fin, borne, segmentation, lignes_tete = NULL) {
+evaluer_motifs <- function(donnees, roles, debut, fin, borne, segmentation, etat_de, lignes_tete = NULL) {
+  if (!is.character(etat_de) || length(etat_de) != 1L || is.na(etat_de) || !(etat_de %in% TRANSITIONS$etat_de))
+    stop("evaluer_motifs() : etat_de hors de TRANSITIONS$etat_de (erreur de programmation).", call. = FALSE)
   n <- .row_names_info(donnees, 2L)
   if (!is.null(lignes_tete) && (!is.integer(lignes_tete) || !is.null(attributes(lignes_tete)) ||
                                 anyNA(lignes_tete) || anyDuplicated(lignes_tete) ||
@@ -1342,7 +1355,8 @@ evaluer_motifs <- function(donnees, roles, debut, fin, borne, segmentation, lign
       sexe_t <- sexe[propres]; sexe_t[!(sexe_t %in% MODALITES_SEXE)] <- NA
       t$tete_sexe_incoherent <- marquer(groupes_heterogenes(g, sexe_t))
     }
-    if (!is.null(segment) && "segment" %in% segmentation)
+    # Transition de la personne seulement (E2.4 ; #380, option (c1)).
+    if (identical(etat_de, "tete") && !is.null(segment) && "segment" %in% segmentation)
       t$tete_segment_incoherent <- marquer(groupes_heterogenes(g, as.character(segment[propres])))
     # Lecture B d'E2.4 (décision du mainteneur du 16/10/2026) : motif si le
     # premier décès s_d de la tête précède `borne` (= fin - délai + 1) et
@@ -2392,7 +2406,8 @@ preparer_donnees <- function(donnees, roles, p, segmentation, exclusions, recett
   n <- .row_names_info(donnees, 2L)
   if (!n) refuser("donnees", "base_vide", formuler("La base d'observation ne contient aucune ligne."))
   ev <- switch(recette$recette,
-    lignes_dates_completes = evaluer_motifs(donnees, roles, p$debut, p$fin, p$borne, segmentation),
+    lignes_dates_completes = evaluer_motifs(donnees, roles, p$debut, p$fin, p$borne, segmentation,
+                                            p$transition$etat_de),
     agregats = evaluer_motifs_agregats(donnees, roles, p),
     stocks_successifs = evaluer_motifs_stocks(donnees, roles, p, segmentation),
     stop(sprintf("preparer_donnees() : recette « %s » sans évaluation des motifs (erreur de programmation).",

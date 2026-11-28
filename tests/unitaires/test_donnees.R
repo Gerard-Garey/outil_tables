@@ -1902,6 +1902,41 @@ verifier("segments différents dans une tête, segmentation par segment : refus 
 r <- prep(d = d, roles = c(ROLES, segment = "segment"), segmentation = "sexe")
 verifier("segments différents, segment hors segmentation : admis, avertissement role_non_employe",
          "role_non_employe" %in% r$avertissements$code)
+# #380, option (c1) (E2.4 amendée, M616) : pour une transition du contrat
+# (rachat), le segment est traité comme un attribut du contrat ; même jeu
+# (T3 dans les segments b et c), id_tete déclaré, segmentation par segment.
+# Avant (c1) : refus tete_segment_incoherent, lignes 3 et 4, sous le rachat
+# comme sous le décès (constat mesuré à 18905f9 et à 5b06f86).
+R_SEG <- c(ROLES, segment = "segment")
+x <- refus(prep(d = d, roles = R_SEG, segmentation = c("sexe", "segment"), transition = VD))
+verifier("#380 (c1), décès (transition de la personne), segments différents dans une tête : refus tete_segment_incoherent inchangé, lignes 3 et 4",
+         identical(names(x$details$decompte), "tete_segment_incoherent") &&
+           identical(x$details$lignes$tete_segment_incoherent, 3:4))
+r <- prep(d = d, roles = R_SEG, segmentation = c("sexe", "segment"), transition = RA)
+verifier("#380 (c1), rachat (transition du contrat), segments différents dans une tête : aucun refus, aucune ligne exclue, motif au catalogue à 0, unité contrat",
+         identical(r$resultat$numeros_conserves, 1:4) && identical(r$resultat$nombre_lignes_exclues, 0L) &&
+           identical(r$diagnostics$motifs$nombre[r$diagnostics$motifs$motif == "tete_segment_incoherent"], 0L) &&
+           identical(r$resultat$unite_observation, "contrat"))
+r0 <- prep(d = d, roles = R_SEG[names(R_SEG) != "id_tete"], segmentation = c("sexe", "segment"), transition = RA)
+verifier("#380 (c1), rachat : observations identical() à celles de la construction sans id_tete (hors colonne id_tete), même correspondance des lignes",
+         identical(r$resultat$observations[names(r0$resultat$observations)], r0$resultat$observations) &&
+           identical(r$resultat$observation_des_lignes, r0$resultat$observation_des_lignes))
+r <- prep(d = d, roles = R_SEG, segmentation = c("sexe", "segment"), transition = RA,
+          exclusions = "tete_segment_incoherent")
+verifier("#380 (c1), rachat, règle d'exclusion tete_segment_incoherent déclarée : sans objet, aucune ligne exclue",
+         identical(r$resultat$numeros_conserves, 1:4) && identical(r$resultat$nombre_lignes_exclues, 0L))
+# Table construite (exposition, brut) sous le rachat : identical() avec et
+# sans id_tete (identité exacte).
+PLAN_380 <- list(transition = RA, periode = PER, delai_declaration = 0, segmentation = "segment",
+                 etapes = list(donnees = list(exclusions = character(0)),
+                               exposition = list(convention = "plus_fine", par_annee = FALSE),
+                               brut = list(estimateurs = "poisson", niveau = 0.95)))
+x1 <- construire_table(d, R_SEG, PLAN_380)
+x0 <- construire_table(d, R_SEG[names(R_SEG) != "id_tete"], PLAN_380)
+verifier("#380 (c1), rachat + id_tete + segmentation par segment : table construite, exposition et brut identical() à la construction sans id_tete (identité exacte)",
+         identical(x1$etapes$exposition$resultat, x0$etapes$exposition$resultat) &&
+           identical(x1$etapes$brut$resultat, x0$etapes$brut$resultat) &&
+           sum(x1$etapes$exposition$resultat$exposition$evenements) == 1L)
 # F5 : observation après le décès ; F6 : deux décès à dates différentes.
 x <- refus(prep(d = avec(sortie = D(c("2019-12-31", NA, "2022-03-01", "2022-03-15")),
                          cause = c("rachat", "en_cours", "deces", "autre"))))
