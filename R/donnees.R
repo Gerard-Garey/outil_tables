@@ -2403,6 +2403,18 @@ preparer_donnees <- function(donnees, roles, p, segmentation, exclusions, recett
   if (is.null(exclues)) exclues <- integer(0)
   conservees <- if (length(exclues)) donnees[-exclues, , drop = FALSE] else donnees
   numeros <- setdiff(seq_len(n), exclues)
+  # Garde (#372, erreur de programmation, inatteignable par une entrée admise :
+  # controler_lignes_donnees() a imposé l'accord de nrow(), des noms de lignes et
+  # des colonnes) : les numéros conservés et exclus recouvrent exactement les
+  # lignes reçues, une fois chacune. Le nombre de lignes est lu sur une colonne
+  # de rôle, sans dispatch, non sur `n` : une lecture de `n` faussée (état
+  # d'avant #354 : numeros 1:5 pour 4 lignes) fausserait la garde avec elle.
+  L <- longueur_lue(lire_champ(donnees, roles[[1L]]))
+  couverts <- c(numeros, exclues)
+  if (!is.integer(couverts) || anyNA(couverts) || any(couverts < 1L | couverts > L) ||
+      length(couverts) != L || any(numeros %in% exclues))
+    stop(paste("preparer_donnees() : numéros de lignes conservées ou exclues hors des lignes reçues, ou conservées + exclues",
+               "différentes des lignes reçues (erreur de programmation)."), call. = FALSE)
   # Postcondition de l'extraction (#319) : controler_lignes_extraites().
   if (length(exclues)) controler_lignes_extraites(donnees, conservees, numeros, roles)
   if (!length(numeros))

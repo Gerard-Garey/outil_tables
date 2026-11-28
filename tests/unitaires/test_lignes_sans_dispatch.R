@@ -35,6 +35,13 @@
 #  copie d'avant, garde mécanique : aucun nrow() ni ncol() dans ces deux
 #  fonctions (critère C6 du plan de B41).
 #
+#  Suite #372 (B41) : garde de preparer_donnees() (stop(), erreur de
+#  programmation), qui lit le nombre de lignes sur une colonne de rôle et non
+#  sur `n` ; la copie d'avant de #354 l'atteint (même cible, mensonge compté)
+#  et reçoit son erreur, sous les trois recettes ; entrées limites : la garde
+#  ne se déclenche pas (aucune ligne exclue, exclusion partielle) et le refus
+#  aucune_ligne_conservee reste intact (toutes exclues).
+#
 #  Natures des attendus (ADR 0007, point 11.4) : identité exacte (résultat et
 #  fiche sur k354 identical() à ceux de la classe k354 sans cible ; empreinte
 #  des données égale à celle du data.frame nu) ; valeurs écrites à la main
@@ -214,6 +221,13 @@ local({
     })
   }
 
+  # Garde de preparer_donnees() (#372) : erreur de programmation (stop(), ni refus_tablexp ni autre condition
+  # de R). Message reconnu sur ses fragments ASCII (début « preparer_donnees() : num », fin « (erreur de
+  # programmation) ») : hors UTF-8, le message du package n'a pas de marque d'encodage et ne se compare pas
+  # en entier à un littéral du test (mesuré : identical() FALSE sous LC_CTYPE=POSIX, nchar() en octets).
+  garde_372 <- function(x) inherits(x, "error") && !inherits(x, "refus_tablexp") &&
+    grepl("preparer_donnees() : num", conditionMessage(x), fixed = TRUE) &&
+    grepl("(erreur de programmation)", conditionMessage(x), fixed = TRUE)
   # --- evaluer_motifs*() et preparer_donnees() (R/donnees.R) ---
   # Effet d'avant mesuré par site et par recette ; « aucun » : mensonge
   # atteint sans effet observé sur ce jeu (constat sur un jeu, non preuve
@@ -231,24 +245,55 @@ local({
          avant = function(f, J) f(k354(J$d), J$r, J$p, J$seg),
          controle = function(a, J) !inherits(a$valeur, "condition") && length(a$avertissements) >= 1L &&
            identical(a$valeur, tablexp:::evaluer_motifs_stocks(J$d, J$r, J$p, J$seg))),
-    list(nom = "preparer_donnees", jeu = "lignes", effet = "numeros_conserves 1:5 pour 4 lignes (résultat faux silencieux)",
+    # preparer_donnees() : depuis #372, la garde (stop(), erreur de programmation) arrête la copie d'avant
+    # avant tout effet aval ; avant la garde : numeros_conserves 1:5 pour 4 lignes (lignes) et 1:13 pour 12
+    # (stocks), sans erreur, et erreur de R « replacement has 4 rows, data has 5 » (agregats).
+    list(nom = "preparer_donnees", jeu = "lignes", effet = "garde de #372 (numeros 1:5 pour 4 lignes lues sur la colonne de rôle)",
          avant = function(f, J) preparer(f, J),
-         controle = function(a, J) !inherits(a$valeur, "condition") &&
-           identical(a$valeur$resultat$numeros_conserves, 1:5)),
-    list(nom = "preparer_donnees", jeu = "agregats", effet = "erreur de R « replacement has 4 rows, data has 5 »",
+         controle = function(a, J) garde_372(a$valeur)),
+    list(nom = "preparer_donnees", jeu = "agregats", effet = "garde de #372 (numeros 1:5 pour 4 lignes lues sur la colonne de rôle)",
          avant = function(f, J) preparer(f, J),
-         controle = function(a, J) inherits(a$valeur, "error") && !inherits(a$valeur, "refus_tablexp") &&
-           grepl("replacement has 4 rows, data has 5", conditionMessage(a$valeur), fixed = TRUE)),
-    list(nom = "preparer_donnees", jeu = "stocks", effet = "numeros_conserves 1:13 pour 12 lignes (résultat faux silencieux)",
+         controle = function(a, J) garde_372(a$valeur)),
+    list(nom = "preparer_donnees", jeu = "stocks", effet = "garde de #372 (numeros 1:13 pour 12 lignes lues sur la colonne de rôle)",
          avant = function(f, J) preparer(f, J),
-         controle = function(a, J) !inherits(a$valeur, "condition") &&
-           identical(a$valeur$resultat$numeros_conserves, 1:13)))
+         controle = function(a, J) garde_372(a$valeur)))
   for (s in SITES_DONNEES) {
     J <- JEUX[[s$jeu]]
     verifier(sprintf("#354 %s, recette %s, contrôle (copie d'avant, nrow(donnees)) : mensonge atteint, effet d'avant : %s", s$nom, s$jeu, s$effet), {
       a <- sous_cible(body(AVANT[[s$nom]]), s$avant(AVANT[[s$nom]], J))
       a$mensonges >= 1L && isTRUE(s$controle(a, J))
     })
+  }
+  # Garde de #372 inatteignable par une entrée admise : entrées limites de preparer_donnees(), motif
+  # sexe_manquant déclaré exclu, sur le data.frame nu et sur k354 sans cible (honnête). Aucune ligne exclue,
+  # exclusion de la première ligne (recette stocks : propagation aux deux autres lignes de son unité, A,
+  # lignes 1 à 3), toutes les lignes exclues (refus aucune_ligne_conservee). Numéros conservés écrits à la main.
+  LIMITES_372 <- list(lignes = list(aucune = 1:4, premiere = 2:4), agregats = list(aucune = 1:4, premiere = 2:4),
+                      stocks = list(aucune = 1:12, premiere = 4:12))
+  preparer_donnees_372 <- function(d, J)
+    tablexp:::preparer_donnees(d, J$r, J$p, J$seg, "sexe_manquant", tablexp:::controler_roles(d, J$r, J$seg))
+  for (j in names(LIMITES_372)) {
+    J <- JEUX[[j]]; col <- J$r[["sexe"]]
+    for (cl in c("data.frame", "k354")) {
+      limite <- function(cas) {
+        d <- J$d
+        if (cas == "premiere") d[[col]][1L] <- NA
+        if (cas == "toutes") d[[col]] <- rep(NA_character_, nrow(d))
+        if (cl == "k354") d <- k354(d)
+        attrape(preparer_donnees_372(d, J))
+      }
+      for (cas in names(LIMITES_372[[j]]))
+        verifier(sprintf("#372 preparer_donnees, recette %s, entrée %s, cas « %s » : garde silencieuse, numeros_conserves %s (valeurs écrites à la main)",
+                         j, cl, cas, paste(range(LIMITES_372[[j]][[cas]]), collapse = ":")), {
+          x <- limite(cas)
+          if (inherits(x, "condition")) conditionMessage(x)
+          else identical(x$resultat$numeros_conserves, LIMITES_372[[j]][[cas]])
+        })
+      verifier(sprintf("#372 preparer_donnees, recette %s, entrée %s, toutes les lignes exclues : refus aucune_ligne_conservee inchangé (la garde ne s'en mêle pas)", j, cl), {
+        x <- limite("toutes")
+        inherits(x, "refus_tablexp") && identical(x$motif, "aucune_ligne_conservee")
+      })
+    }
   }
   # Couples (fonction, recette) où preparer_donnees() appelle la fonction :
   # une évaluation des motifs par recette, preparer_donnees() sous les trois.
