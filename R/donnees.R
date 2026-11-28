@@ -2412,7 +2412,7 @@ preparer_donnees <- function(donnees, roles, p, segmentation, exclusions, recett
   L <- longueur_lue(lire_champ(donnees, roles[[1L]]))
   couverts <- c(numeros, exclues)
   if (!is.integer(couverts) || anyNA(couverts) || any(couverts < 1L | couverts > L) ||
-      length(couverts) != L || any(numeros %in% exclues))
+      length(couverts) != L || anyDuplicated(couverts) > 0L)
     stop(paste("preparer_donnees() : numéros de lignes conservées ou exclues hors des lignes reçues, ou conservées + exclues",
                "différentes des lignes reçues (erreur de programmation)."), call. = FALSE)
   # Postcondition de l'extraction (#319) : controler_lignes_extraites().

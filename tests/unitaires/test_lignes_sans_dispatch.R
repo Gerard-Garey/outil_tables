@@ -40,7 +40,9 @@
 #  sur `n` ; la copie d'avant de #354 l'atteint (même cible, mensonge compté)
 #  et reçoit son erreur, sous les trois recettes ; entrées limites : la garde
 #  ne se déclenche pas (aucune ligne exclue, exclusion partielle) et le refus
-#  aucune_ligne_conservee reste intact (toutes exclues).
+#  aucune_ligne_conservee reste intact (toutes exclues) ; un numéro conservé en
+#  double compensé par une ligne manquante, sans ligne exclue, reçoit l'erreur
+#  de la garde (copie de preparer_donnees() à numéro en double).
 #
 #  Natures des attendus (ADR 0007, point 11.4) : identité exacte (résultat et
 #  fiche sur k354 identical() à ceux de la classe k354 sans cible ; empreinte
@@ -294,6 +296,35 @@ local({
         inherits(x, "refus_tablexp") && identical(x$motif, "aucune_ligne_conservee")
       })
     }
+  }
+  # Garde de #372, recouvrement « une fois chacune » : copie de preparer_donnees() où, aucune ligne n'étant
+  # exclue, le deuxième numéro conservé reprend le premier (numéros 1, 1, 3, 4, ... : une ligne en double,
+  # la ligne 2 manquante ; longueur, bornes et intersection avec les exclues restent corrects). La condition
+  # d'avant (any(numeros %in% exclues) au lieu de anyDuplicated(couverts) > 0L) laissait passer ce cas.
+  # Remplacement fait sur le langage ; rend NULL si l'affectation de `numeros` n'est pas trouvée exactement une fois.
+  copie_doublon <- function() {
+    reel <- get("preparer_donnees", envir = asNamespace("tablexp"))
+    k <- 0L
+    remplacer <- function(e) {
+      if (identical(e, quote(numeros <- setdiff(seq_len(n), exclues)))) {
+        k <<- k + 1L
+        return(quote({ numeros <- setdiff(seq_len(n), exclues); numeros[2L] <- numeros[1L] }))
+      }
+      for (i in seq_along(e)) if (is.call(e[[i]])) e[[i]] <- remplacer(e[[i]])
+      e
+    }
+    f <- reel
+    body(f) <- remplacer(body(reel))
+    if (k != 1L) NULL else f
+  }
+  DOUBLON_372 <- copie_doublon()
+  verifier("#372 garde, copie de preparer_donnees() à numéro conservé en double formée : une seule affectation de `numeros` remplacée", !is.null(DOUBLON_372))
+  for (j in names(LIMITES_372)) {
+    J <- JEUX[[j]]
+    verifier(sprintf("#372 preparer_donnees, recette %s, aucune ligne exclue, numéro conservé en double compensé par une ligne manquante (numeros 1, 1, 3, ...) : erreur de la garde (stop(), erreur de programmation)", j), {
+      x <- attrape(DOUBLON_372(J$d, J$r, J$p, J$seg, "sexe_manquant", tablexp:::controler_roles(J$d, J$r, J$seg)))
+      garde_372(x)
+    })
   }
   # Couples (fonction, recette) où preparer_donnees() appelle la fonction :
   # une évaluation des motifs par recette, preparer_donnees() sous les trois.
